@@ -3,6 +3,7 @@ fromBox/*
 export_fig2/*
 store/
 store/*
+FMINSEARCHBND/*
 
 # random package
 amd-software-adrenalin-edition-22.10.3-minimalsetup-221105_web
@@ -14,3 +15,4 @@ amd-software-adrenalin-edition-22.10.3-minimalsetup-221105_web
 *.bmp
 *.fig
 *.zip
+*.gif
