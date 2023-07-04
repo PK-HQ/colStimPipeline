@@ -30,8 +30,8 @@ end
 run([mainPath 'users/PK/colStimPipeline/exptListBiasingFull.m'])
 
 %% Define reference and current session
-pipelineMode='';% beta/stable
-analysisType='summary'; %beta/neurometric/stability
+pipelineMode='beta';% beta/stable
+analysisType=''; %summary/beta/neurometric/stability
 
 %for biasing expt
 currentSessID=17;
@@ -44,9 +44,10 @@ analysisSessID=[12 14 15 17 19 20 21 23 24 26 29 31 32 34 37 40]; %10 excluded b
 % Columnar bitmap processing params
 currentSession=datastruct(currentSessID).date;
 alignmentSession=datastruct(alignmentSessID).date;
-gridSize=datastruct(currentSessID).gridSize; %smaller = more rubbish; splits image into NumTiles=512x512/gridSize for adaptive histeq
-gammaCorrFactor=datastruct(currentSessID).gammaCorrFactor; %smaller = more rubbish
-sensitivity=datastruct(currentSessID).sensitivity; % higher = less stringent
+bitmapParams.gridSize=datastruct(currentSessID).gridSize; %smaller = more rubbish; splits image into NumTiles=512x512/gridSize for adaptive histeq
+bitmapParams.gammaCorrFactor=datastruct(currentSessID).gammaCorrFactor; %smaller = more rubbish
+bitmapParams.sensitivity=datastruct(currentSessID).sensitivity; % higher = less stringent
+bitmapParams.desiredOrts=[0 90];
 
 % Datapath
 if ispc
@@ -70,7 +71,7 @@ set(0,'DefaultFigureWindowStyle','docked')
 %% Run the desired bitmap generation pipeline variant
 switch pipelineMode
     case {'beta'}
-        saveOrNot=1;
+        saveOrNot=0;
         plotFlag=1;
         
        %% Fast pipeline (coregisters within session ort map to optostim block green image)
@@ -87,9 +88,7 @@ switch pipelineMode
         dsCurrentSess=datastruct(currentSessID); %fixed, to get ort map projected onto
         
         % Get within session reference orientation map
-        fastSwitch=1;
-        desiredOrts=[0 90];
-        [columnarBitmap,VERpca]=getColumnarBitmapV4(mainPath,dsReferenceSess,dsCurrentSess,gridSize,gammaCorrFactor,sensitivity,desiredOrts,fastSwitch,plotFlag,0);
+        [columnarBitmap,VERpca]=getColumnarBitmapV4(mainPath,dsReferenceSess,dsCurrentSess,bitmapParams,plotFlag);
 
         % Coregister to most current green image
         [columnarBitmapCoregistered]=coregisterBitmap2GreenImgV2(dsReferenceSess,dsCurrentSess,columnarBitmap,plotFlag);
@@ -103,7 +102,8 @@ switch pipelineMode
         
         [projBitmapTRBB]=convertForProjector(dsCurrentSess,columnarBitmapCoregistered,orts,...
             gridSize,gammaCorrFactor,sensitivity,'cam2proj',alignmentTransform,saveOrNot);
-    case {'stable'} %within session
+    1;
+  case {'stable'} %within session
         saveOrNot=1;
         plotFlag=1;
         

@@ -1,4 +1,38 @@
 function filenameStruct=generateFilenames(dataStruct)
+%% --- Names ---
+
+% pdfFilename=filenameStructSession.neurometricPDF;
+% mapsFilename=filenameStructSession.colmapMat;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 % def mainPath
 if ispc
   mainPath='Y:/';
