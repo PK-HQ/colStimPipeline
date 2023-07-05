@@ -1,9 +1,6 @@
 function [diffBitmap,VERpca,PCAExplTotal,pixelDensities,bitmapEnergies]=getColumnarBitmapV4(...
-  mainPath,dataStructRef, dataStructSession,bitmapParams, plotOrNot)
+  mainPath,dataStructRef, dataStructSession,bitmapParams, plotFlag)
 %% Change log
-% 1. Suspect that there are pixels with abnormally high value in 90-165deg patterns, try solve by clipping outliers 
-% outside +-3sd at [-1 ,1]
-
 % 2. F0 footprint crop by using defining ROI per orientation map that is > 70% amplitude, then crop all to that ROI
 
 %% What it does
@@ -16,10 +13,9 @@ function [diffBitmap,VERpca,PCAExplTotal,pixelDensities,bitmapEnergies]=getColum
 % 4. Thresholding, i.e. columnarBitmap
 
 %% Plotting
-disablePlots(plotOrNot)
+disablePlots(plotFlag)
 
 %% Define column selection method
-columnSelectionMethod='MapOrt';
 orangeLightPD=56.1;
 
 %% Get filenames
@@ -41,8 +37,8 @@ imgX=[0 imgDims(1)];
 imgY=[0 imgDims(2)];
 ROIx=[1 imgDims(1)];%[round(.016/.016) imgDims(1)];
 ROIy=[1 imgDims(2)];%[round(3.2/.016) imgDims(2)];
-ROISquareMask=NaN(imgX(2),imgY(2));
-ROISquareMask(ROIy(1):ROIy(2),ROIx(1):ROIx(2))=1;
+%ROISquareMask=NaN(imgX(2),imgY(2));
+%ROISquareMask(ROIy(1):ROIy(2),ROIx(1):ROIx(2))=1;
 
 %n
 nBlanks=size(DataCond,3)-nOrt;
@@ -65,6 +61,21 @@ normVERpca=normalizePCA(VERpca,ROImaskNaN);
 histEqCol=histEqualization(normVERpca,imgDims,bitmapParams.gridSize);
 gammaCol=gammaCorrection(histEqCol,bitmapParams.gammaCorr);
 [diffBitmap,pixelDensity,estDutycycle]=adaptThresholding(gammaCol,bitmapParams.sensitivity,ROImask);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 %% Setup for plot
 figure('name','PCA-ed responses')
@@ -296,7 +307,6 @@ export_fig(filenameStructSession.neurometricPDF,'-pdf','-nocrop');
 
 diffBitmap(:,:,selectedOrt);
 bitmapEnergies=bitmapEnergies(selectedOrt);
-
 
 
 %% Save maps
