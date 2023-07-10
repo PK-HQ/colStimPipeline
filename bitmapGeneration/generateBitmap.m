@@ -1,4 +1,4 @@
-function [VERpca,normVERpca,histEqCol,gammaCol,columnarBitmap,columnarBitmapStats,optostimBitmap]=generateBitmap(selectedOrt,responsePCAImages,Mask,bitmapParams)
+function [VERpca,normVERpca,histEqCol,gammaCol,columnarBitmap,columnarBitmapStats,optostimBitmap]=generateBitmap(selectedOrt,responsePCAImages,ROImask,bitmapParams)
 %% README
 % Function processes PCA-ed columnar responses and outputs optostim bitmaps
 % for biasing experiments that apply optostim as manipulation. Steps are:
@@ -15,9 +15,7 @@ function [VERpca,normVERpca,histEqCol,gammaCol,columnarBitmap,columnarBitmapStat
 
 
 %% Make ROI mask
-ROImask=double(Mask); %convert binary mask to double mask
-ROImaskNaN=ROImask; % convert binary mask to NaN mask
-ROImaskNaN(ROImaskNaN==0)=NaN;
+ROImaskNaN=createNanMask(ROImask);
 
 % get wante
 responseImages=responsePCAImages(:,:,selectedOrt);
@@ -37,7 +35,7 @@ for ortNo=1:size(responseImages,3)
 
     
     %% gamma corr
-    gammaCol(:,:,ortNo)=imadjust(histEqCol(:,:,ortNo),[],[],bitmapParams.gammaCorr);
+    gammaCol(:,:,ortNo)=imadjust(histEqCol(:,:,ortNo),[],[],bitmapParams.gammaCorrFactor);
     
     
      %% do adaptive thresholding
@@ -50,7 +48,7 @@ for ortNo=1:size(responseImages,3)
     %% calculate bitmap statistocs: duty cycle and pixel density
     bitmapNaN=columnarBitmap(:,:,ortNo).*ROImaskNaN;
     columnarBitmapStats.pixelDensity(ortNo)=nansum(bitmapNaN(:))*100/nansum(ROImaskNaN(:));
-    columnarBitmapStats.estDutycycle(ortNo)=sqrt(pixelDensity*2/100)*5/10;
+    columnarBitmapStats.estDutycycle(ortNo)=sqrt(columnarBitmapStats.pixelDensity(ortNo)*2/100)*5/10;
   
     
     

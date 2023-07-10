@@ -46,22 +46,15 @@ DataCondBlankSubt=DataCond(:,:,nBlanks+1:nOrt+nBlanks)-mean(DataCond(:,:,1:nBlan
 
 %% Extract masked VER and pca-ed VER
 %ROI mask
-ROImask=double(Mask);
-ROImaskNaN=ROImask;
-ROImaskNaN(ROImaskNaN==0)=NaN;
-ROItuningMap=ROImask.*MapAmpOrt;
+ROImask=double(Mask); % converts binary columnar mask to double
+ROItuningMap=ROImask.*MapAmpOrt; % converts binary columnar mask into graded amplitude mask
 
 %% Figure params
 nRows=2;
 nCols=6;
 
 %% Processing
-VERpca=extractPCA(selectedOrt,RespCondPCA,ROImaskNaN,ROISquareMask);
-normVERpca=normalizePCA(VERpca,ROImaskNaN);
-histEqCol=histEqualization(normVERpca,imgDims,bitmapParams.gridSize);
-gammaCol=gammaCorrection(histEqCol,bitmapParams.gammaCorr);
-[diffBitmap,pixelDensity,estDutycycle]=adaptThresholding(gammaCol,bitmapParams.sensitivity,ROImask);
-
+[VERpca,normVERpca,histEqCol,gammaCol,columnarBitmap,columnarBitmapStats,optostimBitmap]=generateBitmap(selectedOrt,RespCondPCA,ROImask,bitmapParams);
 
 
 
@@ -89,9 +82,9 @@ plotCounter=plotter(normVERpca,ROItuningMap,selectedOrts,plotIdx,plotCounter,'No
 plotCounter=plotter(histEqCol,ROItuningMap,selectedOrts,plotIdx,plotCounter,'Equalization');
 plotCounter=plotter(gammaCol,ROItuningMap,selectedOrts,plotIdx,plotCounter,'Gamma corr.');
 for i=1:2
-  plotCounter=plotter(diffBitmap(:,:,i),ROItuningMap,selectedOrts(i),plotIdx,plotCounter,['Adapt. threshold', ' (DC=' sprintf('%.2f',estDutycycle(i)) ', ' sprintf('%.1f%%',pixelDensity(i)) ')']);
+  plotCounter=plotter(optostimBitmap(:,:,i),ROItuningMap,selectedOrts(i),plotIdx,plotCounter,['Adapt. threshold', ' (DC=' sprintf('%.2f',estDutycycle(i)) ', ' sprintf('%.1f%%',pixelDensity(i)) ')']);
 end
-
+1;
 
 
 %% 1 Visualize PCA-ed data
