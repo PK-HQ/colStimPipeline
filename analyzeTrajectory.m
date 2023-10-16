@@ -51,7 +51,7 @@ if isfile(filenameStructCurrent.Intg) % Check if intg response file exist
             method='manual';
     end
     % Coregister
-    [imgReferenceCoreg,coregStats,transformParams]=coregisterGreenImages(imgReference,imgTarget,method,filenameStructCurrent,Mask);
+    [imgReferenceCoreg,coregStats,transformParams]=coregisterGreenImages(dataStructReference,dataStructCurrent,Mask);
     % transform and define ROI mask
     ROImask=double(Mask);
     ROImask=double(imwarp(ROImask,transformParams,'OutputView',imref2d(size(imgTarget))));

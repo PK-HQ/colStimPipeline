@@ -1,8 +1,8 @@
-function plotCounter=plotter(dataMat,mask,selectedOrts,plotIdx,plotCounter,titleStr,nRows,nCols)
+function plotCounter=plotter(hAx,dataMat,mask,selectedOrts,plotIdx,plotCounter,titleStr,nRows,nCols)
 Ort=[0 90];
 imgDims=size(dataMat(:,:,1));
 imgX=[0 imgDims(1)];
-imgY=[0 imgDims(2)]
+imgY=[0 imgDims(2)];
 for ortNo=1:length(selectedOrts)
   axes(hAx(plotIdx(plotCounter)));
   img=dataMat(:,:,ortNo);
@@ -23,9 +23,6 @@ end
 
 
 
-;
-
 
 upFontSize(14,.015)
-set(h,'FontSize',16)
 end

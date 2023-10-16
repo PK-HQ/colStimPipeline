@@ -25,23 +25,21 @@ if ispc
 elseif contains(getenv('HOSTNAME'),'psy.utexas.edu')
   mainPath='/eslab/data/';
 end
-
 %open([mainPath 'users/PK/colStimPipeline/exptListBiasingFull.m'])
 run([mainPath 'users/PK/colStimPipeline/exptListBiasingFull.m'])
 
 %% Define reference and current session
-pipelineMode='beta';% beta/stable
-analysisType=''; %summary/beta/neurometric/stability
+pipelineMode='';% beta/stable
+analysisType='psychfit'; %summary/psychfit/beta/neurometric/stability
 
 %for biasing expt
-currentSessID=17;
+currentSessID=92;
+%for analysis
+analysisSessID=fliplr([93 92 90 89 88 87 84 83 81 79 78 74 73 72 67 66 65 64 62 59 51 50]);%sort([83 82 81 79 78 77 76 74 73 72 67 66 65 64 62 59 58 51 50],'ascend'); %63 %[50 51]; %fliplr([43 44 45 47 48, 52 53 54 57 58 59 62 63 64 65 66]); %[12 14 15 17 19 20 21 23 24 26 29 31 32 34 37 40]; %17; %10 excluded because baseline different
+%[79 78 77 76 74 73 72 68 67 66 65 64 62 59 58 51 50]
+% Columnar bitmap processing params
 referenceSessID=datastruct(currentSessID).referenceSessionEntryNo; %choose ID with a session and run containing orientation map
 alignmentSessID=datastruct(currentSessID).alignmentSessionEntryNo;
-
-%for analysis
-analysisSessID=[12 14 15 17 19 20 21 23 24 26 29 31 32 34 37 40]; %10 excluded because baseline different
-%
-% Columnar bitmap processing params
 currentSession=datastruct(currentSessID).date;
 alignmentSession=datastruct(alignmentSessID).date;
 bitmapParams.gridSize=datastruct(currentSessID).gridSize; %smaller = more rubbish; splits image into NumTiles=512x512/gridSize for adaptive histeq
@@ -71,14 +69,15 @@ set(0,'DefaultFigureWindowStyle','docked')
 %% Run the desired bitmap generation pipeline variant
 switch pipelineMode
     case {'beta'}
-        saveOrNot=0;
+        saveFlag=0;
+        saveFlagBMP=1;
         plotFlag=1;
         
-       %% Fast pipeline (coregisters within session ort map to optostim block green image)
+        %% Fast pipeline (coregisters within session ort map to optostim block green image)
         % Get correction for camera-projector alignment
         % imregtform of orignal and recovered bitmap, apply to correct for
         % camera-projector alignment
-        % open projectorCameraCalibration
+        open projectorCameraCalibration
         
         % Get projector-camera alignment transformation matrix
         load([alignmentSessionFolder 'alignmentTransform.mat'],'alignmentTransform')
@@ -88,20 +87,22 @@ switch pipelineMode
         dsCurrentSess=datastruct(currentSessID); %fixed, to get ort map projected onto
         
         % Get within session reference orientation map
-        [columnarBitmap,VERpca]=getColumnarBitmapV4(mainPath,dsReferenceSess,dsCurrentSess,bitmapParams,plotFlag);
+        [columnarBitmap,VERpca,columnarmapStats]=getColumnarBitmapV4(mainPath,dsReferenceSess,dsCurrentSess,bitmapParams, ...
+          plotFlag, saveFlag);
 
         % Coregister to most current green image
-        [columnarBitmapCoregistered]=coregisterBitmap2GreenImgV2(dsReferenceSess,dsCurrentSess,columnarBitmap,plotFlag);
+        [columnarBitmapCoregistered, columnarPCAsCoregistered]=coregisterBitmap2GreenImgV2(dsReferenceSess,dsCurrentSess, ...
+          columnarBitmap,VERpca,plotFlag,saveFlag);
 
         % Account for PRF
         %?
         
         % Correct for camera-projector alignment
-        orts=0:15:165;
+        orts=[0 90];%0:15:165;
         HE=1000;
         
-        [projBitmapTRBB]=convertForProjector(dsCurrentSess,columnarBitmapCoregistered,orts,...
-            gridSize,gammaCorrFactor,sensitivity,'cam2proj',alignmentTransform,saveOrNot);
+        [projBitmapTRBB,nBlobs,medianBlobAreas]=convertForProjector(dsReferenceSess,dsCurrentSess,columnarBitmapCoregistered,orts,...
+            bitmapParams.gridSize,bitmapParams.gammaCorrFactor,bitmapParams.sensitivity,'cam2proj',alignmentTransform,saveFlagBMP,saveFlag);
     1;
   case {'stable'} %within session
         saveOrNot=1;
@@ -139,7 +140,7 @@ switch pipelineMode
         if ~exist(bmpPath, 'dir')
             mkdir(bmpPath)
         end
-
+        saveOrNot=1; % save bitmap
         [projBitmapTRBB]=convertForProjector(dsCurrentSess,columnarBitmapCoregistered,orts,...
             HE,gammaCorrFactor,thresholdPrctile,'cam2proj',alignmentTransform,saveOrNot);
 
@@ -147,83 +148,24 @@ end
 
 %% Run the desired analysis pipeline variant
 switch analysisType
-    case {'beta'}        
-        for sessionID=[4]%1:numel(analysisSessID)%1:numel(analysisSessID)%1:numel(analysisSessID)
-            tic
-            currentSessID=analysisSessID(sessionID);
-            dsCurrentSess=datastruct(currentSessID); %fixed, to get ort map projected onto
-            dsReferenceSess=datastruct(dsCurrentSess.referenceSessionEntryNo);
-            alignmentSession=datastruct(dsCurrentSess.alignmentSessionEntryNo).date;
-
-            if ispc
-              switch getenv('COMPUTERNAME')
-                case {'LA-CPSD077020WD'} %ARC RM4
-                    alignmentSessionFolder=['D:/Chip' alignmentSession '/'];
-                case {'LA-CPSA07019WD'} %ARC RM5
-                    alignmentSessionFolder=[mainPath 'Chip/Chip' alignmentSession '/'];
-                case {'SEIDEMANN2PANAL'} % CPS L4
-                    alignmentSessionFolder=[mainPath 'Chip/Chip' alignmentSession '/'];
-                    currentSessionFolder=[mainPath 'Chip/Chip' currentSession '/'];
-              end
-            elseif contains(getenv('HOSTNAME'),'psy.utexas.edu')
-              alignmentSessionFolder=[mainPath 'Chip/Chip' alignmentSession '/'];
-              currentSessionFolder=[mainPath 'Chip/Chip' currentSession '/'];
-            end
-            
-            saveFlag=0;
-            plotFlag=0;
-            isSummary=1;
-            
-           %% Fast pipeline (coregisters within session ort map to optostim block green image)
-            % Get correction for camera-projector alignment
-            % imregtform of orignal and recovered bitmap, apply to correct for
-            % camera-projector alignment
-            % open projectorCameraCalibration
-
-            % Get projector-camera alignment transformation matrix
-            load([alignmentSessionFolder 'alignmentTransform.mat'],'alignmentTransform')
-
-
-            % Get within session reference orientation map
-            fastSwitch=1;
-            desiredOrts=[0 90];
-            
-            %TESTING
-            analyzeTrajectory(dsReferenceSess,dsCurrentSess)
-            
-            %{
-            [columnarBitmap,VERpca,PCAExplTotal,pixelDensities,powerDensities]=getColumnarBitmapV4(dsReferenceSess,dsCurrentSess,gridSize,gammaCorrFactor,sensitivity,...
-                desiredOrts,fastSwitch,plotFlag,isSummary);
-            
-            % Coregister to most current green image
-            [columnarBitmapCoregistered, columnarPCAsCoregistered]=coregisterBitmap2GreenImgV2(dsReferenceSess,dsCurrentSess,columnarBitmap,VERpca,plotFlag);
-            
-            [visualr,visualrRatio,PCAr,PCArRatio,optoIntensity]=assessOptoEffect2(dsReferenceSess,dsCurrentSess,columnarBitmapCoregistered,columnarPCAsCoregistered,saveFlag);
-            
-            % --- Neurometric biasing ---
-            % Opto similarity vs visual
-            visualrCont(sessionID,1:2)=visualr;
-            visualrRatiosCont(sessionID,1:2)=visualrRatio;
-            
-            PCArCont(sessionID,1:2)=PCAr;
-            PCArRatiosCont(sessionID,1:2)=PCArRatio;
-           
-            % Opto intensity vs visual
-            optoIntensityCont(sessionID,1:4)=optoIntensity; %2x overall mean, 2x peak mean     
-            %}
-            
-             
-        end
     case {'summary'}        
         for sessionID=1:numel(analysisSessID)%1:numel(analysisSessID)%1:numel(analysisSessID)%1:numel(analysisSessID)
             tic
-            
+            saveFlag=0;
+            saveFlagBMP=0;
+            plotFlag=1;
             % define session IDs, session meta info
             currentSessID=analysisSessID(sessionID);
             dsCurrentSess=datastruct(currentSessID); %fixed, to get ort map projected onto
             dsReferenceSess=datastruct(dsCurrentSess.referenceSessionEntryNo);
             alignmentSession=datastruct(dsCurrentSess.alignmentSessionEntryNo).date;
+            
+            bitmapParams.gridSize=datastruct(currentSessID).gridSize; %smaller = more rubbish; splits image into NumTiles=512x512/gridSize for adaptive histeq
+            bitmapParams.gammaCorrFactor=datastruct(currentSessID).gammaCorrFactor; %smaller = more rubbish
+            bitmapParams.sensitivity=datastruct(currentSessID).sensitivity; % higher = less stringent
+            bitmapParams.desiredOrts=[0 90];
 
+            
             % define alignment and current session data folders
             if ispc
               switch getenv('COMPUTERNAME')
@@ -240,10 +182,7 @@ switch analysisType
               currentSessionFolder=[mainPath 'Chip/Chip' currentSession '/'];
             end
             
-            
-            saveFlag=1;
-            plotFlag=1;
-            isSummary=1;
+
             
            %% Fast pipeline (coregisters within session ort map to optostim block green image)
             % Get correction for camera-projector alignment
@@ -258,40 +197,43 @@ switch analysisType
             % Get within session reference orientation map
             fastSwitch=1;
             desiredOrts=[0 90];
-            
-            %TESTING            
-            [columnarBitmap,VERpca,PCAExplTotal,pixelDensities,powerDensities]=getColumnarBitmapV4(dsReferenceSess,dsCurrentSess,gridSize,gammaCorrFactor,sensitivity,...
-                desiredOrts,fastSwitch,plotFlag,isSummary);
-            
-            % Coregister to most current green image
-            [columnarBitmapCoregistered, columnarPCAsCoregistered]=coregisterBitmap2GreenImgV2(dsReferenceSess,dsCurrentSess,columnarBitmap,VERpca,plotFlag);
+                
+          % Get within session reference orientation map
+          [columnarBitmap,VERpca,columnarmapStats]=getColumnarBitmapV4(mainPath,dsReferenceSess,dsCurrentSess,bitmapParams, ...
+            plotFlag, saveFlag);
 
-            % Account for PRF
-            %?
+          % Coregister to most current green image
+          [columnarBitmapCoregistered, columnarPCAsCoregistered]=coregisterBitmap2GreenImgV2(dsReferenceSess,dsCurrentSess, ...
+            columnarBitmap,VERpca,plotFlag,saveFlag);
 
-            % Correct for camera-projector alignment
-            orts=0:15:165;
-            HE=1000;
+          % Account for PRF
+          %?
 
-            [projBitmapTRBB,nBlobs,medianBlobAreas]=convertForProjector(dsCurrentSess,columnarBitmapCoregistered,orts,...
-                gridSize,gammaCorrFactor,sensitivity,'cam2proj',alignmentTransform,saveFlag);
+          % Correct for camera-projector alignment
+          orts=[0 90];%0:15:165;
+          HE=1000;
 
-            [blurEstimate,gfpStaticMax,mcherryStaticMax]=QCstatic(dsCurrentSess,plotFlag);
+          [projBitmapTRBB,bitmapStats,bitmapStats2]=convertForProjector(dsReferenceSess,dsCurrentSess,columnarBitmapCoregistered,orts,...
+              bitmapParams.gridSize,bitmapParams.gammaCorrFactor,bitmapParams.sensitivity,'cam2proj',alignmentTransform,saveFlagBMP,saveFlag);
+      1;
+            % Static images
+            [blurEstimate,gfpStaticMax,mcherryStaticMax]=QCstatic(dsCurrentSess,plotFlag,saveFlag);
             
             % slope and intercept
             % --- Behavioral biasing ---
-            [deltaSorted,muSorted,sigmaSorted]=analyzeBiasingBlock(dsCurrentSess,saveFlag);
-           
-            [visualr,visualrRatio,PCAr,PCArRatio,optoIntensity]=assessOptoEffect2(dsReferenceSess,dsCurrentSess,columnarBitmapCoregistered,columnarPCAsCoregistered,saveFlag);
+            [betaSorted,muSorted,sigmaSorted]=analyzeBiasingBlock(dsCurrentSess,saveFlag,'full');
+            % --- Neurometric biasing (integrated responses) --- 
             
-            analyzeTrajectory(dsReferenceSess,dsCurrentSess)
-
+            %[visualr,visualrRatio,PCAr,PCArRatio,optoIntensity]=assessOptoEffect2(dsReferenceSess,dsCurrentSess,columnarBitmapCoregistered,columnarPCAsCoregistered,saveFlag);
+            % --- Neurometric biasing (dynamic frame-wise responses) --- 
+            %analyzeTrajectory(dsReferenceSess,dsCurrentSess)
+            
 
            %% Measures (one per measure, per session)
 
            % --- Imaging quality ---
             % Green image blur
-            blurEstimateCont(sessionID,1)=blurEstimate;
+            %blurEstimateCont(sessionID,1)=blurEstimate;
             % GFP static intensity
             gfpStaticMaxCont(sessionID,1)=gfpStaticMax;
             % mCherry static intensity
@@ -299,48 +241,116 @@ switch analysisType
 
             % --- Stimulation power and positioning ---
             % Orientation map quality
-            PCAExplTotalCont(sessionID,1)=PCAExplTotal;
+            %PCAExplTotalCont(sessionID,1)=PCAExplTotal;
             % Pixel density = Percentage pixels on within ROI
-            pixelDensitiesCont(sessionID,1:2)=nonzeros(pixelDensities);
+            %pixelDensitiesCont(sessionID,1:2)=nonzeros(columnarmapStats.pixDensity);
             % Power density = Percentage pixels on within ROI * power * ON-OFF
-            powerDensitiesCont(sessionID,1:2)=powerDensities;
+            %powerDensitiesCont(sessionID,1:2)=powerDensities;
             % No. of blobs
-            nBlobsCont(sessionID,1:2)=nonzeros(nBlobs);
+            %nBlobsCont(sessionID,1:2)=nonzeros(bitmapStats.nBlobs);
             % Size of blobs (median)
-            medianBlobAreasCont(sessionID,1:2)=nonzeros(medianBlobAreas);
+            %contourDC(sessionID,1:2)=nonzeros(bitmapStats.medianBlobAreas);
+            contourColumns(sessionID,1:2)=nonzeros(bitmapStats.nBlobs);
+            contourPixels(sessionID,1:2)=bitmapStats.contourPix;
+            contourPixelDensities(sessionID,1:2)=bitmapStats.contourPixDensity;
+
+            %pixDensityContour
+            %estDutycycleContour
+            %pixDensityTotal
+            %estDutycycleTotal
+            
             % Correlation with bitmap
             
             % --- Behavioral biasing ---
-            deltaSortedCont(sessionID,:)=deltaSorted;
+            betaSortedCont(sessionID,:)=betaSorted;
             muSortedCont(sessionID,:)=muSorted;
             sigmaSortedCont(sessionID,:)=sigmaSorted;
 
 
             % --- Neurometric biasing ---
             % Opto similarity vs visual
-            visualrCont(sessionID,1:2)=visualr;
-            visualrRatiosCont(sessionID,1:2)=visualrRatio;
+            %visualrCont(sessionID,1:2)=visualr;
+            %visualrRatiosCont(sessionID,1:2)=visualrRatio;
             
-            PCArCont(sessionID,1:2)=PCAr;
-            PCArRatiosCont(sessionID,1:2)=PCArRatio;
+            %PCArCont(sessionID,1:2)=PCAr;
+            %PCArRatiosCont(sessionID,1:2)=PCArRatio;
            
             % Opto intensity vs visual
-            optoIntensityCont(sessionID,1:4)=optoIntensity; %2x overall mean, 2x peak mean         
-            
+            %optoIntensityCont(sessionID,1:4)=optoIntensity; %2x overall mean, 2x peak mean         
+
             CF
             toc
         end
+
+        getTemporalStimParams
+
+
+        save([mainPath 'Chip/Meta/summary/neurometricsMinimalColumns' num2str(numel(analysisSessID)) '.mat'],...
+            'analysisSessID',...
+            'contourColumns','contourPixels','contourPixelDensities',...
+            'betaSortedCont','muSortedCont','sigmaSortedCont',...
+            'temporalTotal','temporalDC','temporalON','tbl')
+
+        tbl=array2table([analysisSessID' contourColumns (contourPixels.*temporalON') betaSortedCont],...
+            'VariableNames',{'EntryID' 'Column-H' 'Column-V', 'Energy-H', 'Energy-V','Beta-H','Beta-Baseline','Beta-V'})
+       %% Minimal columns
+        % Define x y z, averaged across 2 patterns       
+        zPower=contourPixels.*temporalON'; 
+        xColumns=contourColumns;
+        yBeta=betaSortedCont(:,[1 3]);
+        
+        
+        metricStr='beta';
+        plotMinimumColumns(xColumns,yBeta,zPower,analysisSessID,metricStr)
+        metricStr='deltabeta';
+        plotMinimumColumns(xColumns,yBeta,zPower,analysisSessID,metricStr)
+        
+        
+                plotMinimumColumns3d(xColumns,yBeta,zPower,analysisSessID)
+
+        
+        
+        
+        
+        
+        zPower(controlBlocks)=NaN; %control
+        outlierBlocks=zPower<70000 | zPower>100000; zPower(controlBlocks)=NaN; zPower(outlierBlocks)=NaN;
+        zPower(isoutlier(zPower))=NaN; exclBlocks=isnan(zPower); zPower(exclBlocks)=[]; zPower(controlBlocks)=0;
+        xColumns(exclBlocks)=NaN;
+        yDeltaBeta(exclBlocks)=NaN;
+        xColumns(isnan(xColumns))=[];yDeltaBeta(isnan(yDeltaBeta))=[];
+        
+        
+        yline(0,'--','HandleVisibility','off'); hold on % y=0 line
+        h=scatter(xColumns,yDeltaBeta,100,zPower,'filled','MarkerEdgeColor','k','LineWidth',2)%,'w','o','filled','MarkerEdgeColor','k','HandleVisibility','on','LineWidth',2);
+        hold off
+        yticks([-.5:.1:1]); ylim([-.2 1]);  
+        xlim([0 40])
+        upFontSize(14,.0025)
+        title('Columns x biasing effect')
+        xlabel('Average of columns for H- and V-optostim bitmap','FontName','Arial')
+        ylabel('\Delta\beta_{V-H optostim}','FontName','Arial','FontSize',18)
+        legend({'\Delta\beta_{V-H optostim}'})
+        
+        
+        
+        %% other params
         PCArConOpto=1./(PCArRatiosCont./PCArCont);       
         PCArInconOpto=PCArCont;
         PCArFullCont=[PCArConOpto(:,1) PCArInconOpto(:,:) PCArConOpto(:,2)];
-        save([mainPath 'Chip/Meta/summary/neurometrics20230413.mat'],'visualrCont','visualrRatiosCont','PCArCont','PCArFullCont','PCArRatiosCont','optoIntensityCont','blurEstimateCont','gfpStaticMaxCont','mcherryStaticMaxCont','PCAExplTotalCont','pixelDensitiesCont','powerDensitiesCont','nBlobsCont','medianBlobAreasCont','deltaSortedCont','muSortedCont','sigmaSortedCont')
+        %save([mainPath 'Chip/Meta/summary/neurometricsMinimalColumns.mat'],'visualrCont','visualrRatiosCont','PCArCont','PCArFullCont','PCArRatiosCont','optoIntensityCont','blurEstimateCont','gfpStaticMaxCont','mcherryStaticMaxCont','PCAExplTotalCont','pixelDensitiesCont','powerDensitiesCont','nBlobsCont','medianBlobAreasCont','betaSortedCont','muSortedCont','sigmaSortedCont')
         1;    
         
-
+        %% Analyze parameters across sessions
+        analyzeParameters
+        
+        %% Plot histogram
+        plotBiasingHistogram(mainPath,psychometric,saveFlag)
+        
         %% Beta
-        x_baseline=deltaSortedCont(:,2);
-        y_hopto=deltaSortedCont(:,1);
-        y_vopto=deltaSortedCont(:,3);
+        x_baseline=betaSortedCont(:,2);
+        y_hopto=betaSortedCont(:,1);
+        y_vopto=betaSortedCont(:,3);
         
         figure
         h1=scatter(x_baseline,y_hopto,160,'b','v','filled','MarkerEdgeColor','k'); hold on
@@ -366,8 +376,8 @@ switch analysisType
 
         
        %% Beta subtracted
-        x_baseline=deltaSortedCont(:,2);
-        y_vhopto=deltaSortedCont(:,3)-deltaSortedCont(:,1);
+        x_baseline=betaSortedCont(:,2);
+        y_vhopto=betaSortedCont(:,3)-betaSortedCont(:,1);
         
         figure
         h1=scatter(x_baseline,y_vhopto,160,[138,43,226]/255,'diamond','filled','MarkerEdgeColor','k'); hold on
@@ -445,12 +455,11 @@ switch analysisType
         upFontSize(24,0.012)
         1;        
         
-        
         %Robust fit
-        plotRobustFit(deltaSortedCont(:,1)-deltaSortedCont(:,3),optoIntensityCont(:,1)-optoIntensityCont(:,2))
+        plotRobustFit(betaSortedCont(:,1)-betaSortedCont(:,3),optoIntensityCont(:,1)-optoIntensityCont(:,2))
         
         %% Do all cross-session statistics here
-        %plotBiasingHistogram(deltaSortedCont)
+        %plotBiasingHistogram(betaSortedCont)
     
     
         
@@ -461,20 +470,32 @@ switch analysisType
             dsReferenceSess=datastruct(dsCurrentSess.referenceSessionEntryNo);
             alignmentSession=datastruct(dsCurrentSess.alignmentSessionEntryNo).date;
 
-            saveFlag=0;
-            plotFlag=0;
+            saveFlag=1;
+            plotFlag=1;
             isSummary=1;
 
             % slope and intercept
             % --- Behavioral biasing ---
-            [deltaSorted,muSorted,sigmaSorted]=analyzeBiasingBlock(dsCurrentSess,saveFlag);
-
+            [betaSorted,muSorted,sigmaSorted]=analyzeBiasingBlock(dsCurrentSess,saveFlag,'psychfit');
             % Behavioral biasing
-            deltaSortedCont(sessionID,:)=deltaSorted;
+            betaSortedCont(sessionID,:)=betaSorted;
             muSortedCont(sessionID,:)=muSorted;
             sigmaSortedCont(sessionID,:)=sigmaSorted;
+            %nColumnsCont(sessionID,:)=dsCurrentSess.nColumns;
         end
-                
+        % stats
+        ranksum(betaSortedCont(:,3),betaSortedCont(:,1),'tail','both')
+        
+        % plot minimum columns
+        hBeta=betaSortedCont(:,1);
+        vBeta=betaSortedCont(:,3);
+        deltaBeta=round(vBeta-hBeta,2);
+        figure('name','Minimum columns for biasing')
+        scatter(nColumnsCont,deltaBeta,100,'ok','linewidth',2)
+        xticks([1 5:5:40])
+        xlim([0 40])
+        upFontSize(13,0.005)
+        1;
     case {'stability'}
         referenceSessID=12; % 1-VSD or 4-GCaMP 20220920
         dsReferenceSess=datastruct(referenceSessID);

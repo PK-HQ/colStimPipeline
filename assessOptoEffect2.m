@@ -17,32 +17,24 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     
     % set ROI mask
     ROImask=double(Mask);
-    ROImask=double(imwarp(ROImask,transformParams,'OutputView',imref2d(size(imgTarget))));
+    ROImask=double(imwarp(ROImask,transformParams,'OutputView',imref2d(size(ROImask))));
     ROImaskNaN=ROImask;
     ROImaskNaN(ROImaskNaN==0)=NaN;
 
     %% Get usable trials, indexed appropriately to match cortical response images (find trials in TS with success or failure code only)
-    [trialIdx,images,condIDs]=getUsableTrials(TS,DataTrial);
-
+    [trials,images,condIDs]=getUsableTrials(TS,DataTrial);
+    
     %% Define conditions, plot order
     nOptoConds=numel(find(TS.Header.Conditions.TypeCond==3));
     blank=condIDs.blankConds;
     nblank=numel(blank);
     nConds=6;
-    
-    % Define condition indices
-    V0=condIDs.baselineConds(1:numel(condIDs.baselineConds)/2);%[1:3:nOptoConds/2]+nblank; 
-    V90=condIDs.baselineConds(numel(condIDs.baselineConds)/2 + 1 : numel(condIDs.baselineConds));%[nOptoConds/2+1:3:nOptoConds]+nblank;
-    V0O0=condIDs.opto0Conds(1:numel(condIDs.opto0Conds)/2);
-    V90O0=condIDs.opto0Conds(numel(condIDs.opto0Conds)/2 + 1 : numel(condIDs.opto0Conds));
-    V0O90=condIDs.opto90Conds(1:numel(condIDs.opto90Conds)/2);
-    V90O90=condIDs.opto90Conds(numel(condIDs.opto90Conds)/2 + 1 : numel(condIDs.opto90Conds));
-  
+
     % Define plot order
-    plotOrder=[V0' V0O0' V0O90' V90' V90O0' V90O90']-nblank;
+    plotOrder=[condIDs.V0' condIDs.V0O0' condIDs.V0O90' condIDs.V90' condIDs.V90O0' condIDs.V90O90']-nblank;
     plotOrder=reshape(plotOrder',[1 nOptoConds]); %to plot correctly with tight_subplot
-    [condTrialIdx,~]=find(trialIdx.All==blank);
-    blankTrialsAvg=mean(images.Average(:,:,condTrialIdx),3);
+    [condtrials,~]=find(trials.All==blank);
+    blankTrialsAvg=mean(images.Average(:,:,condtrials),3);
 
     
     
@@ -54,8 +46,8 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     
     %% 1. Spatial bandpass to extract columnar-scale responses
     for optoCondID=1:nOptoConds%2:nConds+1
-        [condTrialIdx,~]=find(trialIdx.All==optoCondID+nblank); %to get opto cond ID, use 1:nOptoConds + number of blank
-        condTrialAvg(:,:,optoCondID)=mean(images.Average(:,:,condTrialIdx),3)-blankTrialsAvg;
+        [condtrials,~]=find(trials.All==optoCondID+nblank); %to get opto cond ID, use 1:nOptoConds + number of blank
+        condTrialAvg(:,:,optoCondID)=mean(images.Average(:,:,condtrials),3)-blankTrialsAvg;
         columnarResponse(:,:,optoCondID)=FilterFermi2D(condTrialAvg(:,:,optoCondID), 0.8, 3, TS.Header.Imaging.SizePxl);
     end
 
@@ -111,22 +103,22 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     
     % --- Get subtracted images ---
     % Difference between max contrast visual stimuli (visual 0 - visual 90
-    visual_difference=columnarResponse(:,:,V90(end)-nblank)-columnarResponse(:,:,V0(end)-nblank);
+    visual_difference=columnarResponse(:,:,condIDs.V90(end)-nblank)-columnarResponse(:,:,condIDs.V0(end)-nblank);
 
     % Difference between PCA images
-    pca_difference=columnarPCAsCoregistered(:,:,7)-columnarPCAsCoregistered(:,:,1);
+    pca_difference=columnarPCAsCoregistered(:,:,2)-columnarPCAsCoregistered(:,:,1);
 
     % Difference between opto 0 - opto 90
     %opto_difference_visual0=(columnarResponse(:,:,V0O90(1)-nblank)-columnarResponse(:,:,V0O0(1)-nblank));
     %opto_difference_visual90=(columnarResponse(:,:,V90O90(1)-nblank)-columnarResponse(:,:,V90O0(1)-nblank));
     %opto_difference=(opto_difference_visual0+opto_difference_visual90)/2;
     
-    opto_0=((columnarResponse(:,:,V0O0(1))+columnarResponse(:,:,V90O0(1)))-nblank)./2;
-    opto_90=((columnarResponse(:,:,V0O90(1))+columnarResponse(:,:,V90O90(1)))-nblank)./2;
+    opto_0=((columnarResponse(:,:,condIDs.V0O0(1))+columnarResponse(:,:,condIDs.V90O0(1)))-nblank)./2;
+    opto_90=((columnarResponse(:,:,condIDs.V0O90(1))+columnarResponse(:,:,condIDs.V90O90(1)))-nblank)./2;
     opto_difference = opto_0-opto_90;
 
     % bmp difference
-    bitmap_difference=columnarBitmapCoregistered(:,:,7)-columnarBitmapCoregistered(:,:,1);
+    bitmap_difference=columnarBitmapCoregistered(:,:,2)-columnarBitmapCoregistered(:,:,1);
 
     % compile
     condTrialAvgDiffColumnar(:,:,1)=visual_difference;
@@ -134,7 +126,9 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     condTrialAvgDiffColumnar(:,:,3)=bitmap_difference;
     condTrialAvgDiffColumnar(:,:,4)=opto_difference;
 
-    
+    maskedImgs=condTrialAvgDiffColumnar.*ROImaskNaN;
+    climUpper=roundup(max(maskedImgs(:)),10^-3);
+    climLower=-roundup(min(maskedImgs(:)),10^-3);
     % --- Plot ---
     for plotNo=1:4
         img=condTrialAvgDiffColumnar(:,:,plotNo);
@@ -187,9 +181,9 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     %% Calculate correlation and intensity of each opto+vis condition with baseline+vis
     % --- Calculate correlation & intensity between each condition's average image to a reference visual baseline
     % (max contrast) ---  
-    conditionSet=[V0O0,V90O0,V0O90,V90O90,V0,V90];
-    conditionSetversusV0=[V0O90];
-    conditionSetversusV90=[V90O0];
+    conditionSet=[condIDs.V0O0,condIDs.V90O0,condIDs.V0O90,condIDs.V90O90,condIDs.V0,condIDs.V90];
+    conditionSetversusV0=[condIDs.V0O90];
+    conditionSetversusV90=[condIDs.V90O0];
     for i=1:length(conditionSet)
         img=columnarResponse(:,:,conditionSet(i)-nblank).*ROImask;
         imgRef=visual_difference.*ROImask;%columnarBitmap(:,:,1).*ROImask;
@@ -229,13 +223,13 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     V90xPCAr=pca_correlation(sectionLength*5 + 1 : sectionLength*6);
     
     
-    %% Plotting correlation of responses to visual and PCA difference reference map
+    %% Plotting correlation of responses to visual and PCA difference reference map  
     % --- Visual reference map ---
     figure('name','Correlation: Responses vs visual & PCA reference ')
     % Plot versus visual 0-90°
     nCols=2;
-    nRows=1;
-    [hAx,~]=tight_subplot(nRows,nCols,[.1 .1]);
+    nRows=2;
+    [hAx,~]=tight_subplot(nRows,nCols,[.1 .15],[.05 .15],[.04 .04]);
     axes(hAx(1))
     
     % Plot baselines: visual 0 and 90, without opto
@@ -260,9 +254,10 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     upFontSize(14,.01)
     ylim([-1 1])
 
+        
+    
     % --- PCA reference map ---
     axes(hAx(2))
-    
     % Plot baselines: visual 0 and 90, without opto
     plot(stimCon,V0xPCAr,'b-','LineWidth',2,'Marker','o','MarkerSize',10,'MarkerFaceColor','w','MarkerEdgeColor','k','DisplayName','Vis-0'); hold on;
     plot(stimCon,V90xPCAr,'r-','LineWidth',2,'Marker','o','MarkerSize',10,'MarkerFaceColor','w','MarkerEdgeColor','k','DisplayName','Vis-90'); hold on;
@@ -285,6 +280,34 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     hLeg.FontSize=11;
     [~,hSupLabel]=suplabel({'Correlation between opto-evoked and desired response'},'t',[.08 .08 .84 .84]);
     set(hSupLabel,'FontSize',16)
+    
+    % --- Delta PCA ---
+        % --- PCA reference map ---
+    axes(hAx(4))
+    % Plot baselines: visual 0 and 90, without opto
+    %plot(stimCon,V0xPCAr,'b-','LineWidth',2,'Marker','o','MarkerSize',10,'MarkerFaceColor','w','MarkerEdgeColor','k','DisplayName','Vis-0'); hold on;
+    %plot(stimCon,V90xPCAr,'r-','LineWidth',2,'Marker','o','MarkerSize',10,'MarkerFaceColor','w','MarkerEdgeColor','k','DisplayName','Vis-90'); hold on;
+    
+    % Plot congruent: visual 0 and 90, with congruent opto
+    plot(stimCon,O0V0xPCAr-V0xPCAr,'b--','LineWidth',2,'Marker','v','MarkerSize',10,'MarkerFaceColor','b','MarkerEdgeColor','k','DisplayName','Opto-0 + Vis-0'); hold on;
+    plot(stimCon,O90V90xPCAr-V90xPCAr,'r--','LineWidth',2,'Marker','^','MarkerSize',10,'MarkerFaceColor','r','MarkerEdgeColor','k','DisplayName','Opto-90 + Vis-90'); hold on;
+
+    % Plot incongruent: visual 0 and 90, with incongruent opto
+    plot(stimCon,O90V0xPCAr-V90xPCAr,'b:','LineWidth',2,'Marker','^','MarkerSize',10,'MarkerFaceColor','r','MarkerEdgeColor','k','DisplayName','Opto-90 + Vis-0'); hold on;
+    plot(stimCon,O0V90xPCAr-V0xPCAr,'r:','LineWidth',2,'Marker','v','MarkerSize',10,'MarkerFaceColor','b','MarkerEdgeColor','k','DisplayName','Opto-0 + Vis-90'); hold on;
+
+    % title and labels
+    title({'Subtracted PCA response', sprintf('Flashed 4Hz grating (S.F.: 2cpd, Con.: %.0f%%)',100)},'FontWeight', 'Normal')
+    xlim([min(stimCon) max(stimCon)])
+    ylim([-1 1]);
+    upFontSize(14,.01)
+
+    % cosmetic
+    hLeg.FontSize=11;
+    [~,hSupLabel]=suplabel({'Correlation between opto-evoked and desired response'},'t',[.08 .08 .84 .84]);
+    set(hSupLabel,'FontSize',16)
+    
+    
     if saveFlag
         export_fig(pdfFilename,'-pdf','-nocrop','-append');
     end
@@ -317,17 +340,17 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     %% Plotting intensity of responses to visual and PCA difference reference map
 
     % Intensity of opto 90 vs visual 0
-    for i=1:length(V0O90)
-        img=columnarResponse(:,:,V0O90(i)-nblank).*ROImask;
-        imgRef=columnarResponse(:,:,V0(i)-nblank).*ROImask;
+    for i=1:length(condIDs.V0O90)
+        img=columnarResponse(:,:,condIDs.V0O90(i)-nblank).*ROImask;
+        imgRef=columnarResponse(:,:,condIDs.V0(i)-nblank).*ROImask;
         [~,~,~,intensityPrct]=calculateSimilarity(img,imgRef);
         opto90IntensityFull(i)=intensityPrct;
     end
     
     % Intensity of opto 0 vs visual 90
-    for i=1:length(V90O0)
-        img=columnarResponse(:,:,V90O0(1)-nblank).*ROImask;
-        imgRef=columnarResponse(:,:,V90(i)-nblank).*ROImask;
+    for i=1:length(condIDs.V90O0)
+        img=columnarResponse(:,:,condIDs.V90O0(1)-nblank).*ROImask;
+        imgRef=columnarResponse(:,:,condIDs.V90(i)-nblank).*ROImask;
         [~,~,~,intensityPrct]=calculateSimilarity(img,imgRef);
         opto0IntensityFull(i)=intensityPrct;
     end
@@ -338,7 +361,7 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     figure('name','Opto 90 intensity')
     % Plot versus visual 0-90°
     nCols=5;
-    nRows=numel(V0O90);    
+    nRows=numel(condIDs.V0O90);    
     [hAx,~]=tight_subplot(nRows,nCols,[.045 .045]);
     
     % get cortical response, and reference
@@ -346,10 +369,10 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     
     % --- Matched visual, incongruent opto vs visual ---
     % Intensity of opto 90 vs visual 0
-    for i=1:length(V0O90)
+    for i=1:length(condIDs.V0O90)
         % get cortical response, and reference
-        img=columnarResponse(:,:,V0O90(i)-nblank).*ROImaskNaN;
-        imgRef=columnarResponse(:,:,V0(end)-nblank).*ROImaskNaN;
+        img=columnarResponse(:,:,condIDs.V0O90(i)-nblank).*ROImaskNaN;
+        imgRef=columnarResponse(:,:,condIDs.V0(end)-nblank).*ROImaskNaN;
         
         % get image as percentage of reference
         imgPrct=100*(img - imgRef) ./ imgRef;        
@@ -397,7 +420,7 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     figure('name','Opto 0 intensity')
     % Plot versus visual 0-90°
     nCols=5;
-    nRows=numel(V0O90); 
+    nRows=numel(condIDs.V0O90); 
     [hAx,~]=tight_subplot(nRows,nCols,[.045 .045]);
     
     % get cortical response, and reference
@@ -405,10 +428,10 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     
     % --- Matched visual, incongruent opto vs visual ---
     % Intensity of opto 90 vs visual 0
-    for i=1:length(V90O0)
+    for i=1:length(condIDs.V90O0)
         % get cortical response, and reference
-        img=columnarResponse(:,:,V90O0(i)-nblank).*ROImaskNaN;
-        imgRef=columnarResponse(:,:,V90(end)-nblank).*ROImaskNaN;
+        img=columnarResponse(:,:,condIDs.V90O0(i)-nblank).*ROImaskNaN;
+        imgRef=columnarResponse(:,:,condIDs.V90(end)-nblank).*ROImaskNaN;
         
         % get image as percentage of reference
         imgPrct=100*(img - imgRef) ./ imgRef;        

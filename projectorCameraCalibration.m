@@ -7,21 +7,21 @@ set(0,'DefaultFigureWindowStyle','docked')
 
 %% Get estimated bitmap
 % set current session
-currentSession='20230209';
-thresholdBmpEst=99;
+currentSession='20230815';
+thresholdBmpEst=99;%99;
 % set bmp folder (that you used to project)
-referenceBMPfolder='20221104';
-referenceBMPOrt=0;
-referenceBMPGamma='G050';
-
+referenceBMPfolder='20230804';%'20230802';%'20221104';
+referenceBMPOrt=0;%90;
+referenceBMPGamma='G120';%'G050'; %'G050';
 
 % ----- Load original bmp -----t
-bmpOriginalFilename=['X:\PK\ColSeries\' referenceBMPfolder '\O' num2str(referenceBMPOrt,'%05.f') 'HE1000' referenceBMPGamma 'T09900.bmp'];
+bmpOriginalFilename=['X:\PK\ColSeries\' referenceBMPfolder '\O' num2str(referenceBMPOrt*100,'%05.f') 'HE0032' referenceBMPGamma 'S00001.bmp'];
+%['X:\PK\ColSeries\' referenceBMPfolder '\O' num2str(referenceBMPOrt,'%05.f') 'HE1000' referenceBMPGamma 'T09900.bmp'];
 bmpOriginal=double(imread(bmpOriginalFilename));
 
 % ----- Load projected response, threshold it to get estimated bmp -----
 responseOriginalfolder=['D:\Chip' currentSession '\'];
-responseOriginalFilename=[responseOriginalfolder 'calib50.bmp'];%'cal100_binned.bmp']; %[responseOriginalfolder 'calibration_binned_gainX2.bmp'];
+responseOriginalFilename=[responseOriginalfolder 'calib100.bmp'];% 'calib50.bmp'];
 dataSaveFolder=responseOriginalfolder;
 responseOriginal=double(imread(responseOriginalFilename));
 responseOriginalHE=adapthisteq(rescale(responseOriginal,0,1),'NumTiles',size(responseOriginal)./16,'Range','full');     %histEqImg=histeq(rescaled,1000);
@@ -38,9 +38,12 @@ dataStruct(entryNo).modality='GCaMP';
 dataStruct(entryNo).bmpOriginal=bmpOriginalFilename;
 dataStruct(entryNo).responseOriginal=responseOriginalFilename;
 
+%[bmpEstimated]=convertForProjector(dataStruct(entryNo),responseOriginalFilt,referenceBMPOrt,...
+%1,1,1,'cam2proj',[],0);
 
-[bmpEstimated]=convertForProjector(dataStruct(entryNo),responseOriginalFilt,referenceBMPOrt,...
-1,1,1,'cam2proj',[],0);
+[bmpEstimated,~,~]=convertForProjector(dataStruct(entryNo),dataStruct(entryNo),responseOriginalFilt,referenceBMPOrt,...
+    1,1,1,'cam2proj',[],0);
+
 % ----- Plot both original and estimated -----
 figure
 [hA,~]=tight_subplot(2,2);
@@ -52,25 +55,61 @@ imgsc(bmpEstimated)
 title('bmpEstimated')
 
 %% Get transformation matrix
+bmpEstimated=rescale(double(bmpEstimated)); %.*ROImask
+
+%optimizer
+regParams.PyramidLevels=3;
+[optimizer,metric] = imregconfig('multimodal');
+
+% Stage 1 = fast rigid (rotate translate)
+%optimizer.MaximumIterations = 500;
+optimizer.InitialRadius = 6.25*10^-4;
+optimizer.GrowthFactor = 1.05;
+transformType='rigid';
+transformCoarse = imregtform(bmpEstimated,bmpOriginal,transformType,optimizer,metric,'DisplayOptimization',false,...
+'PyramidLevels',regParams.PyramidLevels);
+
+% Stage 2 = slow affine (rotate translate scale skew)
+%optimizer.MaximumIterations = 1000;
+
+regParams.PyramidLevels=3;       
+optimizer.InitialRadius = 6.25*10^-3;
+optimizer.GrowthFactor = 1.05;       
+transformType='similarity';
+alignmentTransform = imregtform(bmpEstimated,bmpOriginal,transformType,optimizer,metric,'DisplayOptimization',false,...
+'PyramidLevels',regParams.PyramidLevels,'InitialTransformation',transformCoarse);
+%bmpEstimatedTransformed = imwarp(bmpEstimated,alignmentTransform,'OutputView',imref2d(size(bmpEstimated)));
+
+regParams.PyramidLevels=3;       
+optimizer.InitialRadius = 6.25*10^-3;
+optimizer.GrowthFactor = 1.05;       
+transformType='affine';
+alignmentTransform = imregtform(bmpEstimated,bmpOriginal,transformType,optimizer,metric,'DisplayOptimization',false,...
+'PyramidLevels',regParams.PyramidLevels,'InitialTransformation',alignmentTransform);
+bmpEstimatedTransformed = imwarp(bmpEstimated,alignmentTransform,'OutputView',imref2d(size(bmpEstimated)));
+
+
+%{
 % ----- coregister estimated and original bitmap -----
 [optimizer,metric] = imregconfig('multimodal');
-optimizer.MaximumIterations = 1000;
+%optimizer.MaximumIterations = 1000;
 regParams.PyramidLevels=3;
 transformType='similarity';
 alignmentTransform = imregtform(bmpEstimated,bmpOriginal,transformType,optimizer,metric,'DisplayOptimization',false,...
 'PyramidLevels',regParams.PyramidLevels);
 % ----- apply transform -----
 bmpEstimatedTransformed = imwarp(bmpEstimated,alignmentTransform,'OutputView',imref2d(size(bmpEstimated)));
-
-%{
-transformType='similarity';
-transformParams = imregtform(bmpEstimatedTransformed,bmpOriginal,transformType,optimizer,metric,'DisplayOptimization',false,...
-'PyramidLevels',regParams.PyramidLevels);
-% ----- apply transform -----
-bmpEstimatedTransformed = imwarp(bmpEstimatedTransformed,transformParams,'OutputView',imref2d(size(bmpEstimated)));
 %}
-% ----- get transform params -----
 
+
+
+
+
+
+
+
+% ----- get transform params -----
+figure
 transformCorrPost = corrcoef(bmpOriginal,bmpEstimatedTransformed);
 transformCorrPre = corrcoef(bmpOriginal,bmpEstimated);
 coregStats.Similarity = transformCorrPost(1,2);
@@ -92,8 +131,11 @@ title(sprintf('Post-coregistration, %.2f', coregStats.Similarity))
 %% Apply to c
 transformParamsOriginal=alignmentTransform;
 
-[bmpEstimated]=convertForProjector(dataStruct(entryNo),responseOriginalFilt,referenceBMPOrt,...
-1,1,1,'cam2proj',transformParamsOriginal,0);
+%[bmpEstimated]=convertForProjector(dataStruct(entryNo),responseOriginalFilt,referenceBMPOrt,...
+%1,1,1,'cam2proj',transformParamsOriginal,0);
+
+[bmpEstimated,~,~]=convertForProjector(dataStruct(entryNo),dataStruct(entryNo),responseOriginalFilt,referenceBMPOrt,...
+    1,1,1,'cam2proj',transformParamsOriginal,0);
 
 % ----- Plot both original and estimated -----
 figure

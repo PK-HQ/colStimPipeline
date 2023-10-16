@@ -193,7 +193,7 @@ ylim([-.75 .75]);addSkippedTicks(-.75,.75,.25,'y');
 yline(0,'k--')
 upFontSize(14,0.005);
 %suplabel('Session-wise psychometric and neurometric data','t',[.08 .08 .84 .78]);
-export_fig(pdfFilename,'-pdf','-nocrop');
+%export_fig(pdfFilename,'-pdf','-nocrop');
 
 
 
@@ -288,7 +288,7 @@ ylim([-1 1]);addSkippedTicks(-1,1,.25,'y');
 upFontSize(14,0.005);
 xlim([0 16])
 suplabel('Session-wise \Delta psychometric and neurometric data','t',[.08 .08 .84 .78]);
-export_fig(pdfFilename,'-pdf','-nocrop','-append');
+%export_fig(pdfFilename,'-pdf','-nocrop','-append');
 
 
 
@@ -364,7 +364,7 @@ end
 1;
 suplabel('Read-write parameters on biasing (\Delta\beta_{V})','t',[.08 .08 .84 .76]);
 upFontSize(14,0.005);
-export_fig(pdfFilename,'-pdf','-nocrop','-append');
+%export_fig(pdfFilename,'-pdf','-nocrop','-append');
 
 %% Linear regression (Bias and parameters, H)
 figure('name','Regression, H-optostim')
@@ -425,7 +425,7 @@ end
 1;
 suplabel('Read-write parameters on biasing (\Delta\beta_{H})','t',[.08 .08 .84 .76]);
 upFontSize(14,0.005);
-export_fig(pdfFilename,'-pdf','-nocrop','-append');
+%export_fig(pdfFilename,'-pdf','-nocrop','-append');
 
 
 %% Linear regression (Bias and parameters, V-H)
@@ -486,8 +486,8 @@ for measure=1:size(predictors_x_VH,1)-1
 end
 suplabel('Read-write parameters on biasing (\Delta\beta_{V-H})','t',[.08 .08 .84 .76]);
 upFontSize(14,0.005);
-export_fig(pdfFilename,'-pdf','-nocrop','-append');
-
+%export_fig(pdfFilename,'-pdf','-nocrop','-append');
+1;
 %% Multivariate regression
 %{
 set1=[3, ... %PCA expl

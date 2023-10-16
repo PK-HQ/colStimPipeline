@@ -57,7 +57,6 @@ beta = param(5);
 lapseLower = param(6);
 lapseUpper = param(7);
 logLikelihood  = costFunction([muLower sigmaLower muUpper sigmaUpper beta lapseLower lapseUpper],x,y);%Cost_Function([alpha beta bias 0],deltaOrientation,y,yInverse);
-[muLower sigmaLower muUpper sigmaUpper beta lapseLower lapseUpper]
 %% Plot fitted curve with scatter plot overlay
 threshold=plotFitCurve([muLower sigmaLower muUpper sigmaUpper beta lapseLower lapseUpper],logLikelihood,x,y,...
    sessionID,markerColor,markerType);

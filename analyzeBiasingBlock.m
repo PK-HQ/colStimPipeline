@@ -1,8 +1,11 @@
-function [deltaSorted,muSorted,sigmaSorted]=analyzeBiasingBlock(dsCurrentSess,saveFlag)
+function [betaSorted,muSorted,sigmaSorted]=analyzeBiasingBlock(dsCurrentSess,saveFlag,saveType)
 %% Main script to run all behavioral biasing analyses
 filenameStructCurrent=generateFilenames(dsCurrentSess);
-pdfFilename=filenameStructCurrent.neurometricPDF;
-
+if strcmp(saveType,'psychfit')
+    pdfFilename=filenameStructCurrent.psychfitPDF;
+elseif strcmp(saveType,'full')
+    pdfFilename=filenameStructCurrent.neurometricPDF;
+end
 %% Figure behavior
 set(0,'DefaultFigureWindowStyle','docked')
 taskName='optostim';
@@ -37,14 +40,45 @@ nSessions=1;
 plotCurve=1;
 plotThreshold=1;
 plotBias=1;
-dataInputDir = dsCurrentSess;
-[deltaSorted,muSorted,sigmaSorted]=plotPsychometricOptostimV4(dataInputDir,taskName,...
+if isempty(filenameStructCurrent.baselinerun) % all opto and baseline conds in same block
+    figure('Name','Psychometrics'); hold on
+    runData=load(filenameStructCurrent.TS);
+    [betaSorted,muSorted,sigmaSorted]=plotPsychometricOptostimV4(dsCurrentSess,runData,taskName,...
     [plotCurve,plotThreshold,plotBias]);
-upFontSize(18,0.005)
-export_fig(pdfFilename,'-pdf','-nocrop','-append');
+    xticks(-100:10:100)
+    hold off
+    xtickangle(gca,0)
+    upFontSize(18,0.005)
+    axis square
+    switch saveFlag
+      case {1}
+        export_fig(pdfFilename,'-pdf','-nocrop','-append');
+    end
+else  % opto and baseline conds in separate block
+    runData=load(filenameStructCurrent.TS);
+    baselineData=load(filenameStructCurrent.baselinerun);
+    figure('Name','Psychometrics'); hold on
+    [betaBaseline,muBaseline,sigmaBaseline]=plotPsychometricOptostimV4(dsCurrentSess,baselineData,taskName,...
+    [plotCurve,plotThreshold,plotBias]); hold on
+    [betaOptostim,muOptostim,sigmaOptostim]=plotPsychometricOptostimV4(dsCurrentSess,runData,taskName,...
+    [plotCurve,plotThreshold,plotBias]);
+    betaSorted=[betaOptostim(2) betaBaseline(2) betaOptostim(1)];
+    muSorted=[muOptostim(2) muBaseline(1) muOptostim(1)];
+    sigmaSorted=[sigmaOptostim(2) sigmaBaseline(1) sigmaOptostim(1)];
+    xticks(-100:10:100)
+    hold off
+    xtickangle(gca,0)
+    upFontSize(18,0.005)
+    axis square
+    switch saveFlag
+      case {1}
+        export_fig(pdfFilename,'-pdf','-nocrop','-append');
+    end
+end
+
 
 for stimcond=1:3
-    fprintf('Cond %.0f: %.2f (%.2f)\n',stimcond,mean(deltaSorted(:,stimcond)), std(deltaSorted(:,stimcond)))
+    fprintf('Cond %.0f: %.2f (%.2f)\n',stimcond,mean(betaSorted(:,stimcond)), std(betaSorted(:,stimcond)))
 end
 
 end

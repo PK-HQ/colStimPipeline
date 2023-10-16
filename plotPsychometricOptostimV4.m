@@ -1,4 +1,4 @@
-function [deltaSorted,muSorted,sigmaSorted]=plotPsychometricOptostimV4(dataDir,taskName,plotFlags)
+function [betaSorted,muSorted,sigmaSorted]=plotPsychometricOptostimV4(dataStruct,runData,taskName,plotFlags)
 %% Plots psychometric curves, thresholds, biases across sessions per monkey
 %analysis params
 gaborEccentricityWanted=1.46;%1.46;%5;
@@ -7,8 +7,8 @@ gaborSFWanted=6;%6;%4
 
 fprintf('Analysis: Z=%g, SF=%g, E=%g \n',gaborSizeWanted,gaborSFWanted,gaborEccentricityWanted)
 
-filenameStruct=generateFilenames(dataDir);
-TSFilename=filenameStruct.TS;
+%filenameStruct=generateFilenames(dataDir);
+%TSFilename=filenameStruct.TS;
 
 %cd(dataDir)
 %% Plot raw psychometric curve per session
@@ -21,14 +21,13 @@ end
 
 % For each session get all runs
 
-figure;hold on
 
 %pdf filename
 %pdfFilename=[dataDir 'M' monkeyIDs{monkey} 'Z' num2str(gaborSizeWanted*100,'%05g') 'S' num2str(gaborSFWanted*100,'%05g')...
 %   'E' num2str(gaborEccentricityWanted*100,'%05g') 'N' num2str(nSessions,'%03g')];
 
 %load single run data from datafolder
-runData=load(TSFilename);
+%runData=load(TSFilename);
 
 if isfield(runData.TS.Header.Conditions,'GaborSize')%'GaborSize')
     switch taskName
@@ -102,36 +101,56 @@ if isfield(runData.TS.Header.Conditions,'GaborSize')%'GaborSize')
         fprintf('V-90 optostim: %f %% vertical reports\n\n',...
             prct90opto)
         %
+        
+        %% Fit psychometric function here
+        nOptoConds=size(conds0,1);
         mkrCond={'o','v','^'};
-
         % colormap
         cmap=fireice;
-        cmap=cmap([22 1+10 43-10],:);
-        %newcolors = {'black','black','blue','blue','red','red'};
-        %colororder(newcolors)
-        for condSet=1:3 %baseline, opto0, opto90
+        if nOptoConds==3 %when optostim and baseline are in same blocks
+            mkrCond={'o','v','^'};
+            cmap=cmap([22 1+10 43-10],:); %black, blue red
+        elseif nOptoConds==2 %when optostim and baseline are in different blocks
+            mkrCond={'v','^'};
+            cmap=cmap([1+10 43-10],:); %blue & red
+        elseif nOptoConds==1 %when optostim and baseline are in different blocks
+            mkrCond={'o'};
+            cmap=cmap(22,:); %black
+        end
+
+        %init
+        beta=nan(1,3);
+        mu=nan(1,3);
+        sigma=nan(1,3);
+
+        for condSet=1:nOptoConds %baseline, opto0, opto90
             conds2extract=[conds0(condSet,:), conds90(condSet,:)]; %[-5 -12 -30] [5 12 30]
-            deltaOrientation=gaborCon(conds2extract);
+            betaOrientation=gaborCon(conds2extract);
             percentHorReport=100-vertReportPrctData(conds2extract);
             percentVertReport=vertReportPrctData(conds2extract);
             nTrials=completedData(conds2extract);
 
             % Maximum likelihood fit with a generalized gaussian fun
-            %[muFit, betaFit, sigmaFit, Lapse, Likelihood] = FitPsyML(deltaOrientation,percentVertReport,percentHorReport,'plot')
+            %[muFit, betaFit, sigmaFit, Lapse, Likelihood] = FitPsyML(betaOrientation,percentVertReport,percentHorReport,'plot')
                        
-            [~,betaFit,muFit,sigmaFit] = fitPsyDualCDFv2(deltaOrientation,percentVertReport,dataDir.date,cmap(condSet,:),mkrCond{condSet});
-            %[~,betaFit,muFit,sigmaFit] = fitPsyDualCDFv3(deltaOrientation,percentVertReport,dataDir.date,cmap(condSet,:),mkrCond{condSet});
-            delta(condSet)=betaFit;
+            %[~,betaFit,muFit,sigmaFit] = fitPsyDualCDFv2(betaOrientation,percentVertReport,dataDir.date,cmap(condSet,:),mkrCond{condSet});
+            [betaOrientation,percentVertReport]=mergeZeros(betaOrientation,percentVertReport);
+            [~,betaFit,muFit,sigmaFit,param,x,y] = fitPsyDualCDFv3(betaOrientation,percentVertReport,dataStruct.date,cmap(condSet,:),mkrCond{condSet});
+            fprintf('mu=%.2f, sigma=%.2f, beta=%.2f, lapseLower=%.2f, lapseUpper=%.2f\n',param(1),param(2),param(3),param(4),param(5))
+
+            beta(condSet)=betaFit;
             mu(condSet)=muFit;
             sigma(condSet)=sigmaFit;
+            contrasts(:,condSet)=x;
+            vertPrct(:,condSet)=y;
         end
 
-        deltaSorted=[delta(2) delta(1) delta(3)];
+        betaSorted=[beta(2) beta(1) beta(3)];
         muSorted=[mu(2) mu(1) mu(3)];
         sigmaSorted=[sigma(2) sigma(1) sigma(3)];
         % Add title
-        h=title({dataDir.date,...
-         ['${\Delta}$: ' num2str(deltaSorted(1),'%.2f') ', '  num2str(deltaSorted(2),'%.2f') ', ' num2str(deltaSorted(3),'%.2f')]},...
+        h=title({dataStruct.date,...
+         ['${\beta}$: ' num2str(betaSorted(1),'%.2f') ', '  num2str(betaSorted(2),'%.2f') ', ' num2str(betaSorted(3),'%.2f')]},...
          'FontWeight','normal','FontSize',14,'FontName','Arial','interpreter','latex');
 
         pubfig(h,12,2,0.005);
@@ -143,9 +162,9 @@ if isfield(runData.TS.Header.Conditions,'GaborSize')%'GaborSize')
         % legend
         legend({'Baseline','H stim (0\circ)','V-stim (90\circ)'})
 
-        upFontSize(14,0.01)
+        upFontSize(14,0.005)
         % ax ticks
-        addSkippedTicks(-60,60,5,'x')
+        %addSkippedTicks(-60,60,5,'x')
         addSkippedTicks(0,100,12.5,'y')
     end
 end

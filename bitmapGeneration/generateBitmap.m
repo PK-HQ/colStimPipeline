@@ -25,14 +25,14 @@ for ortNo=1:size(responseImages,3)
     
     %% Mask pca response with SNR mask (selected in RunDA, typically d'>=8 or RMS>=0.01)
     VERpca(:,:,ortNo)=responseImages(:,:,ortNo).*ROImaskNaN;
-    VERpca(:,:,ortNo)=VERpca(:,:,ortNo);
+    %VERpca(:,:,ortNo)=VERpca(:,:,ortNo);
 
     %% normalize to [0,1]
     normVERpca(:,:,ortNo)=rescale(VERpca(:,:,ortNo),0,1).* ROImaskNaN; 
   
     %% histogram equalization,
     histEqCol(:,:,ortNo)=adapthisteq(normVERpca(:,:,ortNo),'NumTiles',imgDims./bitmapParams.gridSize,'Range','full');
-
+    offwarning;
     
     %% gamma corr
     gammaCol(:,:,ortNo)=imadjust(histEqCol(:,:,ortNo),[],[],bitmapParams.gammaCorrFactor);
@@ -47,11 +47,9 @@ for ortNo=1:size(responseImages,3)
     
     %% calculate bitmap statistocs: duty cycle and pixel density
     bitmapNaN=columnarBitmap(:,:,ortNo).*ROImaskNaN;
-    columnarBitmapStats.pixelDensity(ortNo)=nansum(bitmapNaN(:))*100/nansum(ROImaskNaN(:));
-    columnarBitmapStats.estDutycycle(ortNo)=sqrt(columnarBitmapStats.pixelDensity(ortNo)*2/100)*5/10;
-  
-    
-    
+    columnarBitmapStats.pixDensity(ortNo)=nansum(bitmapNaN(:))*100/nansum(ROImaskNaN(:));
+    columnarBitmapStats.DC(ortNo)=sqrt(columnarBitmapStats.pixDensity(ortNo)*2/100)*5/10;
+      
 end
 
 % Subtract them to eliminate overlap, these are the final bitmaps

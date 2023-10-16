@@ -1,4 +1,4 @@
-function [movingImgMaskCoregistered,coregStats,transformParams]=coregisterGreenImages(...
+function [movingImgMaskCoregistered,coregStats,transformParams,ImgReference,ImgTarget]=coregisterGreenImages(...
   dataStructReference,dataStructCurrent,Mask)
 %% [README] Loads green images of reference and current session, and 
 %%% coregister with auto (same session) or manual mode (diff session or override)
@@ -10,6 +10,7 @@ filenameStructSession=generateFilenames(dataStructCurrent);
 %% Coreg
 % Get coregistration params for greenImageReference (to be transformed) to greenImageSession (anchor image)
 sameSession=isequal(dataStructCurrent.date,dataStructReference.date);
+sameSession=1; %OVERRIDE
 switch sameSession
     case {1}
         method='auto'; %manual/auto
@@ -36,21 +37,21 @@ switch coregMask
         ROImask=zeros(size(Mask));
         yOffset=50;
         xOffset=50;
-        ROImask(min(x)-xOffset:max(x)+xOffset,min(y)-yOffset:max(y)+yOffset)=1;
+        %ROImask(min(x)-xOffset:max(x)+xOffset,min(y)-yOffset:max(y)+yOffset)=1;
         movingImgMask=rescale(double(ImgReference)); %.*ROImask
         ImgTarget=rescale(double(ImgTarget));        
 end
 
 %% Correct for gross misalignments
-figure('name','Green image coregistration')
+figure('name','Vasculature coregistration')
 [hA,~]=tight_subplot(2,2);%1+(1*autoStages),3,[.05 .05]);
 % pre
 axes(hA(1))
-imgsc(ImgTarget,'Target (fixed)'); upFontSize(14,.015)
+imgsc(ImgTarget,'Session green image (fixed)'); upFontSize(14,.015)
 axes(hA(2))
-imgsc(movingImgMask,'Reference (moving)'); upFontSize(14,.015)
+imgsc(movingImgMask,'Reference green image (moving)'); upFontSize(14,.015)
 axes(hA(3))
-imagesc(imfuse(ImgTarget,movingImgMask,'ColorChannels','red-cyan')); axis square; title('Superimposed (Raw)','FontWeight','Normal'); upFontSize(14,.015)
+imagesc(imfuse(ImgTarget,movingImgMask,'ColorChannels','red-cyan')); axis square; title('Superimposed (Pre-coregistration)','FontWeight','Normal'); upFontSize(14,.015)
 
 switch method
     case {'manual'}
@@ -77,7 +78,38 @@ switch method
         switch autoStages
             case {2}
                 titleStr='Superimposed (similarity + affine)';
+                
+                % set levels
+                regParams.PyramidLevels=3;
 
+                %optimizer
+                [optimizer,metric] = imregconfig('multimodal');
+
+                % Stage 1 = fast rigid (rotate translate)
+                %optimizer.MaximumIterations = 500;
+                optimizer.InitialRadius = 6.25*10^-4;
+                optimizer.GrowthFactor = 1.05;
+                transformType='rigid';
+                transformCoarse = imregtform(movingImgMask,ImgTarget,transformType,optimizer,metric,'DisplayOptimization',false,...
+                'PyramidLevels',regParams.PyramidLevels);
+                movingImgMaskCoarse = imwarp(movingImgMask,transformCoarse,'OutputView',imref2d(size(ImgTarget)));
+
+                % Stage 2 = slow affine (rotate translate scale skew)
+                %optimizer.MaximumIterations = 1000;
+                regParams.PyramidLevels=3;       
+                optimizer.InitialRadius = 6.25*10^-3;
+                optimizer.GrowthFactor = 1.05;       
+                transformType='affine';
+                transformParams = imregtform(movingImgMask,ImgTarget,transformType,optimizer,metric,'DisplayOptimization',false,...
+                'PyramidLevels',regParams.PyramidLevels,'InitialTransformation',transformCoarse);
+
+                % Previous function used
+                %[tformCoarse,movingImgMaskDemons]=imregdemons(movingImgMask,ImgTarget,'PyramidLevels',5,'AccumulatedFieldSmoothing',3);
+
+                % save transformation file
+                save(filenameStructSession.transformParams,'transformParams')
+
+                %{
                 if isfile(filenameStructSession.transformParams)
                     % load transformaiton file if exist
                     load(filenameStructSession.transformParams);
@@ -111,6 +143,7 @@ switch method
                     % save transformation file
                     save(filenameStructSession.transformParams,'transformParams')
                 end
+                  %}
                  upFontSize(14,.015)
                 1;
             case {1}

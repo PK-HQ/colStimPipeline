@@ -1,3 +1,0 @@
-\widehat{y_{horizontal}} = \Delta * normcdf(-x,-mu, sigma)) \\
-
-\widehat{y_{vertical}} = (1-\Delta) * normcdf(x, mu, sigma)) + \Delta

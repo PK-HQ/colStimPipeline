@@ -4,35 +4,6 @@ function filenameStruct=generateFilenames(dataStruct)
 % pdfFilename=filenameStructSession.neurometricPDF;
 % mapsFilename=filenameStructSession.colmapMat;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 % def mainPath
 if ispc
   mainPath='Y:/';
@@ -65,7 +36,16 @@ switch dataStruct.modality %isequal(dataStruct.modality,'GCaMP')
     case {'GCaMP','GEVI'}
         %% Trial structure file (TS)
         filenameStruct.TS=[folderfilePrefixStr 'TS.mat'];
-
+        
+        %% Visual baseline TS.mat
+        if ~isempty(dataStruct.baselinerun)
+            filenameStruct.baselinerun=[mainPath dataStruct.monkey '/' ...
+                dataStruct.monkey dataStruct.date '/run' dataStruct.baselinerun...
+                '/' 'M' dataStruct.monkeyNo 'D' dataStruct.date 'R' dataStruct.baselinerun 'TS.mat'];
+        else
+            filenameStruct.baselinerun=[];
+        end 
+        
         %% Functional responses (FFT/Intg)
         % Search for filenames filenames
         tmpRaw=dir([folderfilePrefixStr '*StabBin*.mat']);
@@ -104,13 +84,10 @@ switch dataStruct.modality %isequal(dataStruct.modality,'GCaMP')
         end
 
         %% Static images
-        % Unbinned for quality check
-        tmpGreen=convertCharsToStrings(dir([imagePath '*EX540L_binned.tif']));
-        filenameStruct.greenStatic=[imagePath tmpGreen.name];
-        tmpGFP=convertCharsToStrings(dir([imagePath '*EX480*OD10_binned.tif']));
-        filenameStruct.gfpStatic=[imagePath tmpGFP.name];
-        tmpMCherry=convertCharsToStrings(dir([imagePath '*EX570*OD10_binned.tif']));
-        filenameStruct.mcherryStatic=[imagePath tmpMCherry.name];
+        % Binned gain for quality check
+        filenameStruct.greenStatic=getFirstFile(imagePath,'*EX540L_binned.tif');
+        filenameStruct.gfpStatic=getFirstFile(imagePath,'*EX480*D*_binned_*.tif');
+        filenameStruct.mcherryStatic=getFirstFile(imagePath,'*EX570*D*_binned*.tif');
 
         % Binned green image (for coregistration)
         filenameStruct.greenImg=convertCharsToStrings([imagePath 'green_binned.bmp']);
@@ -134,10 +111,14 @@ switch dataStruct.modality %isequal(dataStruct.modality,'GCaMP')
             filenameStruct.responseOriginal=dataStruct.responseOriginal;
         end
 
+        %% 2D Gaussian fit
+         filenameStruct.gaussianFit=[imagePath 'gaussianFit.mat'];
+
        %% Save file names
         filenameStruct.colmapPDF=[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date PCAsuffix '.pdf'];
-        filenameStruct.neurometricPDF=[mainPath 'Chip/Meta/summary/' 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date  'R' dataStruct.run 'summary.pdf'];%[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date 'NeurometricSummary.pdf'];
+        filenameStruct.neurometricPDF=[mainPath 'Chip/Meta/summary/' 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date  'R' dataStruct.run 'Summary.pdf'];%[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date 'NeurometricSummary.pdf'];
         filenameStruct.colmapMat=[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date PCAsuffix '.mat'];
+        filenameStruct.psychfitPDF=[mainPath 'Chip/Meta/summary/' 'M' dataStruct.monkeyNo uniqueStr 'psychfits.pdf'];%[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date 'NeurometricSummary.pdf'];
 
 
 
