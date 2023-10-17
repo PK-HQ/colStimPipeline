@@ -955,7 +955,7 @@ datastruct(entryNo).gaussianCond=2;
 datastruct(entryNo).nColumns=20;
 datastruct(entryNo).greenImgID=2;
 
-
+% First decoupled baseline
 entryNo=73; % B; 
 datastruct(entryNo).monkeyNo='28';
 datastruct(entryNo).monkey='Chip';

@@ -6,8 +6,9 @@ if ispc
 elseif contains(getenv('HOSTNAME'),'psy.utexas.edu')
   mainPath='/eslab/data/';
 end
+saveFlag=0;
 run([mainPath 'users/PK/colStimPipeline/exptListBiasingFull.m'])
-currentSessID=64;%analysisSessID(sessionID);      
+currentSessID=62;%analysisSessID(sessionID);      
 dsCurrentSess=datastruct(currentSessID); %fixed, to get ort map projected onto
 referenceSessID=dsCurrentSess.referenceSessionEntryNo;
 dsReferenceSess=datastruct(referenceSessID); %fixed, to get ort map projected onto
@@ -15,7 +16,7 @@ dsReferenceSess=datastruct(referenceSessID); %fixed, to get ort map projected on
 filenameStructCurrent=generateFilenames(dsCurrentSess);
 filenameStructReference=generateFilenames(dsReferenceSess);
 
-%% 1. Load integrated cortical response, TS, gaussian ROI mask
+%% Stage 1. Load integrated cortical response, TS, gaussian ROI mask
 if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists 
     %% Load data
     % TS
@@ -26,27 +27,32 @@ if isfile(filenameStructCurrent.Intg) % Load imaging data if it exists
     load(filenameStructCurrent.gaussianFit)
     % d' ROI mask, RespCondPCA
     load(filenameStructReference.Orientation,'Mask','RespCondPCA')
-    ortmap=RespCondPCA;
-    ortmap=transformImage(RespCondPCA,filenameStructCurrent);
-    
+    %make ROI mask  
     ROImask=double(Mask);
-    %ROImask=transformImage(ROImask,filenameStructCurrent);
     ROImaskNaN=ROImask;
-    ROImaskNaN(ROImaskNaN==0)=NaN;
+    ROImaskNaN(ROImaskNaN==0)=NaN; 
+    %mask ort map, apply vasculature transform (morphs ort map to the imaging window view from experiment)
+    PCAmap=RespCondPCA .* ROImaskNaN;
+    PCAmap=transformImage(RespCondPCA,filenameStructCurrent);
+    
+
 end
 
-%% 2. For each intg image, split image into stimulated and nonstimulated area with gaussian ROI mask
+%% Stage 2. For each intg image, split image into stimulated and nonstimulated area with gaussian ROI mask
 %% Process integrated image to get the average image per condition (successfully completed trials only)
 [trials,images,condIDs]=getUsableTrials(TS,DataTrial);
 [images.averageColumn]=columnarfilter(TS,images.average);
 
-%% Split the image into optostim and recruitment ROI
+%% Stage 3. Split the image into optostim and recruitment ROI
+% Init
 optostimVisual=[];optostimOrientation=[];
-recruitmentVisual=[];recruitmentOrientation=[];
+recruitmentVisMap=[];recruitmentPCAMap=[];
 optostimROI=[];recruitROI=[];
+% Define n-optostim conds and n-blanks
 nOptoConds=numel(find(TS.Header.Conditions.TypeCond==3));
 blank=condIDs.blankConds;
 nblank=numel(blank);
+% Extract gaussian levels used in experiment
 gaussLevels=dsCurrentSess.gaussianContourLevel; % grab the gaussian levels used
 for gaussNo=1:numel(gaussLevels)
     %% Define the optostim+visual and visual-only conditions for the optostim ROI mask (0 or 90), based on which optostim was applied during experiment
@@ -64,16 +70,12 @@ for gaussNo=1:numel(gaussLevels)
     % grab the gaussian level previously used to create optostim ROI (out of gaussian max level)
     gaussLevel=max(gaussLevels); %gaussLevels(gaussNo); 
     % define the stimulated ROI (gaussian) and nonstimulated ROI (inverse)
-    optostimMask=double(ROIMaskgaussian(gaussLevel).area);recruitmentMask=double(~optostimMask);
+    optostimMask=double(ROIMaskgaussian(gaussLevel).area);
+    recruitmentMask=double(~optostimMask);
     optostimMask(optostimMask==0)=NaN;
     recruitmentMask(recruitmentMask==0)=NaN;
-   
-    %% Create difference map from the visual-only images (reference map)
-    condIDV0max=max(condIDs.V0);condIDV90max=max(condIDs.V90);
-    visualSubtMap=images.averageColumn(:,:,condIDV90max)-images.averageColumn(:,:,condIDV0max);
-    ortSubtMap=ortmap(:,:,7)-ortmap(:,:,1);
     
-    % mask the optostim images
+    %% Mask the optostim images
     for cond=1:numel(condsOptostim)
         condID=condsOptostim(cond);
         % unmasked for sanity check
@@ -82,24 +84,9 @@ for gaussNo=1:numel(gaussLevels)
         % mask it twice, once for d' mask, then split into stimulated or nonstimulated area
         optostimROI(:,:,condID-nblank)=(images.averageColumn(:,:,condID)) .* optostimMask .* ROImaskNaN;
         recruitROI(:,:,condID-nblank)=(images.averageColumn(:,:,condID)) .* recruitmentMask .* ROImaskNaN;
-        
-        %% Correlate responses in the recruitment area to a difference map (high contrast visual, subtracted)
-        [~,~,corrValue,~]=calculateSimilarity(recruitROI(:,:,condID-nblank), visualSubtMap .* recruitmentMask .* ROImaskNaN);
-        recruitmentVisual(condID-nblank)=corrValue;
-        
-        [~,~,corrValue,~]=calculateSimilarity(recruitROI(:,:,condID-nblank), ortSubtMap .* recruitmentMask .* ROImaskNaN);
-        recruitmentOrientation(condID-nblank)=corrValue;
-        
-        %% Correlate responses in the stimulated area to a difference map (high contrast visual, subtracted)
-        [~,~,corrValue,~]=calculateSimilarity(optostimROI(:,:,condID-nblank), visualSubtMap .* optostimMask .* ROImaskNaN);
-        optostimVisual(condID-nblank)=corrValue;
-        
-        [~,~,corrValue,~]=calculateSimilarity(optostimROI(:,:,condID-nblank), ortSubtMap .* optostimMask .* ROImaskNaN);
-        optostimOrientation(condID-nblank)=corrValue;
-        
     end
     
-    % mask the visual images
+    %% Mask the visual images
     for cond=1:numel(condsVisual)
         condID=condsVisual(cond);
         % unmasked for sanity check
@@ -108,31 +95,50 @@ for gaussNo=1:numel(gaussLevels)
         % mask it twice, once for d' mask, then split into stimulated or nonstimulated area
         optostimROI(:,:,condID-nblank)=(images.averageColumn(:,:,condID)) .* optostimMask .* ROImaskNaN;
         recruitROI(:,:,condID-nblank)=(images.averageColumn(:,:,condID)) .* recruitmentMask .* ROImaskNaN;
-        
-        %% Correlate responses in the recruitment area to a difference map (high contrast visual, subtracted)
-        [~,~,corrValue,~]=calculateSimilarity(recruitROI(:,:,condID-nblank), visualSubtMap .* recruitmentMask .* ROImaskNaN);
-        recruitmentVisual(condID-nblank)=corrValue;
-        
-        [~,~,corrValue,~]=calculateSimilarity(recruitROI(:,:,condID-nblank), ortSubtMap .* recruitmentMask .* ROImaskNaN);
-        recruitmentOrientation(condID-nblank)=corrValue;
-        
-        %% Correlate responses in the stimulated area to a difference map (high contrast visual, subtracted)
-        [~,~,corrValue,~]=calculateSimilarity(optostimROI(:,:,condID-nblank), visualSubtMap .* optostimMask .* ROImaskNaN);
-        optostimVisual(condID-nblank)=corrValue;
-        
-        [~,~,corrValue,~]=calculateSimilarity(optostimROI(:,:,condID-nblank), ortSubtMap .* optostimMask .* ROImaskNaN);
-        optostimOrientation(condID-nblank)=corrValue;
-        
     end
 end
 
-%% Expectation
-%%-incon +con
+%% Stage 4. Correlate to get difference map
+%% Create difference map from the visual-only images (reference map)
+condIDV0max=max(condIDs.V0);condIDV90max=max(condIDs.V90);
+visualSubtMap=(images.averageColumn(:,:,condIDV90max)-images.averageColumn(:,:,condIDV0max)) .* ROImaskNaN;
+pcaSubtMap=(PCAmap(:,:,7)-PCAmap(:,:,1)); %ROI mask already applied
 
+for visualStim=1:2
+    %% Define the optostim+visual and visual-only conditions for the correlation (congruent or incongruent), based on visual stimulus used
+    if visualStim==1 % if opto 0 was applied
+        % Q: for given visual 0, does opto 0 drive recruitment that resembles 0 more than opto 90? 
+        condsVisual=condIDs.V0;
+        condsOptostimCon=[condIDs.V0O0];
+        condsOptostimIncon=[condIDs.V0O90];
+    else % if opto 90 was applied
+        % Q: for given visual 90, does opto 90 drive recruitment that resembles 90 more than opto 0? 
+        condsVisual=condIDs.V90;
+        condsOptostimCon=[condIDs.V90O90];
+        condsOptostimIncon=[condIDs.V90O0];
+    end
+    
+    %% Correlate the optostim images
+    for cond=1:numel(condsOptostimCon)
+        condCon=condsOptostimCon(cond);
+        condIncon=condsOptostimIncon(cond);
+        
+        %compute correlation between difference image and difference map
+        [~,~,corrValue,~]=calculateSimilarity(recruitROI(:,:,condCon-nblank) - recruitROI(:,:,condIncon-nblank), visualSubtMap);
+        recruitmentVisMap(visualStim,cond)=corrValue;
+        [~,~,corrValue,~]=calculateSimilarity(recruitROI(:,:,condCon-nblank) - recruitROI(:,:,condIncon-nblank), pcaSubtMap);
+        recruitmentPCAMap(visualStim,cond)=corrValue;
+        
 
+        %compute correlation between difference image and difference map
+        [~,~,corrValue,~]=calculateSimilarity(fullROI(:,:,condCon-nblank) - fullROI(:,:,condIncon-nblank), visualSubtMap);
+        fullVisMap(visualStim,cond)=corrValue;
+        [~,~,corrValue,~]=calculateSimilarity(fullROI(:,:,condCon-nblank) - fullROI(:,:,condIncon-nblank), pcaSubtMap);
+        fullPCAMap(visualStim,cond)=corrValue;
+    end
+end
 
-%% Plot images
-%% 1-A. Plot spatially filtered images
+%% Stage 4A. Plot columnar responses
 figure('name','Columnar responses')
 nCols=6;
 
@@ -147,7 +153,7 @@ colormap(fireice)
 for plotNo=1:nOptoConds
     colormap(fireice)
     plotID=plotOrder(plotNo);
-    img=recruitROI(:,:,plotID);
+    img=fullROI(:,:,plotID);
 
     axes(hAx(plotNo))
     imgsc(img)
@@ -172,100 +178,63 @@ end
 %colormap(gray)
 upFontSize(14,.015)
 [~,h]=suplabel({'Columnar signals (bandpassed 0.8-3.0 cpmm)',' ','Visual 0\circ                                                                                                                             Visual 90\circ'},'t',[.08 .08 .84 .81]);
-
 colormap(fireice)
-
-
-
-
 % Save the figures
 set(h,'FontSize',16)
 if saveFlag
     export_fig(pdfFilename,'-pdf','-nocrop','-append');
 end
 
-
-%% X. Plotting correlation of responses to visual and PCA difference reference map  
-% --- Visual reference map ---
+%% Stage 4B. Plotting correlation of responses to visual and PCA difference reference map  
 figure('name','Correlation: Responses vs visual & PCA reference ')
 % Plot versus visual 0-90°
 nCols=2;
-nRows=2;
-[hAx,~]=tight_subplot(nRows,nCols,[.1 .15],[.05 .15],[.04 .04]);
-axes(hAx(2))
+nRows=1;
+[hAx,~]=tight_subplot(nRows,nCols,[.2 .1],[.2 .2],[.1 .1]);
 
-%% Define plot x-y
+%% Full, versus PCA map
+axes(hAx(1))
 % stimulus conditions
 stimCon=unique(TS.Header.Conditions.StimCon(find(TS.Header.Conditions.TypeCond==3)));
-% visual-only
-V0xVisualr=recruitmentVisual([condIDs.V0]-2);
-V90xVisualr=recruitmentVisual([condIDs.V90]-2);
 % congruent optostim+visual
-O0V0xVisualr=recruitmentVisual([condIDs.V0O0]-2);
-O90V90xVisualr=recruitmentVisual([condIDs.V90O90]-2);
-% incongruent optostim+visual
-O90V0xVisualr=recruitmentVisual([condIDs.V0O90]-2);
-O0V90xVisualr=recruitmentVisual([condIDs.V90O0]-2);
-
-
-% visual-only
-V0xVisualr=recruitmentOrientation([condIDs.V0]-2);
-V90xVisualr=recruitmentOrientation([condIDs.V90]-2);
-% congruent optostim+visual
-O0V0xVisualr=recruitmentOrientation([condIDs.V0O0]-2);
-O90V90xVisualr=recruitmentOrientation([condIDs.V90O90]-2);
-% incongruent optostim+visual
-O90V0xVisualr=recruitmentOrientation([condIDs.V0O90]-2);
-O0V90xVisualr=recruitmentOrientation([condIDs.V90O0]-2);
-
-% Plot baselines: visual 0 and 90, without opto
-plot(stimCon,V0xVisualr,'k-','LineWidth',2,'Marker','o','MarkerSize',10,'MarkerFaceColor','b','MarkerEdgeColor','k','DisplayName','Vis-0'); hold on;
-plot(stimCon,V90xVisualr,'k-','LineWidth',2,'Marker','o','MarkerSize',10,'MarkerFaceColor','r','MarkerEdgeColor','k','DisplayName','Vis-90'); hold on;
-
+opto0effect=recruitmentPCAMap(1,:);
+opto90effect=recruitmentPCAMap(2,:);
 % Plot congruent: visual 0 and 90, with congruent opto
-plot(stimCon,O0V0xVisualr,'b-','LineWidth',2,'Marker','v','MarkerSize',10,'MarkerFaceColor','b','MarkerEdgeColor','k','DisplayName','Opto-0 + Vis-0'); hold on;
-plot(stimCon,O90V90xVisualr,'r-','LineWidth',2,'Marker','^','MarkerSize',10,'MarkerFaceColor','r','MarkerEdgeColor','k','DisplayName','Opto-90 + Vis-90'); hold on;
-
-% Plot incongruent: visual 0 and 90, with incongruent opto
-plot(stimCon,O90V0xVisualr,'b--','LineWidth',2,'Marker','^','MarkerSize',10,'MarkerFaceColor','r','MarkerEdgeColor','k','DisplayName','Opto-90 + Vis-0'); hold on;
-plot(stimCon,O0V90xVisualr,'r--','LineWidth',2,'Marker','v','MarkerSize',10,'MarkerFaceColor','b','MarkerEdgeColor','k','DisplayName','Opto-0 + Vis-90'); hold on;
-
+plot(stimCon,opto0effect,'b-','LineWidth',2,'Marker','v','MarkerSize',10,'MarkerFaceColor','b','MarkerEdgeColor','k','DisplayName','Opto-0 (Vis 0 - 90)'); hold on;
+plot(stimCon,opto90effect,'r-','LineWidth',2,'Marker','^','MarkerSize',10,'MarkerFaceColor','r','MarkerEdgeColor','k','DisplayName','Opto-90 (Vis 90 - 0)'); hold on;
 % title and labels
-title({'Subtracted visual response', sprintf('Single gabor (S.F.: 6cpd, Con.: %.0f%%)',max(stimCon))},'FontWeight', 'Normal')
-xlabel('Absolute gabor contrast (%)');xlim([min(stimCon) max(stimCon)])
-ylabel('Correlation (r)');
-hLeg=legend('location','southeast','NumColumns',3,'FontSize',10);
-
+title({'Recruitment', sprintf('4Hz flashed grating (SF: 2cpd, 100%%)')},'FontWeight', 'Normal')
+xlim([min(stimCon) max(stimCon)]); xlabel('Absolute gabor contrast (%)');
+line(xlim,[0 0],'color',.3*[1 1 1],'lineWidth',1.5,'LineStyle','--','HandleVisibility','off')
+ylabel('Correlation with PCA map (r)');
+hLeg=legend('location','southeast','NumColumns',1,'FontSize',14);
 % cosmetic
 upFontSize(14,.01)
 ylim([-1 1])
+% Add inset of subtracted image
+axes('Position',[.33 .65 .15 .15])
+imgsc(fullROI(:,:,max(condIDs.V0O0)-nblank) - fullROI(:,:,max(condIDs.V0O90)-nblank));
+axis off; colormap fireice; caxis([-7.5 7.5]*10^-3)
 
-
-% --- PCA reference map ---
+%% Recruitment, versus PCA map
 axes(hAx(2))
-% Plot baselines: visual 0 and 90, without opto
-plot(stimCon,V0xPCAr,'b-','LineWidth',2,'Marker','o','MarkerSize',10,'MarkerFaceColor','w','MarkerEdgeColor','k','DisplayName','Vis-0'); hold on;
-plot(stimCon,V90xPCAr,'r-','LineWidth',2,'Marker','o','MarkerSize',10,'MarkerFaceColor','w','MarkerEdgeColor','k','DisplayName','Vis-90'); hold on;
-
+% stimulus conditions
+stimCon=unique(TS.Header.Conditions.StimCon(find(TS.Header.Conditions.TypeCond==3)));
+% congruent optostim+visual
+opto0effect=-recruitmentPCAMap(1,:)*100./fullPCAMap(1,:);
+opto90effect=recruitmentPCAMap(2,:)*100./fullPCAMap(2,:);
 % Plot congruent: visual 0 and 90, with congruent opto
-plot(stimCon,O0V0xPCAr,'b--','LineWidth',2,'Marker','v','MarkerSize',10,'MarkerFaceColor','b','MarkerEdgeColor','k','DisplayName','Opto-0 + Vis-0'); hold on;
-plot(stimCon,O90V90xPCAr,'r--','LineWidth',2,'Marker','^','MarkerSize',10,'MarkerFaceColor','r','MarkerEdgeColor','k','DisplayName','Opto-90 + Vis-90'); hold on;
-
-% Plot incongruent: visual 0 and 90, with incongruent opto
-plot(stimCon,O90V0xPCAr,'b:','LineWidth',2,'Marker','^','MarkerSize',10,'MarkerFaceColor','r','MarkerEdgeColor','k','DisplayName','Opto-90 + Vis-0'); hold on;
-plot(stimCon,O0V90xPCAr,'r:','LineWidth',2,'Marker','v','MarkerSize',10,'MarkerFaceColor','b','MarkerEdgeColor','k','DisplayName','Opto-0 + Vis-90'); hold on;
-
+plot(stimCon,opto0effect,'b-','LineWidth',2,'Marker','v','MarkerSize',10,'MarkerFaceColor','b','MarkerEdgeColor','k','DisplayName','Opto-0 (Vis 0 - 90)'); hold on;
+plot(stimCon,opto90effect,'r-','LineWidth',2,'Marker','^','MarkerSize',10,'MarkerFaceColor','r','MarkerEdgeColor','k','DisplayName','Opto-90 (Vis 90 - 0)'); hold on;
 % title and labels
-title({'Subtracted PCA response', sprintf('Flashed 4Hz grating (S.F.: 2cpd, Con.: %.0f%%)',100)},'FontWeight', 'Normal')
-xlim([min(stimCon) max(stimCon)])
-ylim([-1 1]);
-upFontSize(14,.01)
-
+title({'Ratio of recruitment to full response', sprintf('4Hz flashed grating (SF: 2cpd, 100%%)')},'FontWeight', 'Normal')
+xlim([min(stimCon) max(stimCon)]);ylabel('Ratio of recruitment to full response (%)');
+line(xlim,[0 0],'color',.3*[1 1 1],'lineWidth',1.5,'LineStyle','--','HandleVisibility','off')
+hLeg=legend('location','southeast','NumColumns',1,'FontSize',14);
 % cosmetic
-hLeg.FontSize=11;
-[~,hSupLabel]=suplabel({'Correlation between opto-evoked and desired response'},'t',[.08 .08 .84 .84]);
-set(hSupLabel,'FontSize',16)
-
-
-
-
+upFontSize(14,.01)
+ylim([-100 100])
+% Add inset of subtracted image
+axes('Position',[.78 .65 .15 .15])
+imgsc(recruitROI(:,:,max(condIDs.V0O0)-nblank) - recruitROI(:,:,max(condIDs.V0O90)-nblank));
+axis off; colormap fireice; caxis([-7.5 7.5]*10^-3)
