@@ -292,21 +292,21 @@ switch analysisType
             'temporalTotal','temporalDC','temporalON','tbl')
 
         tbl=array2table([analysisSessID' contourColumns (contourPixels.*temporalON') betaSortedCont],...
-            'VariableNames',{'EntryID' 'Column-H' 'Column-V', 'Energy-H', 'Energy-V','Beta-H','Beta-Baseline','Beta-V'})
+            'VariableNames',{'EntryID' 'Column-H' 'Column-V', 'Energy-H', 'Energy-V','Beta-H','Beta-Baseline','Beta-V'});
        %% Minimal columns
         % Define x y z, averaged across 2 patterns       
         zPower=contourPixels.*temporalON'; 
         xColumns=contourColumns;
         yBeta=betaSortedCont(:,[1 3]);
         
-        
+        % 2D line fit (ncolumns X beta)
         metricStr='beta';
         plotMinimumColumns(xColumns,yBeta,zPower,analysisSessID,metricStr)
         metricStr='deltabeta';
         plotMinimumColumns(xColumns,yBeta,zPower,analysisSessID,metricStr)
         
-        
-                plotMinimumColumns3d(xColumns,yBeta,zPower,analysisSessID)
+        % 3D surface fit (power x ncolumns X beta)
+        plotMinimumColumns3d(xColumns,yBeta,zPower,analysisSessID)
 
         
         

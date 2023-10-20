@@ -1,4 +1,4 @@
-function B = FilterFermi2D(A,LowCutOff,HighCutOff,SizePxl)
+function B = FilterFermi2D(image,LowCutOff,HighCutOff,SizePxl)
 
 %% Filter A with 2D Fermi filter
 % A is an array with at leat 2 dimentions
@@ -13,9 +13,9 @@ function B = FilterFermi2D(A,LowCutOff,HighCutOff,SizePxl)
 % Last modified on Apr. 24, 2013
 
 %% Check input/output arguements
-SizeA = size(A);
-Height = SizeA(1);
-Width = SizeA(2);
+SizeImage = size(image);
+Height = SizeImage(1);
+Width = SizeImage(2);
 
 %% Fermi filter
 ParmFermiLowPass = [1,HighCutOff,0,HighCutOff*0.05];
@@ -38,6 +38,7 @@ end
 FiltFermi = FiltFermiHighPass-FiltFermiLowPass;
 
 %% Show Fermi filter
+%{
 thgf = figure;
 ti = floor(Height/2)+1;
 plot(SFX,FiltFermi(ti,:),'LineWidth',2);
@@ -61,19 +62,20 @@ title('Fermi filter (1D-slice)', ...
       'FontWeight','bold', ...
       'FontSize',12);
 drawnow;pause(0.1);
+close(thgf);
+%}
 
 %% Filter A
-SizeA([1,2]) = 1;
+SizeImage([1,2]) = 1;
 B = ...
   ifft(ifft(ifftshift(ifftshift( ...
-    fftshift(fftshift(fft(fft(A,[],1),[],2),1),2).* ...
-    repmat(FiltFermi,SizeA),1),2),[],1),[],2);
+    fftshift(fftshift(fft(fft(image,[],1),[],2),1),2).* ...
+    repmat(FiltFermi,SizeImage),1),2),[],1),[],2);
 
-if isreal(A)
+if isreal(image)
   B = real(B);
 end
 
 %% Close figure
-close(thgf);
 
 

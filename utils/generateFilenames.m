@@ -119,6 +119,7 @@ switch dataStruct.modality %isequal(dataStruct.modality,'GCaMP')
         filenameStruct.neurometricPDF=[mainPath 'Chip/Meta/summary/' 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date  'R' dataStruct.run 'Summary.pdf'];%[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date 'NeurometricSummary.pdf'];
         filenameStruct.colmapMat=[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date PCAsuffix '.mat'];
         filenameStruct.psychfitPDF=[mainPath 'Chip/Meta/summary/' 'M' dataStruct.monkeyNo uniqueStr 'psychfits.pdf'];%[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date 'NeurometricSummary.pdf'];
+        filenameStruct.recruitmentPDF=[mainPath 'Chip/Meta/recruitment/' 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date  'R' dataStruct.run 'Recruitment.pdf'];%[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date 'NeurometricSummary.pdf'];
 
 
 
