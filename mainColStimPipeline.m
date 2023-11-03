@@ -30,12 +30,12 @@ run([mainPath 'users/PK/colStimPipeline/exptListBiasingFull.m'])
 
 %% Define reference and current session
 pipelineMode='';% beta/stable
-analysisType='psychfit'; %summary/psychfit/beta/neurometric/stability
+analysisType='summary'; %summary/psychfit/beta/neurometric/stability
 
 %for biasing expt
 currentSessID=92;
 %for analysis
-analysisSessID=fliplr([93 92 90 89 88 87 84 83 81 79 78 74 73 72 67 66 65 64 62 59 51 50]);%sort([83 82 81 79 78 77 76 74 73 72 67 66 65 64 62 59 58 51 50],'ascend'); %63 %[50 51]; %fliplr([43 44 45 47 48, 52 53 54 57 58 59 62 63 64 65 66]); %[12 14 15 17 19 20 21 23 24 26 29 31 32 34 37 40]; %17; %10 excluded because baseline different
+analysisSessID=81%fliplr([93 92 90 89 88 87 84 83 81 79 78 74 73 72 67 66 65 64 62 59 51 50]);%sort([83 82 81 79 78 77 76 74 73 72 67 66 65 64 62 59 58 51 50],'ascend'); %63 %[50 51]; %fliplr([43 44 45 47 48, 52 53 54 57 58 59 62 63 64 65 66]); %[12 14 15 17 19 20 21 23 24 26 29 31 32 34 37 40]; %17; %10 excluded because baseline different
 %[79 78 77 76 74 73 72 68 67 66 65 64 62 59 58 51 50]
 % Columnar bitmap processing params
 referenceSessID=datastruct(currentSessID).referenceSessionEntryNo; %choose ID with a session and run containing orientation map
@@ -215,7 +215,7 @@ switch analysisType
 
           [projBitmapTRBB,bitmapStats,bitmapStats2]=convertForProjector(dsReferenceSess,dsCurrentSess,columnarBitmapCoregistered,orts,...
               bitmapParams.gridSize,bitmapParams.gammaCorrFactor,bitmapParams.sensitivity,'cam2proj',alignmentTransform,saveFlagBMP,saveFlag);
-      1;
+
             % Static images
             [blurEstimate,gfpStaticMax,mcherryStaticMax]=QCstatic(dsCurrentSess,plotFlag,saveFlag);
             

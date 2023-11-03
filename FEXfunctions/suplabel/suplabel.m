@@ -40,7 +40,7 @@ function [ax,h]=suplabel(text,whichLabel,supAxes)
 currax=findobj(gcf,'type','axes','-not','tag','suplabel');
 
 if nargin < 3
- supAxes=[.08 .08 .84 .3];
+ supAxes=[.08 .08 .88 .3];
  ah=findall(gcf,'type','axes');
  if ~isempty(ah)
   supAxes=[inf,inf,0,0];
@@ -101,6 +101,6 @@ if (nargout < 2)
   return
 end
 
-end
+ set(h,'FontWeight','normal');
 %%%ah=findall(gcf,'type','axes');
 %%%'sssssssss',kb

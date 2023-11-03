@@ -1,4 +1,5 @@
 clear all; clc
+saveFlag=0;
 
 %% From mainColstimPipeline
 if ispc
@@ -6,11 +7,10 @@ if ispc
 elseif contains(getenv('HOSTNAME'),'psy.utexas.edu')
   mainPath='/eslab/data/';
 end
-saveFlag=0;
 run([mainPath 'users/PK/colStimPipeline/exptListBiasingFull.m'])
 
 analysisSessID=fliplr([72 67 66 65 64 62]); %fliplr([93 92 90 89 88 87 84 83 81 79 78 74 73 72 67 66 65 64 62 59]);
-
+distancePrct=15/200;
 for sessionID=1:numel(analysisSessID)
     currentSessID=analysisSessID(sessionID);
     
@@ -57,6 +57,8 @@ for sessionID=1:numel(analysisSessID)
     nblank=numel(blank);
     % Extract gaussian levels used in experiment
     gaussLevels=dsCurrentSess.gaussianContourLevel; % grab the gaussian levels used
+    maxGaussLevel=dsCurrentSess.gaussianContourLevelMax;
+    bufferDist=round(maxGaussLevel * distancePrct);
     for gaussNo=1:numel(gaussLevels)
         %% Define the optostim+visual and visual-only conditions for the optostim ROI mask (0 or 90), based on which optostim was applied during experiment
         if gaussNo==1 % if opto 0 was applied
@@ -71,7 +73,8 @@ for sessionID=1:numel(analysisSessID)
 
         %% Create binary mask of each image, with the mask = gaussian or inverse of the gaussian
         % grab the gaussian level previously used to create optostim ROI (out of gaussian max level)
-        gaussLevel=max(gaussLevels); %gaussLevels(gaussNo); 
+        gaussLevel=max(gaussLevels) - bufferDist; % take the larger one of both, then add a buffer distance
+        
         % define the stimulated ROI (gaussian) and nonstimulated ROI (inverse)
         optostimMask=double(ROIMaskgaussian(gaussLevel).area);
         recruitmentMask=double(~optostimMask);
@@ -181,6 +184,8 @@ for sessionID=1:numel(analysisSessID)
     colormap(fireice)
     % Save the figures
     set(h,'FontSize',16)
+    
+    upFontSize(16,.01)
     if saveFlag
         export_fig(pdfFilename,'-pdf','-nocrop');
     end
@@ -191,7 +196,7 @@ for sessionID=1:numel(analysisSessID)
     % Plot versus visual 0-90°
     nCols=2;
     nRows=1;
-    [hAx,~]=tight_subplot(nRows,nCols,[.2 .1],[.2 .2],[.1 .1]);
+    [hAx,~]=tight_subplot(nRows,nCols,[.2 .1],[.2 .2],[.15 .1]);
 
     %% Full, versus PCA map
     axes(hAx(1))
@@ -216,7 +221,12 @@ for sessionID=1:numel(analysisSessID)
     axes('Position',[.33 .65 .15 .15])
     imgsc(fullROI(:,:,max(condIDs.V0O0)-nblank) - fullROI(:,:,max(condIDs.V0O90)-nblank));
     axis off; colormap fireice; caxis([-7.5 7.5]*10^-3)
-
+    % Add inset of subtracted image
+    axes('Position',[-.007 .44 .15 .15])
+    imgsc(pcaSubtMap);
+    axis off; colormap fireice; caxis([-7.5 7.5]*10^-3)
+    
+    
     %% Recruitment, versus PCA map
     axes(hAx(2))
     % stimulus conditions
@@ -240,6 +250,8 @@ for sessionID=1:numel(analysisSessID)
     imgsc(recruitROI(:,:,max(condIDs.V0O0)-nblank) - recruitROI(:,:,max(condIDs.V0O90)-nblank));
     axis off; colormap fireice; caxis([-7.5 7.5]*10^-3)
     
+    
+    upFontSize(16,.01)
     if saveFlag
         export_fig(pdfFilename,'-pdf','-nocrop','-append');
     end
@@ -247,6 +259,7 @@ for sessionID=1:numel(analysisSessID)
     %% Compile for comparison across sessions
     sessionColumns(sessionID,[1 2])=dsCurrentSess.nColumns;
     sessionRatio(sessionID,[1 2])=[mean(opto0ratio) mean(opto90ratio)];
+    
 end
 
 tbl=array2table([analysisSessID' sessionColumns sessionRatio],...

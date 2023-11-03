@@ -8,7 +8,7 @@ end
 
 
 %% imgsc(img, cmapStr, title)
-nanColor=1;
+nanColor=.25;
 cmin=min(img(:),[],'omitnan');
 cmax=max(img(:),[],'omitnan');
 

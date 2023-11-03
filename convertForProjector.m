@@ -50,7 +50,7 @@ for imgNo = 1:size(columnarBitmapCoregistered,3) % for each input image in camer
 
             %fit and plot and save 2D gaussian with ROI mask overlay
             figure('name','Gaussian masks')
-            [ROIMaskgaussian]=fit2Dgaussian(dataStructSession,desiredResp,ROIMaskNan);
+            [ROIMaskgaussian]=fit2Dgaussian(dataStructSession,desiredResp,camspaceBitmap,ROIMaskNan);
             save(filenameStructSession.gaussianFit,'ROIMaskgaussian')
             switch saveFlag
               case {1}
@@ -104,11 +104,11 @@ for imgNo = 1:size(columnarBitmapCoregistered,3) % for each input image in camer
                 subplot(2,6,1)
                 [xContour,yContour]=find(~isnan(nanContour));
                 bound=boundary(xContour,yContour);
-                imgsc(camspaceBitmap);hold on; plot(yContour(bound),xContour(bound),'color',[.5 .5 .5],'linewidth',.5);
+                imgsc(camspaceBitmap);hold on; plot(yContour(bound),xContour(bound),'color','r','linewidth',.5);
                 title({'Columns with contour overlay','(cam-space)'})
 
                 subplot(2,6,2)
-                imgsc(gaussianMaskedImg);title({'Extracted columns','(cam-space)'})
+                imgsc(gaussianMaskedImg);title({'Targeted columns','(cam-space)'})
 
 
                %% Plot 2: Resize to projector space

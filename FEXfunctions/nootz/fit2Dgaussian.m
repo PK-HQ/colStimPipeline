@@ -14,10 +14,11 @@
 function [ROIMaskgaussian]=fit2Dgaussian(varargin)
 dataStruct=varargin{1};
 desiredResp=varargin{2};
-if length(varargin)==3
+if length(varargin)==4
     dataStruct=varargin{1};
     desiredResp=varargin{2};
-    mask=varargin{3};
+    bitmap=varargin{3};
+    mask=varargin{4};
 end
 % In this numerical test we use two-dimensional fitting functions:
 % 1. 2D Gaussian function ( A requires 5 coefs ).
@@ -65,16 +66,11 @@ switch FitOrientation
         C=del2(rotgaussFunc(A,X)); mesh(xh,yh,rotgaussFunc(A,X),C); hold on
         fullGaussianFit=rotgaussFunc(A,X);
 end
-%{
-subplot(3,8,[1 2 9 10]);
-surface(x,y,S,'EdgeColor','none'); alpha(0.5); axis square
-colormap('pink'); view(-60,20); grid on; hold off
-upFontSize(12,0.01)
-%}
+
 %% Plot actual data
 subplot(3,8,[1 2 9 10]); 
 imagesc(x(1,:),y(:,1),desiredResp); axis square; 
-colormap('pink');colorbar; 
+colormap('gray');colorbar; 
 title('4Hz response to gaussian');
 upFontSize(12,0.01); hold on
 % Output and compare data and fitted function coefs
@@ -100,13 +96,16 @@ upFontSize(12,0.01); hold on
 nContourLevels=dataStruct.gaussianContourLevelMax;
 subplot(3,8, [7 8 15 16]);
 % plot underlying ROI masked gaussian response
-imagesc(x(1,:),y(:,1),maskedGaussianFit); axis square; hold on;
+%imagesc(x(1,:),y(:,1),maskedGaussianFit); axis square; hold on;
+fused=imfuse(maskedGaussianFit,bitmap,'ColorChannels',[2 1 1]);imagesc(x(1,:),y(:,1),fused);axis square; hold on;
+
 % ! Changed from flipud on 8/21/2023 !
-[mat,con]=contour((maskedGaussianFit),nContourLevels,'color',[.5 .5 .5],'LineWidth',.5,'ShowText','on'); %contour(flipud(maskedGaussianFit),nContourLevels,'red','LineWidth',.5,'ShowText','on');
+contourlinewidth=.5;
+[mat,con]=contour((maskedGaussianFit),nContourLevels,'color',[1 1 1],'LineWidth',contourlinewidth,'ShowText','off'); %contour(flipud(maskedGaussianFit),nContourLevels,'red','LineWidth',.5,'ShowText','on');
 contourLevels=con.LevelList;axis square
 upFontSize(12,0.01); hold on
 title('Contour plot for generating masks')
-clabel(mat,con)
+clabel(mat,con,numel(con),'LabelSpacing',100)
 con.LevelList = round(con.LevelList, 3);
 for i=1:nContourLevels
     ROIMaskgaussian(i).threshPercentile=contourLevels(i);
