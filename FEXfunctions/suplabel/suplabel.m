@@ -90,6 +90,7 @@ if strcmp('t',whichLabel)
   h=get(ax,'Title');
   set(h,'VerticalAlignment','middle')
   set(h,'FontSize',18)
+   set(h,'FontWeight','normal');
 elseif strcmp('x',whichLabel)
   h=get(ax,'XLabel');
   set(h,'FontSize',14)
@@ -97,10 +98,11 @@ elseif strcmp('y',whichLabel) | strcmp('yy',whichLabel)
   h=get(ax,'YLabel');
   set(h,'FontSize',14)
 end
+set(h,'FontWeight','normal');
 if (nargout < 2)
   return
 end
 
- set(h,'FontWeight','normal');
+
 %%%ah=findall(gcf,'type','axes');
 %%%'sssssssss',kb

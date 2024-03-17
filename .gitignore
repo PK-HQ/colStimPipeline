@@ -1,22 +1,9 @@
-# Folders
-fromBox/*
-export_fig2/*
-store/
-store/*
-FMINSEARCHBND/*
-
-# random package
-amd-software-*
-
-# autosave files
-._*
-*.asv
-
-# output filetypes, e.g. images and pdfs
-*.ppt
-*.pptx
-*.pdf
-*.bmp
-*.fig
-*.zip
-*.gif
+/GEVI
+/autoRunDA
+/store
+/docs
+/ColSeries
+/FEXfunctions
+/GeneralDataAnalyses
+/testcode
+/utils

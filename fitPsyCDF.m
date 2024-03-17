@@ -1,4 +1,4 @@
-function [threshold,beta,mu,sigma,param,x,y] = fitPsyDualCDFv3(varargin)
+function [threshold,beta,mu,sigma,param,x,y] = fitPsyCDF(varargin)
 %% README
 % Fits psychometric function for contrast, 2 asymmetrical curves for x<mu and x>mu. Maximum Likelihood fit. Created
 % by PK (2023), modified from Giac's script.
@@ -20,6 +20,7 @@ sessionID=varargin{3}; % date as a str, for display only
 markerColor=varargin{4}; % e.g. 'r'
 markerType=varargin{5}; % e.g. 'o'
 hAx=varargin{6};
+half=varargin{7};
 %% Find optimal parameter values
 % --- Initial values, lower and upper bounds --- 
 smoothingFlag=0;
@@ -32,6 +33,7 @@ initialParams=[mu     sigma    beta     lapseLower lapseUpper];
 paramLB      =[10     10/6       0          0.0               0.0];
 paramUB      =[100     40/6      1          00               0];
 %% Run parameter optimization
+%{
 sOptOptm = ...
     optimset('LargeScale','On', ...
     'TolFun',1e-8,'TolX',1e-8, ...
@@ -51,22 +53,21 @@ opts.MaxIter = 100000;
     initialParams,...
     paramLB,...
     paramUB);
-
+%}
 %  --- Extract param values and likelihood of best fit --- 
-mu = param(1);
-sigma = param(2);
-beta = param(3);
-lapseLower = param(4);
-lapseUpper = param(5);
-logLikelihood  = costFunction([mu sigma beta lapseLower lapseUpper],x,y,smoothingFlag);%Cost_Function([alpha beta bias 0],betaOrientation,y,yInverse);
-
+mu = 1; %param(1);
+sigma = 1; %param(2);
+beta = 1; %param(3);
+lapseLower = 1; %param(4);
+lapseUpper = 1; %param(5);
+logLikelihood  = 1; %costFunction([mu sigma beta lapseLower lapseUpper],x,y,smoothingFlag);%Cost_Function([alpha beta bias 0],betaOrientation,y,yInverse);
+param=[1 1 1 1 1 1];
 %% Plot fitted curve with scatter plot overlay
 threshold=plotFitCurve([mu sigma beta lapseLower lapseUpper],logLikelihood,x,y,...
-   sessionID,markerColor,markerType,hAx,smoothingFlag);
+   sessionID,markerColor,markerType,hAx,smoothingFlag,half);
 
 % Return biasing (beta)
 beta = beta+lapseLower; %total vertical displacement of curve at midpoint
-
 end
 
 %% Cost function: to calculate likelihood of fit vs actual data
@@ -75,7 +76,7 @@ function cost = costFunction(param,x,y,smoothingFlag)
 yInverse=100-y;
 
 % Fit curve to data
-yFit = dualNormCDF([param(1),param(2),param(3),param(4),param(5)],x,smoothingFlag);
+yFit = normCDF([param(1),param(2),param(3),param(4),param(5)],x,smoothingFlag);
 
 % calculate probability for each data point
 ct = 0;
@@ -92,7 +93,7 @@ cost = -2*sum(LL) ;
 end
 
 % --- Curve fitting for data ---
-function yFit = dualNormCDF(param,x,smoothingFlag)
+function yFit = normCDF(param,x,smoothingFlag)
 % Version: Feb 2023
 % Psychometric Function for contrast, 2 asymmetrical curves for x<mu and x>mu
 
@@ -146,50 +147,78 @@ end
 
 %% --- Plotting curve and scatter --- 
 function threshold=plotFitCurve(param,logLikelihood,x,y,sessionStr,...
-     markerColor,markerType,hAx,smoothingFlag)
-     axes(hAx)
+     markerColor,markerType,hAx,smoothingFlag,half)
+     %axes(hAx)
 
      hold on
      
      % --- Plot curve --- 
-     xFit = linspace(min(x),max(x),100);
-     yFit = dualNormCDF(param,xFit,smoothingFlag);
-     plot(xFit,yFit*100,'Color',markerColor,'LineWidth',2.5);hold on;
-     [~, indexOfMin] = min(abs(yFit-.70));
-     threshold=xFit(indexOfMin);
-     
+     threshold=.7;
+
      % --- Scatter plot ---
      lw=3;%.25;
      baseline=sum(markerColor)==0;
      if baseline % Baseline in black
          markerColor=[1 1 1];
          alphalevel=1;
-         mkrSz=300;%200;
+         mkrSz=10;%200;
      else % Optostim transparent
-         mkrSz=250;%80;
+         mkrSz=10;%80;
          alphalevel=1;
      end
-     h=scatter(x,y,mkrSz,markerColor,markerType,'filled','MarkerEdgeColor','k','HandleVisibility','off','LineWidth',lw);hold on;
-     set(h, 'MarkerFaceAlpha', alphalevel, 'MarkerEdgeAlpha', alphalevel) % set transparency level
-     set(h, 'MarkerFaceAlpha', alphalevel, 'MarkerEdgeAlpha', 1) % set transparency level
-     
+
+     if half==1 % -ve contrasts
+            % Flip up, flip right
+            idx=x<=0;
+            x= -1 * x(idx);%x(x<=0);
+            y= 100 - y(idx);
+     elseif half==2 % +ve contrasts
+            % leave it
+            idx=x>=-0;
+            x=x(idx);%x(x>=0);
+            y=y(idx);
+     elseif half==3 % merge both
+            idxNeg=x<0;
+            idxPos=x>0;
+            % Check if x=zero exists
+            [idxZero]=find(sum([idxPos; idxNeg])==0);
+            if ~isempty(idxZero) %if yes, include
+                y=[y(idxZero) mean([y(idxPos);100-y(idxNeg)])];
+                x=[x(idxZero), x(x>0)];
+            else % if no, ignore
+                y=[mean([y(idxPos);100-y(idxNeg)])];
+                x=x(x>0);
+            end
+     end
      % --- Chance guide lines --- 
      line([0 0],[0 100],'Color',.4*[1 1 1],'LineStyle','--','LineWidth',.25,'HandleVisibility','off')
      line([-100 100],[50 50],'Color',.4*[1 1 1], 'LineStyle','--','LineWidth',.25,'HandleVisibility','off')
      
+     % --- Data points ---
+     if markerColor==[1 1 1]
+         lineColor=[0 0 0];
+     else
+         lineColor=markerColor;
+     end
+     h=plot(x,y,markerType,'MarkerSize',mkrSz,'Color',lineColor,'MarkerFaceColor',markerColor,'MarkerEdgeColor','k','HandleVisibility','on','LineWidth',lw);hold on;
+     %h=scatter(x,y,mkrSz,markerColor,markerType,'filled','MarkerEdgeColor','k','HandleVisibility','on','LineWidth',lw);hold on;
+     %set(h, 'MarkerFaceAlpha', alphalevel, 'MarkerEdgeAlpha', alphalevel) % set transparency level
+     %set(h, 'MarkerFaceAlpha', alphalevel, 'MarkerEdgeAlpha', 1) % set transparency level
      
      % Add ticks
+     %{
      if max(x)-min(x)<10
         addSkippedTicks(min(x),max(x),.5,'x')
      else
-         addSkippedTicks(-100,100,10,'x')
+         addSkippedTicks(0,100,10,'x')
      end
      addSkippedTicks(0,100,100/8,'y')
-     % Add limits
-     xlim([min(x),max(x)])
-     ylim([0,100])
+    %}
+    % Add limits
+     %xlim([min(x),max(x)])
+     %ylim([0,100])
      % Add title
-     h=title(sessionStr,'FontWeight','normal','FontSize',14,'FontName','Arial','interpreter','latex');
+     h=title(sessionStr,'FontWeight','normal','FontSize',14,'FontName','Arial'); %,'interpreter','latex');
      % Add verbose title (edit to add params 1-7)
      %{
      h=title({sessionStr,...
@@ -198,11 +227,12 @@ function threshold=plotFitCurve(param,logLikelihood,x,y,sessionStr,...
       'FontWeight','normal','FontSize',14,'FontName','Arial','interpreter','latex');
      %}
   
-     %pubfig(h,12,2,0.005);
+     %pubfig(h,12,-11,0.005);
 
      % Add legend 
      hLeg=legend('location','northwest');
      hLeg.ItemTokenSize = [7,25];
-     set(hLeg,'visible','off')
+     %set(hLeg,'visible','off')
      hold on
+     axis square
 end

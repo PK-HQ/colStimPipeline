@@ -51,7 +51,7 @@ if ndims(ImagingData)==3
     
     %% Sort condIDs into visual x opto conditions
     % Grouped by optostim condition
-    condIDs.blankConds = find(cellfun(@isempty,TS.Header.Conditions.ProjImg));
+    condIDs.blankConds = find(cellfun(@isempty,TS.Header.Conditions.ProjImg)); nBlanks=numel(condIDs.blankConds);
     condIDs.baselineConds = findMatch(TS.Header.Conditions.ProjImg,'Dot');
     condIDs.opto0Conds = findMatch(TS.Header.Conditions.ProjImg,'O000');
     condIDs.opto90Conds = findMatch(TS.Header.Conditions.ProjImg,'O090');
@@ -63,37 +63,51 @@ if ndims(ImagingData)==3
     condIDs.V0O90=condIDs.opto90Conds(1:numel(condIDs.opto90Conds)/2);
     condIDs.V90O90=condIDs.opto90Conds(numel(condIDs.opto90Conds)/2 + 1 : numel(condIDs.opto90Conds));
 
-    %% Subtract blank
+    %% Subtract blank, remove blank
     [blankTrialIdx,~]=find(trials.All==condIDs.blankConds);
     blankTrialsAvg=mean(ImagingData(:,:,blankTrialIdx),3);
     ImagingDataBlankSubt=ImagingData-blankTrialsAvg;
     
-    images.trials=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),max(trials.All),20);
-    images.trialsCorrect=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),max(trials.All),20);
-    images.trialsError=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),max(trials.All),20);
+    maxTrials=numel(trials.All);%max(groupcounts(trials.All));
+    maxConds=max(trials.All);
+    maxNonblankConds=maxConds-nBlanks;
+    images.trials=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),maxNonblankConds,maxTrials);
+    images.trialsCorrect=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),maxNonblankConds,maxTrials);
+    images.trialsError=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),maxNonblankConds,maxTrials);
 
-    images.average=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),max(trials.All));
-    images.averageCorrect=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),max(trials.All));
-    images.averageError=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),max(trials.All));
+    images.average=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),maxNonblankConds);
+    images.averageCorrect=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),maxNonblankConds);
+    images.averageError=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),maxNonblankConds);
     
     %% Average the imaging data by condition
-    for condID=1:max(trials.All)
+    nonblankConds=1:max(trials.All);
+    nonblankConds(condIDs.blankConds)=[];
+    for condNo=1:max(trials.All)-nBlanks
+        condID=nonblankConds(condNo);
         % get trial indices
         [condTrialIdx,~]=find(trials.All==condID);
         correctTrialIdx=intersect(usableCorrTrialIdx,condTrialIdx);
         errorTrialIdx=intersect(usableErrTrialIdx,condTrialIdx);
 
         % store trial images by condition x correct/error
-        images.trials(:,:,condID,1:numel(condTrialIdx))=ImagingDataBlankSubt(:,:,condTrialIdx);
-        images.trialsCorrect(:,:,condID,1:numel(correctTrialIdx))=ImagingDataBlankSubt(:,:,correctTrialIdx);
-        images.trialsError(:,:,condID,1:numel(errorTrialIdx))=ImagingDataBlankSubt(:,:,errorTrialIdx);
+        images.trials(:,:,condNo,1:numel(condTrialIdx))=ImagingDataBlankSubt(:,:,condTrialIdx);
+        images.trialsCorrect(:,:,condNo,1:numel(correctTrialIdx))=ImagingDataBlankSubt(:,:,correctTrialIdx);
+        images.trialsError(:,:,condNo,1:numel(errorTrialIdx))=ImagingDataBlankSubt(:,:,errorTrialIdx);
         
         % store average images by condition x correct/error
-        images.average(:,:,condID)=nanmean(images.trials(:,:,condID,:),4);
-        images.averageCorrect(:,:,condID)=nanmean(images.trialsCorrect(:,:,condID,:),4);
-        images.averageError(:,:,condID)=nanmean(images.trialsError(:,:,condID,:),4);
+        images.average(:,:,condNo)=nanmean(images.trials(:,:,condNo,:),4);
+        images.averageCorrect(:,:,condNo)=nanmean(images.trialsCorrect(:,:,condNo,:),4);
+        images.averageError(:,:,condNo)=nanmean(images.trialsError(:,:,condNo,:),4);
     end
-    %images.Average=ImagingDataBlankSubt(:,:,usableTrialIdx);
+   
+   % Remove all blank conds from idx
+   fields=fieldnames(condIDs);
+   for fn=1:numel(fields)
+       name=fields{fn};
+      % reassign
+       condIDs.(name)=condIDs.(name)-nBlanks; %=condIDs.(fn{1})
+   end
+   
 elseif ndims(ImagingData)==4
     %{
     images.All=ImagingDataBlankSubt(:,:,:,usableTrialIdx);

@@ -8,7 +8,7 @@ end
 
 
 %% imgsc(img, cmapStr, title)
-nanColor=.25;
+nanColor=1;
 cmin=min(img(:),[],'omitnan');
 cmax=max(img(:),[],'omitnan');
 
@@ -32,7 +32,9 @@ else
 end
 %colorbar
 [colormapRB,colormapR,colormapB] = fireice;
+colormap('viridis')
 
+%{
 if cmax<0
     colormap(colormapB)
 elseif cmin>=0
@@ -40,14 +42,16 @@ elseif cmin>=0
 elseif cmin<0 & cmax>0
     colormap(colormapRB)
 else
-    colormap(gray)
+    %colormap(gray)
 end
-
-colormap(gray)
+%}
+%colormap(gray)
 if contains(titleStr,'\') || contains(titleStr,'{')
     title(titleStr,'FontWeight','Normal','Interpreter','tex')
 else
     title(titleStr,'FontWeight','Normal')
 end
 set(gcf,'color','w')
+
+
 end

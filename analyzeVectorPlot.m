@@ -27,18 +27,7 @@ end
 [~,h]=suplabel('12 orientations','t',[.08 .08 .84 .76]); set(h,'FontWeight','normal');
 
 %% Load ort map, but separated into each color
-for ort=1:12
-    condResp=mapOrtSplit(:,:,1);
-    amplitudeMap(:,:,ort)=condResp.*mapOrtSplit(:,:,ort);
-    % normalize by converting to a percentage of ort map
-    amplitudeSum(ort)=sum(vector(:,:,ort),'all','omitnan')*100 ./ sum(mapOrtSplit(:,:,ort),'all','omitnan'); 
-    % Get angle and amplitude of vector
-    angle=Ort(ort); hypotenuse=amplitudeSum(ort);
-    % Convert to 2D vector coordinates
-    %vector(ort,1)=cos(angle) * hypotenuse; %x
-    %vector(ort,2)=sin(angle) * hypotenuse; %y
-end
-vectorAverage=mean(vectorSum,1);
+ [angle, amplitude, angleAverage, amplitudeAverage]=calculateProjectionVector(condResp, mapOrtSplit, Ort);
 
 % Plot circle map (one circle map per condition type: con opto, incon opto,
 % visual)

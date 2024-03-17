@@ -1,4 +1,4 @@
-function addPix2MM(minXpx,maxXpx,minYpx,maxYpx,subpltIdx,nRows,nCols)
+function addPix2MM(image,subplotIdx,nRows,nCols)
 % Imaging window in pixels and milimeters
 mmTotal=8.22;
 pxTotal=512;
@@ -6,6 +6,8 @@ pxTotal=512;
 MMperPX=mmTotal/pxTotal;
 PXperMM=pxTotal/mmTotal;
 % X-Y limits in pixels
+minXpx=1;minYpx=1;
+maxXpx=size(image,2);maxYpx=size(image,1);
 minXMM=minXpx*MMperPX;
 maxXMM=maxXpx*MMperPX;
 minYMM=minYpx*MMperPX;
@@ -19,7 +21,7 @@ set(gca,'TickDir','out')
 %% If bottom left plot, add labels and tick marks
 selectedSubplot=((nRows-1)*nCols)+1;
 
-if subpltIdx==selectedSubplot
+if subplotIdx==selectedSubplot
     
     %xlabel('X (mm)');
     %ylabel('Y (mm)');
@@ -28,36 +30,44 @@ if subpltIdx==selectedSubplot
     xticks(minXpx-minXpx:PXperMM:maxXpx-minXpx)
     nXMM=maxXMM-minXMM;
     % add xticklabels
-    xlabels = string([0:1:nXMM]); % define xticklabels
-    xlabels(2:2:end) = NaN; % remove every other one
-    ax.XAxis.TickLabels = xlabels; % set
+    xticklabels = string([0:1:nXMM]); % define xticklabels
+    xticklabels(2:2:end) = NaN; % remove every other one
+    ax.XAxis.TickLabels = xticklabels; % set
     % set xlim
     xlim([0 maxXpx-minXpx])
 
     %same for y
     yticks(minYpx-minYpx:PXperMM:maxYpx-minYpx)
     nYMM=maxYMM-minYMM;
-    ylabels = string([0:1:nYMM]); % extract
-    ylabels(2:2:end) = NaN; % remove every other one
-    ax.YAxis.TickLabels = ylabels; % set
+    yticklabels = string([0:1:nYMM]); % extract
+    yticklabels(2:2:end) = NaN; % remove every other one
+    ax.YAxis.TickLabels = yticklabels; % set
     ylim([0 maxYpx-minYpx])
+    xlabel('mm')
+    ylabel('mm')
+    
 else
+    set(gca,'Yticklabel',[]) 
+    set(gca,'Xticklabel',[])
+    %{
     % add xticks
     xticks(minXpx-minXpx:PXperMM:maxXpx-minXpx)
     nXMM=maxXMM-minXMM;
     % add xticklabels
-    xlabels = string([0:1:nXMM]); % define xticklabels
-    xlabels(:) = NaN; % remove every other one
-    ax.XAxis.TickLabels = xlabels; % set
+    xticklabels = string([0:1:nXMM]); % define xticklabels
+    xticklabels(:) = NaN; % remove every other one
+    ax.XAxis.TickLabels = xticklabels; % set
     % set xlim
     xlim([0 maxXpx-minXpx])
 
     %same for y
     yticks(minYpx-minYpx:PXperMM:maxYpx-minYpx)
     nYMM=maxYMM-minYMM;
-    ylabels = string([0:1:nYMM]); % extract
-    ylabels(:) = NaN; % remove every other one
-    ax.YAxis.TickLabels = ylabels; % set
+    yticklabels = string([0:1:nYMM]); % extract
+    yticklabels(:) = NaN; % remove every other one
+    ax.YAxis.TickLabels = yticklabels; % set
     ylim([0 maxYpx-minYpx])
+    %}
 end
+xtickangle(0)
 end

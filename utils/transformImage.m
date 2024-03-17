@@ -4,6 +4,6 @@ function transformedImage=transformImage(image,filenameStructCurrent)
 load(filenameStructCurrent.transformParams) 
 % Apply transformation to all images in image
 for nImage=1:size(image,3)
-    transformedImage(:,:,nImage)=double(imwarp(image(:,:,nImage),transformParams,'OutputView',imref2d(size(image,[1 2]))));
+    transformedImage(:,:,nImage)=double(imwarp(image(:,:,nImage),transformParams,'OutputView',imref2d([size(image,1) size(image,2)])));
 end
 end

@@ -1,28 +1,26 @@
-function [imgReference,imgTarget]=loadGreenImg(dataStructReference,dataStructCurrent,imgTargetName,imgReferenceName)
+function [imgReference,imgTarget]=loadGreenImg(currentBlockStruct,referenceBlockStruct)
 %% Find and load the reference and target green images
-if ispc
-  mainPath='Y:/';
-elseif contains(getenv('HOSTNAME'),'psy.utexas.edu')
-  mainPath='/eslab/data/';
-end
-
+%{
 filenameReferenceY=[mainPath  dataStructReference.monkey '/' dataStructReference.monkey dataStructReference.date '/green_binned.bmp'];
 filenameReferenceOI=['D:/' dataStructReference.monkey dataStructReference.date '/green_binned.bmp'];
 filenameTargetY=[mainPath  dataStructCurrent.monkey '/' dataStructCurrent.monkey dataStructCurrent.date '/green' num2str(dataStructCurrent.greenImgID) '_binned.bmp'];
 filenameTargetOI=['D:/'  dataStructCurrent.monkey dataStructCurrent.date '/green' num2str(dataStructCurrent.greenImgID) '_binned.bmp'];
-if isfile(filenameReferenceY)
-    imgReference=imread(filenameReferenceY);
-    disp(filenameReferenceY)
+%}
+imgReference=nan(512,512);
+imgTarget=nan(512,512);
+if isfile(referenceBlockStruct.greenServer)
+    imgReference=imread(referenceBlockStruct.greenServer);
+    %disp(referenceBlockStruct.greenServer)
 else
-    imgReference=imread(filenameReferenceOI);
-    disp(filenameReferenceOI)
+    imgReference=imread(referenceBlockStruct.greenOI);
+    %disp(referenceBlockStruct.greenOI)
 end
-if isfile(filenameTargetY)
-    imgTarget=imread(filenameTargetY);
-    disp(filenameTargetY)
-elseif isfile(filenameTargetOI)
-    imgTarget=imread(filenameTargetOI);
-    disp(filenameTargetOI)
+if isfile(currentBlockStruct.greenServer)
+    imgTarget=imread(currentBlockStruct.greenServer);
+    %disp(currentBlockStruct.greenServer)
+elseif isfile(currentBlockStruct.greenOI)
+    imgTarget=imread(currentBlockStruct.greenOI);
+    %disp(currentBlockStruct.greenOI)
 end
 %{
 imgTarget=imread(imgTargetName);

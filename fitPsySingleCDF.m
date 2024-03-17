@@ -1,4 +1,4 @@
-function [threshold,beta,mu,sigma,param,x,y] = fitPsyDualCDFv3(varargin)
+function [threshold,beta,mu,sigma,param,x,y] = fitPsySingleCDF(varargin)
 %% README
 % Fits psychometric function for contrast, 2 asymmetrical curves for x<mu and x>mu. Maximum Likelihood fit. Created
 % by PK (2023), modified from Giac's script.
@@ -92,62 +92,68 @@ cost = -2*sum(LL) ;
 end
 
 % --- Curve fitting for data ---
-function yFit = dualNormCDF(param,x,smoothingFlag)
+function yFit = normCDF(param,x,smoothingFlag)
 % Version: Feb 2023
 % Psychometric Function for contrast, 2 asymmetrical curves for x<mu and x>mu
-
 mu = param(1);
 sigma = param(2);
 beta = param(3);
 lapseLower = param(4);
 lapseUpper = param(5);
 
-% Fit 2 parts (<0 and >0), combine
-xLower=x(x<=0);%x(x<=0);
-xUpper=x(x>=-0);%x(x>=0);
-yFitLower=((beta) * normcdf(xLower,-mu,sigma))+lapseLower;
-yFitUpper=((1-beta-lapseLower-lapseUpper) * normcdf(xUpper,mu,sigma)) + (beta+lapseLower);
-% Combine to get single curve spanning x-range
-zeroPointExist=~isempty(find(xLower==0));
-switch zeroPointExist
-    case {0}
-        if smoothingFlag==1
-            cont=nan(2, numel(unique([xLower, xUpper])));
-            cont(1,1:numel(yFitLower))=yFitLower;
-            cont(2,end-numel(yFitUpper)+1:end)=yFitUpper;
-            yFit=mean(cont,'omitnan');
-        else
-            yFitLowerFinal=yFitLower(xLower<0);
-            yFitUpperFinal=yFitUpper(xUpper>=0);
-            yFit=[yFitLowerFinal yFitUpperFinal];
-        end
-    case {1}
-        if smoothingFlag==1
-            cont=nan(2, numel(unique([xLower, xUpper])));
-            cont(1,1:numel(yFitLower))=yFitLower;
-            cont(2,end-numel(yFitUpper)+1:end)=yFitUpper;
-            yFit=mean(cont,'omitnan');
-        else
-            yFitLowerFinal=yFitLower(xLower<0);
-            yFitUpperFinal=yFitUpper(xUpper>=0);
-            yFit=[yFitLowerFinal yFitUpperFinal];
-        end
-end
-cont=nan(2, numel(unique([xLower, xUpper])));
-cont(1,1:numel(yFitLower))=yFitLower;
-cont(2,end-numel(yFitUpper)+1:end)=yFitUpper;
-yFit=mean(cont,'omitnan');
+% Split data into 2 parts
+xHorzConds=x(x<=0);%x(x<=0);
+xVertConds=x(x>=-0);%x(x>=0);
+xSplitConds=[xHorzConds;xVertConds];
 
-% clipping, carryover from Giac's script
-yFit(yFit<0.0001) = 0.0001;
-yFit(yFit> 0.9999) = 0.9999;
+for condSet=1:size(xSplitConds,1)
+  conds=xSplitConds(condSet);
+    
+  % Fit 2 parts (<0 and >0), combine
+  yFit=((beta) * normcdf(conds,mu,sigma))+lapseLower;
+  
+  % Combine to get single curve spanning x-range
+  zeroPointExist=~isempty(find(xLower==0));
+  switch zeroPointExist
+      case {0}
+          if smoothingFlag==1
+              cont=nan(2, numel(unique([xLower, xUpper])));
+              cont(1,1:numel(yFitLower))=yFitLower;
+              cont(2,end-numel(yFitUpper)+1:end)=yFitUpper;
+              yFit=mean(cont,'omitnan');
+          else
+              yFitLowerFinal=yFitLower(xLower<0);
+              yFitUpperFinal=yFitUpper(xUpper>=0);
+              yFit=[yFitLowerFinal yFitUpperFinal];
+          end
+      case {1}
+          if smoothingFlag==1
+              cont=nan(2, numel(unique([xLower, xUpper])));
+              cont(1,1:numel(yFitLower))=yFitLower;
+              cont(2,end-numel(yFitUpper)+1:end)=yFitUpper;
+              yFit=mean(cont,'omitnan');
+          else
+              yFitLowerFinal=yFitLower(xLower<0);
+              yFitUpperFinal=yFitUpper(xUpper>=0);
+              yFit=[yFitLowerFinal yFitUpperFinal];
+          end
+  end
+  cont=nan(2, numel(unique([xLower, xUpper])));
+  cont(1,1:numel(yFitLower))=yFitLower;
+  cont(2,end-numel(yFitUpper)+1:end)=yFitUpper;
+  yFit=mean(cont,'omitnan');
+
+  % clipping, carryover from Giac's script
+  yFit(yFit<0.0001) = 0.0001;
+  yFit(yFit> 0.9999) = 0.9999;
+end
 
 end
 
 %% --- Plotting curve and scatter --- 
 function threshold=plotFitCurve(param,logLikelihood,x,y,sessionStr,...
      markerColor,markerType,hAx,smoothingFlag)
-     axes(hAx)
+     %axes(hAx)
 
      hold on
      

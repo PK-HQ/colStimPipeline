@@ -1,4 +1,4 @@
-function [betaSorted,muSorted,sigmaSorted,contrastsSorted,percentVerticalSorted]=plotPsychometricOptostimV4(dataStruct,runData,taskName,plotFlags,hAx)
+function [betaSorted,muSorted,sigmaSorted,contrastsSorted,percentVerticalSorted]=plotPsychometricFit(dataStruct,runData,taskName,plotFlags,hAx)
 %% Plots psychometric curves, thresholds, biases across sessions per monkey
 %analysis params
 gaborEccentricityWanted=1.46;%1.46;%5;
@@ -108,13 +108,13 @@ if isfield(runData.TS.Header.Conditions,'GaborSize')%'GaborSize')
         % colormap
         cmap=fireice;
         if nOptoConds==3 %when optostim and baseline are in same blocks
-            mkrCond={'o','v','^'};
+            mkrCond={'o-','v-','^-'};
             cmap=cmap([22 1+10 43-10],:); %black, blue red
         elseif nOptoConds==2 %when optostim and baseline are in different blocks
-            mkrCond={'v','^'};
+            mkrCond={'v-','^-'};
             cmap=cmap([1+10 43-10],:); %blue & red
         elseif nOptoConds==1 %when optostim and baseline are in different blocks
-            mkrCond={'o'};
+            mkrCond={'o-'};
             cmap=cmap(22,:); %black
         end
 
@@ -125,28 +125,82 @@ if isfield(runData.TS.Header.Conditions,'GaborSize')%'GaborSize')
         sigma=nan(1,3);
         contrasts=nan(nContrasts,3);
         percentVertical=nan(nContrasts,3);
-        for condSet=1:nOptoConds %baseline, opto0, opto90
-            conds2extract=[conds0(condSet,:), conds90(condSet,:)]; %[-5 -12 -30] [5 12 30]
-            betaOrientation=gaborCon(conds2extract);
-            percentHorReport=100-vertReportPrctData(conds2extract);
-            percentVertReport=vertReportPrctData(conds2extract);
-            nTrials=completedData(conds2extract);
+        for half=1:3
+            axes(hAx(half))
+            for condSet=1:nOptoConds %baseline, opto0, opto90
+                conds2extract=[conds0(condSet,:), conds90(condSet,:)]; %[-5 -12 -30] [5 12 30]
+                betaOrientation=gaborCon(conds2extract);
+                percentHorReport=100-vertReportPrctData(conds2extract);
+                percentVertReport=vertReportPrctData(conds2extract);
+                nTrials=completedData(conds2extract);
 
-            % Maximum likelihood fit with a generalized gaussian fun
-            %[muFit, betaFit, sigmaFit, Lapse, Likelihood] = FitPsyML(betaOrientation,percentVertReport,percentHorReport,'plot')
-                       
-            %[~,betaFit,muFit,sigmaFit] = fitPsyDualCDFv2(betaOrientation,percentVertReport,dataDir.date,cmap(condSet,:),mkrCond{condSet});
-            [betaOrientation,percentVertReport]=mergeZeros(betaOrientation,percentVertReport);
-            [~,betaFit,muFit,sigmaFit,param,x,y] = fitPsyDualCDFv3(betaOrientation,percentVertReport,dataStruct.date,cmap(condSet,:),mkrCond{condSet},hAx);
-            fprintf('mu=%.2f, sigma=%.2f, beta=%.2f, lapseLower=%.2f, lapseUpper=%.2f\n',param(1),param(2),param(3),param(4),param(5))
-            hold on;
-            beta(condSet)=betaFit;
-            mu(condSet)=muFit;
-            sigma(condSet)=sigmaFit;
-            contrasts(:,condSet)=betaOrientation;
-            percentVertical(:,condSet)=percentVertReport;            
+                % Maximum likelihood fit with a generalized gaussian fun
+                %[muFit, betaFit, sigmaFit, Lapse, Likelihood] = FitPsyML(betaOrientation,percentVertReport,percentHorReport,'plot')
+
+                %[~,betaFit,muFit,sigmaFit] = fitPsyDualCDFv2(betaOrientation,percentVertReport,dataDir.date,cmap(condSet,:),mkrCond{condSet});
+                [betaOrientation,percentVertReport]=mergeZeros(betaOrientation,percentVertReport);
+                % define separate axes for each half
+                [~,betaFit,muFit,sigmaFit,param,x,y] = fitPsyCDF(betaOrientation,percentVertReport,dataStruct.date,cmap(condSet,:),mkrCond{condSet},hAx,half);
+                fprintf('mu=%.2f, sigma=%.2f, beta=%.2f, lapseLower=%.2f, lapseUpper=%.2f\n',param(1),param(2),param(3),param(4),param(5))
+                hold on;
+                beta(condSet)=betaFit;
+                mu(condSet)=muFit;
+                sigma(condSet)=sigmaFit;
+                contrasts(:,condSet)=betaOrientation;
+                percentVertical(:,condSet)=percentVertReport;            
+                upFontSize(24,0.01)
+            end
+            % axis labels
+            if half==1
+                title('Horizontal stimuli');
+                ylabel('Correct (%)')
+                xlabel('Gabor contrast (%)')
+                upFontSize(24,0.01)
+
+
+            
+                xlims=[-1 1] *100;%.*roundup(abs(unique(xlim)),10);
+                xlim([0 round(max(betaOrientation)/50)*50])
+                addSkippedTicks(0,100,12.5,'x')
+                addSkippedTicks(0,100,12.5,'y')
+                % legend
+                [h,icons] = legend({'Baseline','Con. optostim (H-opto)','Incon. optostim (V-opto)'},'location','southeast');
+                icons = findobj(icons, '-property', 'Marker', '-and', '-not', 'Marker', 'none');
+                set(icons,'MarkerSize',15,'linewidth',3);
+            elseif half==2
+                title('Vertical stimuli');
+                ylabel('Correct (%)')
+                legend off 
+                upFontSize(24,0.01)
+
+            
+                xlims=[-1 1] *100;%.*roundup(abs(unique(xlim)),10);
+                xlim([0 round(max(betaOrientation)/50)*50])
+                addSkippedTicks(0,100,12.5,'x')
+                addSkippedTicks(0,100,12.5,'y')
+                % legend
+                [h,icons] = legend({'Baseline','Incon. optostim (H-opto)','Con. optostim (V-opto)'},'location','southeast');
+                icons = findobj(icons, '-property', 'Marker', '-and', '-not', 'Marker', 'none');
+                set(icons,'MarkerSize',15,'linewidth',3);
+            elseif half==3
+                title('Combined stimuli');
+                ylabel('Correct (%)')
+                legend off 
+                upFontSize(24,0.01)
+                
+            
+                xlims=[-1 1] *100;%.*roundup(abs(unique(xlim)),10);
+                xlim([0 round(max(betaOrientation)/50)*50])
+                addSkippedTicks(0,100,12.5,'x')
+                addSkippedTicks(0,100,12.5,'y')
+                % legend
+                [h,icons] = legend({'Baseline','Incon. optostim','Con. optostim'},'location','southeast');
+                icons = findobj(icons, '-property', 'Marker', '-and', '-not', 'Marker', 'none');
+                set(icons,'MarkerSize',15,'linewidth',3);
+                
+            end
         end
-
+        
         betaSorted=[beta(2) beta(1) beta(3)];
         muSorted=[mu(2) mu(1) mu(3)];
         sigmaSorted=[sigma(2) sigma(1) sigma(3)];
@@ -161,19 +215,7 @@ if isfield(runData.TS.Header.Conditions,'GaborSize')%'GaborSize')
         %}
         %pubfig(h,12,2,0.005);
 
-        % axis labels
-        ylabel('% Vertical reports')
-        xlabel('Gabor orientation')
 
-        % legend
-        legend({'Baseline','H stim (0\circ)','V-stim (90\circ)'})
-
-        upFontSize(14,0.01)
-        % ax ticks
-        
-        xlims=[-1 1].*roundup(abs(unique(xlim)),10);
-        addSkippedTicks(xlims(1),xlims(2),20,'x')
-        addSkippedTicks(0,100,12.5,'y')
       case {'split'}
         % relevant DV
         condData=runData.TS.Header.Conditions;
@@ -280,7 +322,7 @@ if isfield(runData.TS.Header.Conditions,'GaborSize')%'GaborSize')
                        
             %[~,betaFit,muFit,sigmaFit] = fitPsyDualCDFv2(betaOrientation,percentVertReport,dataDir.date,cmap(condSet,:),mkrCond{condSet});
             [betaOrientation,percentVertReport]=mergeZeros(betaOrientation,percentVertReport);
-            [~,betaFit,muFit,sigmaFit,param,x,y] = fitPsyDualCDFv3(betaOrientation,percentVertReport,dataStruct.date,cmap(condSet,:),mkrCond{condSet},hAx);
+            [~,betaFit,muFit,sigmaFit,param,x,y] = fitPsyCDF(betaOrientation,percentVertReport,dataStruct.date,cmap(condSet,:),mkrCond{condSet},hAx);
 
             
             fprintf('mu=%.2f, sigma=%.2f, beta=%.2f, lapseLower=%.2f, lapseUpper=%.2f\n',param(1),param(2),param(3),param(4),param(5))

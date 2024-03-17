@@ -1,4 +1,4 @@
-function [betaSorted,muSorted,sigmaSorted]=analyzeBiasingBlock(dsCurrentSess,saveFlag,saveType)
+function [betaSorted,muSorted,sigmaSorted,contrastsSorted,percentVerticalSorted]=analyzeBiasingBlock(dsCurrentSess,hAx,saveFlag,saveType)
 %% Main script to run all behavioral biasing analyses
 filenameStructCurrent=generateFilenames(dsCurrentSess);
 if strcmp(saveType,'psychfit')
@@ -14,7 +14,7 @@ taskName='optostim';
 if ispc
     pcID=getenv('COMPUTERNAME');
     switch pcID
-        case {'SEIDEMANN2PANAL'}
+        case {'CVIS-A64882','PSYC-A77304'}
             userStr='pktan';
         case {'LA-CPSD077020WD','LA-CPSA07019WD'}
             userStr='esexpt';
@@ -40,45 +40,67 @@ nSessions=1;
 plotCurve=1;
 plotThreshold=1;
 plotBias=1;
-if isempty(filenameStructCurrent.baselinerun) % all opto and baseline conds in same block
-    figure('Name','Psychometrics'); hold on
+if isempty(filenameStructCurrent.baselineTS) % all opto and baseline conds in same block
     runData=load(filenameStructCurrent.TS);
-    [betaSorted,muSorted,sigmaSorted]=plotPsychometricOptostimV4(dsCurrentSess,runData,taskName,...
-    [plotCurve,plotThreshold,plotBias]);
-    xticks(-100:10:100)
-    hold off
-    xtickangle(gca,0)
-    upFontSize(18,0.005)
+    [betaSorted,muSorted,sigmaSorted,contrastsSorted,percentVerticalSorted]=plotPsychometricOptostimV4(dsCurrentSess,runData,taskName,...
+    [plotCurve,plotThreshold,plotBias],hAx); hold on;
+    % Add title
+    %{
+    h=title({dsCurrentSess.date,...
+         ['${\beta}$: ' num2str(betaSorted(2),'%.2f') ', '  num2str(betaSorted(1),'%.2f') ', ' num2str(betaSorted(3),'%.2f')]},...
+         'FontWeight','normal','FontSize',14,'FontName','Arial','interpreter','latex');
+    %}
+    h=title({dsCurrentSess.date,...
+         ['\beta: ' num2str(betaSorted(2),'%.2f') ', '  num2str(betaSorted(1),'%.2f') ', ' num2str(betaSorted(3),'%.2f')]},...
+         'FontWeight','normal','FontSize',14,'FontName','Arial','interpreter','tex');
     axis square
     switch saveFlag
       case {1}
-        export_fig(pdfFilename,'-pdf','-nocrop','-append');
+        export_fig(pdfFilename,'-pdf','-nocrop','-append','-transparent');
     end
 else  % opto and baseline conds in separate block
     runData=load(filenameStructCurrent.TS);
-    baselineData=load(filenameStructCurrent.baselinerun);
-    figure('Name','Psychometrics'); hold on
-    [betaBaseline,muBaseline,sigmaBaseline]=plotPsychometricOptostimV4(dsCurrentSess,baselineData,taskName,...
-    [plotCurve,plotThreshold,plotBias]); hold on
-    [betaOptostim,muOptostim,sigmaOptostim]=plotPsychometricOptostimV4(dsCurrentSess,runData,taskName,...
-    [plotCurve,plotThreshold,plotBias]);
+    baselineData=load(filenameStructCurrent.baselineTS);
+    [betaBaseline,muBaseline,sigmaBaseline,contrastsBaseline,percentVerticalBaseline]=plotPsychometricOptostimV4(dsCurrentSess,baselineData,taskName,...
+    [plotCurve,plotThreshold,plotBias],hAx); hold on
+    [betaOptostim,muOptostim,sigmaOptostim,contrastsOptostim,percentVerticalOptostim]=plotPsychometricOptostimV4(dsCurrentSess,runData,taskName,...
+    [plotCurve,plotThreshold,plotBias],hAx); hold on;
     betaSorted=[betaOptostim(2) betaBaseline(2) betaOptostim(1)];
     muSorted=[muOptostim(2) muBaseline(1) muOptostim(1)];
     sigmaSorted=[sigmaOptostim(2) sigmaBaseline(1) sigmaOptostim(1)];
-    xticks(-100:10:100)
-    hold off
-    xtickangle(gca,0)
-    upFontSize(18,0.005)
+    
+    % if number of contrasts dont match in baseline and optostim blocks
+    condDifference=numel(contrastsOptostim(:,1))-numel(contrastsBaseline(:,1));
+    if condDifference>0
+        contrastsBaseline(end+condDifference,:)=NaN;
+        percentVerticalBaseline(end+condDifference,:)=NaN;
+    end
+    
+    contrastsSorted=[contrastsOptostim(:,2) contrastsBaseline(:,2) contrastsOptostim(:,1)];
+    percentVerticalSorted=[percentVerticalOptostim(:,2) percentVerticalBaseline(:,2) percentVerticalOptostim(:,1)];
+
+    % Add title
+    %{
+    h=title({[dsCurrentSess.date 'R' dsCurrentSess.run],...
+        ['Mean columns: ' num2str(mean(dsCurrentSess.nColumns))],...
+         ['${\beta}$: ' num2str(betaOptostim(2),'%.2f') ', '  num2str(betaBaseline(2),'%.2f') ', ' num2str(betaOptostim(1),'%.2f')]},...
+         'FontWeight','normal','FontSize',14,'FontName','Arial','interpreter','latex');
+     %}
+    temporalpower=unique(runData.TS.Header.Conditions.ProjTTLPulseOn);
+     h=title({[dsCurrentSess.date 'R' dsCurrentSess.run],...
+        ['Columns: ' num2str(mean(dsCurrentSess.nColumns)) ' (' num2str(temporalpower) 'ms)'],...
+         ['\beta: ' num2str(betaOptostim(2),'%.2f') ', '  num2str(betaBaseline(2),'%.2f') ', ' num2str(betaOptostim(1),'%.2f')]},...
+         'FontWeight','normal','FontSize',14,'FontName','Arial','interpreter','tex');
     axis square
+    upFontSize(24, .01)
     switch saveFlag
       case {1}
-        export_fig(pdfFilename,'-pdf','-nocrop','-append');
+        export_fig(pdfFilename,'-pdf','-nocrop','-append','-transparent');
     end
 end
-
-
 for stimcond=1:3
     fprintf('Cond %.0f: %.2f (%.2f)\n',stimcond,mean(betaSorted(:,stimcond)), std(betaSorted(:,stimcond)))
 end
+hold off
 
 end
