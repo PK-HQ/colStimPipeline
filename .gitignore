@@ -1,0 +1,12 @@
+/autoRunDA
+/ColSeries
+/docs
+/FEXfunctions
+/GeneralDataAnalyses
+/GEVI
+/store
+/testcode
+*.asv
+*.xlsx
+*.xls
+*.mat
