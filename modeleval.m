@@ -4,19 +4,15 @@ saveflag=0;
 
 % Define a struct array with multiple paramsStructs
 paramsArray = struct(...
-    'params1', struct('alphaCon', nlinspace(0, 1, 10, 'nonlinear'), 'alphaIncon', 0.001, 'optoV', 0, 'nPower', 4), ...
-    'params2', struct('alphaIncon', nlinspace(0, 1, 10, 'nonlinear'), 'alphaCon',1, 'optoV', 0, 'nPower', 4), ...
-    'params3', struct('betaCon', nlinspace(0, 1, 10, 'nonlinear'), 'betaIncon', 0, 'alphaCon', 0.1, 'alphaIncon', 0, 'optoV', 1, 'optoH', 0, 'nPower', 8), ...
-    'params4', struct('betaIncon', nlinspace(0, 1, 10, 'nonlinear'), 'betaCon', 0.3, 'alphaCon', 0.1, 'alphaIncon', 0, 'optoV', 1, 'optoH', 0, 'nPower', 8), ...
-    'params5', struct('betaCon', nlinspace(0, 1, 10, 'nonlinear'), 'betaIncon', 0.4, 'alphaCon', 0.1, 'alphaIncon', 0, 'optoV', 1, 'optoH', 1, 'nPower', 8), ...
-    'params6', struct('betaIncon', nlinspace(0, 1, 10, 'nonlinear'), 'betaCon', 0, 'alphaCon', 0.1, 'alphaIncon', 0, 'optoV', 1, 'optoH', 1, 'nPower', 8), ...
-    'params7', struct('betaCon', .3, 'betaIncon', 0.01, 'alphaCon', .1, 'alphaIncon', 0, 'optoV',  nlinspace(0, 1.5, 10, 'linear'), 'optoH', 1, 'nPower', 8));
+    'params1', struct('alphaCon', nlinspace(0, 1, 10, 'nonlinear'), 'alphaIncon', 0.001, 'optoV', 0, 'nPower', 3), ...
+    'params2', struct( 'alphaCon', .01, 'betaCon', 1, 'betaIncon', .0001, 'optoV', nlinspace(0, 1, 10, 'nonlinear'), 'optoH', 0, 'optoBL',  0.00001, 'nPower', 3),...
+    'params3', struct( 'alphaCon', .01, 'betaCon',1, 'betaIncon',0, 'optoV', .3, 'optoH', 0, 'optoBL', nlinspace(0, .001, 10, 'nonlinear'), 'nPower', 3));
 
 % Determine how many sets of parameters there are
 numParams = numel(fieldnames(paramsArray));
 
 % Loop through each paramsStruct in paramsArray
-for i = 7%3:numParams
+for i = numParams
     % Extract the current paramsStruct by dynamically accessing fields of paramsArray
     currentParamsStruct = paramsArray.(sprintf('params%d', i));
     
@@ -28,7 +24,7 @@ for i = 7%3:numParams
     [hAx, ~] = tight_subplot(nRows, nCols, [gap gap], [marginV+.05 marginV+.2], [marginH marginH]);
     
     % Call the simulation function with the current paramsStruct
-    simulateParameterEffects(currentParamsStruct, hAx);
+    simulateParameterEffects(currentParamsStruct, hAx, 'full');
     
     % Set common labels and titles, if applicable
     upFontSize(24, 0.005);

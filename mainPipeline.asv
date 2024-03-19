@@ -27,8 +27,8 @@ switch pipelineMode
 
         % Define reference (orientation map) session and current session
         % (for optostim experiment)
-        dsReferenceSess=datastruct(referenceSessID); %moving reference ort map
-        dsCurrentSess=datastruct(currentSessID); %fixed current session map, which ort map will be projected onto
+        dsReferenceSess=datastruct(referenceSessID); %moving, e.g. ort map
+        dsCurrentSess=datastruct(currentSessID); %fixed, to get ort map projected onto
         filenameStructCurrent=generateFilenames(dsCurrentSess);
         pdfFilename=filenameStructCurrent.neurometricPDF;
 
@@ -36,14 +36,20 @@ switch pipelineMode
         [columnarBitmap,VERpca,columnarmapStats]=getColumnarBitmapV4(mainPath,dsReferenceSess,dsCurrentSess,bitmapParams, ...
           plotFlag, saveFlag, pdfFilename);
 
-        % Coregister reference session orientation map to the cortical view of current session 
+        % Coregister reference session orientation map to the vasculature of the cortical view of current session's 
         [columnarBitmapCoregistered, columnarPCAsCoregistered]=coregisterBitmap2GreenImgV2(dsReferenceSess,dsCurrentSess, ...
           columnarBitmap,VERpca,plotFlag,saveFlag, pdfFilename);
         
-        % create bitmap from orientation map, applying alignment matrix and
-        % accounting for projector dimensions (i.e. a rectangle)
+        % Correct for camera-projector alignment
         orts=[0 90];%0:15:165;
         HE=1000;
+        
+        % Define sessions
+        dsReferenceSess=datastruct(referenceSessID); %moving, e.g. ort map
+        dsCurrentSess=datastruct(currentSessID); %fixed, to get ort map projected onto
+        
+        % create bitmap from orientation map, applying alignment matrix and
+        % accounting for projector dimensions (i.e. a rectangle)
         [projBitmapTRBB,bitmapsCamSpace,nBlobs,medianBlobAreas]=convertForProjector(dsReferenceSess,dsCurrentSess,columnarBitmapCoregistered,orts,...
             bitmapParams.gridSize,bitmapParams.gammaCorrFactor,bitmapParams.sensitivity,'cam2proj',alignmentTransform,plotFlag,saveFlagBMP,saveFlag, pdfFilename);
 end

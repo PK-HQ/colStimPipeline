@@ -30,10 +30,11 @@ for columnRange=1:size(columnRanges,1)
             y=squeeze(behavioralData.percentageCorrect(lineNo,plotID,:,selectedBlocks));
 
             %SEM plot
-            [binnedX, meanY]=plotSEMv2(x,y,lineColor{lineNo},markerType{lineNo}); hold on;
+            [binnedX, meanY, binnedY]=plotSEM(x,y,lineColor{lineNo},markerType{lineNo}); hold on;
 
             if lineNo<=3
-                fitParams = fitNakaRushtonRobustaBisquare(binnedX, meanY, initParam);
+                [fitParams,negLogLikelihood] = fitNakaRushtonMLE(binnedX, binnedY, initParam);
+                %fitParams = fitNakaRushtonRobustaBisquare(binnedX, meanY, initParam);
                 % NR fit plot
                 behavioralData.fit(lineNo,plotID)=fitParams; % saving params
                 %offwarning
@@ -42,7 +43,8 @@ for columnRange=1:size(columnRanges,1)
                 fitParams.fittedMeanY=modelFunc([fitParams.rmax, fitParams.exponent, fitParams.c50, fitParams.beta],xplot);
                 plotFittedLine(xplot, fitParams.fittedMeanY, lineColor{lineNo}); hold on
             elseif lineNo==4
-                fitParams = fitNakaRushtonRobustaBisquare(binnedX, 100-meanY, initParam);
+                [fitParams,negLogLikelihood] = fitNakaRushtonMLE(binnedX, 100-binnedY, initParam);
+                %fitParams = fitNakaRushtonRobustaBisquare(binnedX, 100-meanY, initParam);
                 % NR fit plot
                 behavioralData.fit(lineNo,plotID)=fitParams; % saving params
                 %offwarning

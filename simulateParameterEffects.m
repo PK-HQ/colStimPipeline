@@ -1,6 +1,5 @@
-function simulateParameterEffects(paramsStruct, hAx)
+function simulateParameterEffects(paramsStruct, hAx, modelComplexity)
     %% Initialize Parameters
-    
     visBL = 0;
     alphaCon = 0.1;
     alphaIncon = 0;
@@ -11,7 +10,6 @@ function simulateParameterEffects(paramsStruct, hAx)
     betaIncon = 0;
     c50 = .5;
     nPower = 2;
-    
     
     %% Parameters: Visual stimulus
     visV = nlinspace(0, 100, 100, 'nonlinear'); %-100:1:0;
@@ -38,14 +36,17 @@ function simulateParameterEffects(paramsStruct, hAx)
         if length(paramRange) > 1
             mainParamName=paramName;
             mainParamRange=paramRange;
-            colormapRGB = slanCM('plasma', numel(paramRange));
-            colormap(colormapRGB); % Set the colormap
+
+            exclusionBuffer=5; exclusionBuffers=exclusionBuffer*2 + 1;
+            colormapCon = (slanCM('sunburst', numel(paramRange)+exclusionBuffers)); 
+            colormapCon=[0 0 0; colormapCon([exclusionBuffer+1:end-exclusionBuffer],:)];%plasma
+            colormapIncon = (slanCM('freeze', numel(paramRange)+exclusionBuffers));  
+            colormapIncon=[0 0 0; colormapIncon([exclusionBuffer+1:end-exclusionBuffer],:)];%plasma
 
             for j = 1:length(paramRange)
                 % Update the varying parameter
                 eval([paramName ' = paramRange(j);']);
-
-                prctHorizontal = zeros(1, numel(contrasts));
+                prctVertical = zeros(1, numel(contrasts));
 
                 %% Predicted vertical reports
                 for nContrast = 1:numel(contrasts)
@@ -54,11 +55,26 @@ function simulateParameterEffects(paramsStruct, hAx)
                     contrastV = max(0, contrast);
 
                     % Calculate responses
-                    respH = (alphaCon * contrastH) + (alphaIncon * contrastV) + visBL + ...
-                            (betaCon * (optoH + optoBL)) + (betaIncon * (optoV + optoBL));
-                    respV = (alphaIncon * contrastH) + (alphaCon * contrastV) + visBL + ...
-                            (betaIncon * (optoH + optoBL)) + (betaCon * (optoV + optoBL));
-
+                    switch modelComplexity
+                        case 'full'
+                            % H-columns
+                            visualH=(alphaCon * contrastH) + (alphaIncon * contrastV) + visBL;
+                            optoH=(betaCon * (optoH + optoBL)) + (betaIncon * (optoV + optoBL));
+                            respH =  visualH + optoH;
+                            % V-columns
+                            visualV=(alphaIncon * contrastH) + (alphaCon * contrastV) + visBL;
+                            optoV=(betaIncon * (optoH + optoBL)) + (betaCon * (optoV + optoBL));
+                            respV = visualV + optoV;
+                        case 'simple'
+                            % H-columns
+                            visualH=(alphaCon * contrastH);
+                            optoH=(betaCon * (optoH + optoBL));
+                            respH =  visualH + optoH;
+                            % V-columns
+                            visualV=(alphaCon * contrastV);
+                            optoV=(betaCon * (optoV + optoBL));
+                            respV = visualV + optoV;
+                    end
                     % Feed through Naka Rushton
                     RespHmean = ComputeNakaRushton([c50, nPower], respH);
                     RespVmean = ComputeNakaRushton([c50, nPower], respV);
@@ -66,7 +82,7 @@ function simulateParameterEffects(paramsStruct, hAx)
                     deltaResp = RespVmean - RespHmean;
                     scaling = sqrt(RespHmean + RespVmean);
                     respTrial = 2 * deltaResp / scaling;
-                    prctHorizontal(nContrast) = normcdf(respTrial);
+                    prctVertical(nContrast) = normcdf(respTrial);
                 end
 
                 % Plotting with the specified color for current parameter range
@@ -78,20 +94,18 @@ function simulateParameterEffects(paramsStruct, hAx)
                 % Plot on hAx(1) for negative contrasts
                 axes(hAx(1));
                 hold on;
-                if paramRange(j)<.1
-                    plot(contrasts(positiveIndices), prctHorizontal(positiveIndices)*100, 'LineWidth', 2, 'Color', colormapRGB(j, :), 'DisplayName', num2str(paramRange(j),1));
-                elseif paramRange(j)>.1
-                    plot(contrasts(positiveIndices), prctHorizontal(positiveIndices)*100, 'LineWidth', 2, 'Color', colormapRGB(j, :), 'DisplayName', num2str(paramRange(j),'%.1f'));
+                if paramRange(j)==0
+                    lineName='Baseline';
+                elseif paramRange(j)>0 && paramRange(j)<.1
+                    lineName=num2str(paramRange(j),1);
+                elseif paramRange(j)>0 && paramRange(j)>.1
+                    lineName=num2str(paramRange(j),'%.1f');
                 end
+                plot(contrasts(positiveIndices), prctVertical(positiveIndices)*100, 'LineWidth', 2, 'Color', colormapCon(j, :), 'DisplayName', lineName);
                 
                 axes(hAx(2));
                 hold on;
-                if paramRange(j)<.1
-                    plot(-1*contrasts(negativeIndices), 100-prctHorizontal(negativeIndices)*100, 'LineWidth', 2, 'Color', colormapRGB(j, :), 'DisplayName', num2str(paramRange(j),1));
-                elseif paramRange(j)>.1
-                    plot(-1*contrasts(negativeIndices), 100-prctHorizontal(negativeIndices)*100, 'LineWidth', 2, 'Color', colormapRGB(j, :), 'DisplayName', num2str(paramRange(j),'%.1f'));
-                end
-
+                plot(-1*contrasts(negativeIndices), 100-prctVertical(negativeIndices)*100, 'LineWidth', 2, 'Color', colormapIncon(j, :), 'DisplayName', lineName);
                 
             end
             break; % Exit after plotting the parameter with a range
@@ -140,6 +154,7 @@ end
 
 %% Subfunctions
 function [paramNameSymbol, paramNameMini, paramNameFull, unitStr]=decodeParamName(paramName)
+unitStr=' a.u.';
 switch paramName
     case 'alphaCon'
         paramNameSymbol='\alpha_{iso}';
@@ -166,6 +181,11 @@ switch paramName
         paramNameSymbol='opto_{V}';
         paramNameMini='opto_{V} strength';
         paramNameFull=['Strength of opto_{V}'];
+        unitStr='%%';
+    case 'optoBL'
+        paramNameSymbol='opto_{BL}';
+        paramNameMini='opto_{BL} strength';
+        paramNameFull=['Strength of opto_{BL}'];
         unitStr='%%';
     case 'c50'
         paramNameSymbol='C_{50}';
