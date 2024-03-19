@@ -1,7 +1,7 @@
 function analyzeSessionPsychometrics(behavioralData, bitmapData, datastruct, analysisBlockID, saveFlag)
 % Naka-Rushton params (Rmax, Exponent, C50, Beta)
-initParam.min = [1, .001, 10, 20];
-initParam.max = [80, 9, 100, 100];
+initParams.min = [10, .1, 10, 20];
+initParams.max = [80, 4, 50, 80];
 
 lineColor={[0 0 0],[0.9294, 0.1098, 0.1373]*1.05,[0, 0.0941, 0.6627]*1.25,[0.4471, 0.0353, 0.7176]*1.1};%{'k','#ED1C23','#0018A9','#7209B7'};
 markerType={'o','^','v','diamond'};
@@ -33,7 +33,7 @@ for columnRange=1:size(columnRanges,1)
             [binnedX, meanY, binnedY]=plotSEM(x,y,lineColor{lineNo},markerType{lineNo}); hold on;
 
             if lineNo<=3
-                [fitParams,negLogLikelihood] = fitNakaRushtonMLE(binnedX, binnedY, initParam);
+                [fitParams] = fitNakaRushtonMLE(binnedX, binnedY, initParams);
                 %fitParams = fitNakaRushtonRobustaBisquare(binnedX, meanY, initParam);
                 % NR fit plot
                 behavioralData.fit(lineNo,plotID)=fitParams; % saving params
@@ -43,7 +43,7 @@ for columnRange=1:size(columnRanges,1)
                 fitParams.fittedMeanY=modelFunc([fitParams.rmax, fitParams.exponent, fitParams.c50, fitParams.beta],xplot);
                 plotFittedLine(xplot, fitParams.fittedMeanY, lineColor{lineNo}); hold on
             elseif lineNo==4
-                [fitParams,negLogLikelihood] = fitNakaRushtonMLE(binnedX, 100-binnedY, initParam);
+                [fitParams] = fitNakaRushtonMLE(binnedX, 100-binnedY, initParams);
                 %fitParams = fitNakaRushtonRobustaBisquare(binnedX, 100-meanY, initParam);
                 % NR fit plot
                 behavioralData.fit(lineNo,plotID)=fitParams; % saving params
@@ -129,7 +129,7 @@ for blockNo=1:numel(selectedBlocks)
             [binnedX, meanY]=plotSEM(x,y,lineColor{lineNo},markerType{lineNo}); hold on;
 
             if lineNo<=3
-                fitParams = fitNakaRushtonRobustaBisquare(binnedX, meanY, initParam);
+                fitParams = fitNakaRushtonRobustaBisquare(binnedX, meanY, initParams);
                 % NR fit plot
                 behavioralData.fit(lineNo,plotID)=fitParams; % saving params
                 %offwarning
