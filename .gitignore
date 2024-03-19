@@ -1,9 +1,13 @@
-/GEVI
 /autoRunDA
-/store
-/docs
 /ColSeries
+/docs
 /FEXfunctions
 /GeneralDataAnalyses
+/GEVI
+/store
 /testcode
 /utils
+*.asv
+*.xlsx
+*.xls
+*.m
