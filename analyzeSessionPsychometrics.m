@@ -9,7 +9,7 @@ lineOrder=[2 1 3 4];xpos=0;ypos=-.20;
 
 
 %% Plot summary of all blocks
-columnRanges=[1 40; 1 5; 6 19; 20 40];
+columnRanges=[20 40];%[1 40; 20 40; 6 19; 1 5];
 
 for columnRange=1:size(columnRanges,1)
     % Get blocks within column range
@@ -30,7 +30,7 @@ for columnRange=1:size(columnRanges,1)
             y=squeeze(behavioralData.percentageCorrect(lineNo,plotID,:,selectedBlocks));
 
             %SEM plot
-            [binnedX, meanY, binnedY]=plotSEM(x,y,lineColor{lineNo},markerType{lineNo}); hold on;
+            [binnedX, meanY, binnedY]=plotSEMv2(x,y,lineColor{lineNo},markerType{lineNo}); hold on;
 
             if lineNo<=3
                 [fitParams] = fitNakaRushtonMLE(binnedX, binnedY, initParams);
@@ -43,7 +43,8 @@ for columnRange=1:size(columnRanges,1)
                 fitParams.fittedMeanY=modelFunc([fitParams.rmax, fitParams.exponent, fitParams.c50, fitParams.beta],xplot);
                 plotFittedLine(xplot, fitParams.fittedMeanY, lineColor{lineNo}); hold on
             elseif lineNo==4
-                [fitParams] = fitNakaRushtonMLE(binnedX, 100-binnedY, initParams);
+                adjustedY = cellfun(@(y) 100 - y, binnedY, 'UniformOutput', false);
+                [fitParams] = fitNakaRushtonMLE(binnedX, adjustedY, initParams);
                 %fitParams = fitNakaRushtonRobustaBisquare(binnedX, 100-meanY, initParam);
                 % NR fit plot
                 behavioralData.fit(lineNo,plotID)=fitParams; % saving params
@@ -58,7 +59,7 @@ for columnRange=1:size(columnRanges,1)
             if  lineNo==1 % Add header
                 % State fit parameters
                 headerText = sprintf(...
-                 ['{\\bfParameters}        {\\bf\\beta}        {\\bfR_{max}}        {\\bfC_{50}}         {\\bfn}          {\\bfR_{robust}^{2}}']);
+                 ['{\\bfParameters}        {\\bf\\beta}        {\\bfR_{max}}        {\\bfC_{50}}         {\\bfn}          {\\bfR_{pseudo}^{2}}']);
                  text(xpos,ypos,headerText,'Units','normalized', 'VerticalAlignment','top', 'HorizontalAlignment','left','Color','k')
             end
 
@@ -66,7 +67,7 @@ for columnRange=1:size(columnRanges,1)
                 newlineStr=repmat('\n',1,lineOrder(lineNo));
                 paramsText=sprintf(...
                 [newlineStr '                           %.0f        %.0f            %.0f          %02.f          %0.2f'], ...
-                fitParams.beta, fitParams.rmax, fitParams.c50, fitParams.exponent, fitParams.R2);
+                fitParams.beta, fitParams.rmax, fitParams.c50, fitParams.exponent, fitParams.pseudoR2);
                 text(xpos,ypos-.02,paramsText,'Units','normalized', 'VerticalAlignment','top', 'HorizontalAlignment','left','Color',lineColor{lineNo});
                 upFontSize(24,0.01)
         end
@@ -126,7 +127,7 @@ for blockNo=1:numel(selectedBlocks)
             y=squeeze(behavioralData.percentageCorrect(lineNo,plotID,:,selectedBlocks(blockNo)));
 
             %SEM plot
-            [binnedX, meanY]=plotSEM(x,y,lineColor{lineNo},markerType{lineNo}); hold on;
+            [binnedX, meanY]=plotSEMv2(x,y,lineColor{lineNo},markerType{lineNo}); hold on;
 
             if lineNo<=3
                 fitParams = fitNakaRushtonRobustaBisquare(binnedX, meanY, initParams);
@@ -154,7 +155,7 @@ for blockNo=1:numel(selectedBlocks)
             if  lineNo==1 % Add header
                 % State fit parameters
                 headerText = sprintf(...
-                 ['{\\bfParameters}        {\\bf\\beta}        {\\bfR_{max}}        {\\bfC_{50}}         {\\bfn}          {\\bfR_{robust}^{2}}']);
+                 ['{\\bfParameters}        {\\bf\\beta}        {\\bfR_{max}}        {\\bfC_{50}}         {\\bfn}          {\\bfR_{pseudo}^{2}}']);
                  text(xpos,ypos,headerText,'Units','normalized', 'VerticalAlignment','top', 'HorizontalAlignment','left','Color','k')
             end
             if lineNo<=3
@@ -162,7 +163,7 @@ for blockNo=1:numel(selectedBlocks)
                 newlineStr=repmat('\n',1,lineOrder(lineNo));
                 paramsText=sprintf(...
                 [newlineStr '                           %.0f        %.0f            %.0f          %02.f          %0.2f'], ...
-                fitParams.beta, fitParams.rmax, fitParams.c50, fitParams.exponent, fitParams.R2);
+                fitParams.beta, fitParams.rmax, fitParams.c50, fitParams.exponent, fitParams.pseudoR2);
                 text(xpos,ypos-.02,paramsText,'Units','normalized', 'VerticalAlignment','top', 'HorizontalAlignment','left','Color',lineColor{lineNo});
                 upFontSize(24,0.01)
             end

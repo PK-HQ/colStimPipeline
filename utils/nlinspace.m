@@ -26,11 +26,11 @@ function spacedValues = nlinspace(startValue, endValue, numPoints, spacingType)
     end
     
     % Remove the last element to ensure the correct number of points
-    spacedValues = spacedValues(1:end-1);
+    spacedValues = spacedValues(1:end);
     
     % Scale the values to the specified range
     spacedValues = (endValue - startValue) * spacedValues / max(spacedValues);
     
     % Include the startValue at the beginning of the array
-    spacedValues = [startValue spacedValues];
+    %spacedValues = [startValue spacedValues];
 end

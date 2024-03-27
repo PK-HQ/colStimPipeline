@@ -81,9 +81,13 @@ function bin = processBin(x, y, binMin, binMax)
     if ~isempty(binValues)
         bin.meanY = mean(binValues,'omitnan');
         bin.sems = std(binValues,'omitnan') / sqrt(numel(binValues));
+        binValues'
+        bin.sems'
     else
         bin.meanY = NaN;
         bin.sems = NaN;
+        binValues'
+        bin.sems'
     end
 end
 

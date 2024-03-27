@@ -37,7 +37,7 @@ function simulateParameterEffects(paramsStruct, hAx, modelComplexity)
             mainParamName=paramName;
             mainParamRange=paramRange;
 
-            exclusionBuffer=5; exclusionBuffers=exclusionBuffer*2 + 1;
+            exclusionBuffer=2; exclusionBuffers=round(exclusionBuffer*1) + 2;
             colormapCon = (slanCM('sunburst', numel(paramRange)+exclusionBuffers)); 
             colormapCon=[0 0 0; colormapCon([exclusionBuffer+1:end-exclusionBuffer],:)];%plasma
             colormapIncon = (slanCM('freeze', numel(paramRange)+exclusionBuffers));  
@@ -92,8 +92,6 @@ function simulateParameterEffects(paramsStruct, hAx, modelComplexity)
                 positiveIndices = contrasts >= 0;
                 
                 % Plot on hAx(1) for negative contrasts
-                axes(hAx(1));
-                hold on;
                 if paramRange(j)==0
                     lineName='Baseline';
                 elseif paramRange(j)>0 && paramRange(j)<.1
@@ -101,12 +99,12 @@ function simulateParameterEffects(paramsStruct, hAx, modelComplexity)
                 elseif paramRange(j)>0 && paramRange(j)>.1
                     lineName=num2str(paramRange(j),'%.1f');
                 end
-                plot(contrasts(positiveIndices), prctVertical(positiveIndices)*100, 'LineWidth', 2, 'Color', colormapCon(j, :), 'DisplayName', lineName);
-                
-                axes(hAx(2));
+                %axes(hAx(1));
                 hold on;
-                plot(-1*contrasts(negativeIndices), 100-prctVertical(negativeIndices)*100, 'LineWidth', 2, 'Color', colormapIncon(j, :), 'DisplayName', lineName);
-                
+                plot(contrasts(positiveIndices), prctVertical(positiveIndices)*100, 'LineWidth', 2, 'Color', colormapCon(j, :), 'DisplayName', lineName);
+                %axes(hAx(1));
+                hold on;
+                plot(-1*contrasts(negativeIndices), 100-prctVertical(negativeIndices)*100, 'LineWidth', 2, 'Color', colormapIncon(j, :), 'HandleVisibility','off');
             end
             break; % Exit after plotting the parameter with a range
         end
@@ -117,14 +115,16 @@ function simulateParameterEffects(paramsStruct, hAx, modelComplexity)
     suplabel({paramNameFull,sprintf(['%s: %.1f - %.1f' unitStr],...
         paramNameSymbol,min(mainParamRange),max(mainParamRange))},'t', [.1 .1 .77 .77]);
 
-    for ax=1:2
-        axes(hAx(ax));
+    for ax=1:length(hAx)
+        if length(hAx)>1
+            axes(hAx(ax));
+        end
         xMax=40; yMax=100;
         xlim([0 xMax]); xticks([0:10:xMax])
         ylim([0 yMax]); yticks([0:10:yMax])
 
         if ax==1
-            title('Vertical gabor')
+            %title('Vertical gabor')
             ylabel('Correct reports (%)'); xlabel('Absolute gabor contrast');
             
             % Parameters and their values for the textbox
