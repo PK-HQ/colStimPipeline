@@ -4,7 +4,7 @@ analysisMode='summary'; %summary/psychometrics/beta/neurometric/stability/neurom
 currentSessID=112;%for biasing expt
 
 % Save, plot flags
-saveFlag=1;
+saveFlag=0;
 saveFlagBMP=0; 
 plotFlag=1;
 
@@ -101,10 +101,11 @@ switch analysisMode
                 
        %% Load data if needed
        % load('Y:\Chip\Meta\summary\statisticsHPC.mat')
+       % load('Y:\Chip\Meta\summary\statisticsR.mat')
 
         %% Psychometrics
         % === Session summary ===
-        analyzeSessionPsychometrics(behavioralData, bitmapData, datastruct, analysisBlockID, saveFlag)
+        behavioralData=analyzeSessionPsychometrics(behavioralData, bitmapData, datastruct, analysisBlockID, chamberWanted, saveFlag)
         %export_fig('Y:\users\PK\Eyal\meetings\summary\summarypsychometrics1to40.pdf','-pdf','-nocrop');
 
         % === Power series ===

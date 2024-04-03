@@ -1,12 +1,16 @@
 function [binnedX, meanY, binnedY] = plotSEMv2(x, y, lineColor, markerType)
     bins = -2.5:5:102.5; % Define bins
+
+    
+
     % Initialize binData structure to store raw Y values
     binData = arrayfun(@(binMin, binMax) initBin(x, y, binMin, binMax), bins(1:end-1), bins(2:end), 'UniformOutput', false);
     binData = [binData{:}];
     
-    % Merging logic
-    binData = mergeBinData(binData);
-    
+    if size(x,2) > 1
+        % Merging logic
+        binData = mergeBinData(binData);
+    end
     % After merging, process bins to calculate mean and sem
     binData = arrayfun(@(bin) processBinAfterMerging(bin), binData, 'UniformOutput', false);
     binData = [binData{:}];
@@ -24,8 +28,11 @@ function [binnedX, meanY, binnedY] = plotSEMv2(x, y, lineColor, markerType)
     meanY = meanY(validIndices);
     binnedY = binnedY(validIndices);
     semY = semY(validIndices);
-    counts = counts(validIndices);
-
+    if size(x,2) > 1
+        counts = counts(validIndices);
+    else
+        counts = counts(validIndices)*10;
+    end
     % Plotting remains unchanged...
     plotData(binnedX, meanY, semY, y, lineColor, markerType, counts);
 end

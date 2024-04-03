@@ -1,4 +1,4 @@
-function analyzeSessionPsychometrics(behavioralData, bitmapData, datastruct, analysisBlockID, saveFlag)
+function behavioralData=analyzeSessionPsychometrics(behavioralData, bitmapData, datastruct, analysisBlockID, chamberWanted, saveFlag)
 % Naka-Rushton params (Rmax, Exponent, C50, Beta)
 initParams.min = [10, .1, 10, 20];
 initParams.max = [80, 4, 50, 80];
@@ -7,10 +7,15 @@ lineColor={[0 0 0],[0.9294, 0.1098, 0.1373]*1.05,[0, 0.0941, 0.6627]*1.25,[0.447
 markerType={'o','^','v','diamond'};
 lineOrder=[2 1 3 4];xpos=0;ypos=-.20;
 
+% Filenames
+filenameA=['Y:/Chip/Meta/biasingSeries/biasingSeriesSummary' chamberWanted '.pdf'];
+filenameB=['Y:/users/PK/Eyal/meetings/biasingSeries/biasingSeriesSummary' chamberWanted '.pdf'];
+filenameC=['Y:/Chip/Meta/biasingSeries/biasingSeries' chamberWanted '.pdf'];
+filenameD=['Y:/users/PK/Eyal/meetings/biasingSeries/biasingSeries' chamberWanted '.pdf'];
 
 %% Plot summary of all blocks
-columnRanges=[20 40];%[1 40; 20 40; 6 19; 1 5];
-
+columnRanges=[1 40];%[1 40; 20 40; 6 19; 1 5];
+%{
 for columnRange=1:size(columnRanges,1)
     % Get blocks within column range
     [selectedBlocks, selectedBlockIDs]=powerfilter(bitmapData, analysisBlockID, 'fixed',columnRanges(columnRange,:));
@@ -33,10 +38,11 @@ for columnRange=1:size(columnRanges,1)
             [binnedX, meanY, binnedY]=plotSEMv2(x,y,lineColor{lineNo},markerType{lineNo}); hold on;
 
             if lineNo<=3
-                [fitParams] = fitNakaRushtonMLE(binnedX, binnedY, initParams);
+                [fitParams] = fitNakaRushtonMLE(binnedX, binnedY);
                 %fitParams = fitNakaRushtonRobustaBisquare(binnedX, meanY, initParam);
                 % NR fit plot
-                behavioralData.fit(lineNo,plotID)=fitParams; % saving params
+                %behavioralData.fit(lineNo,plotID)=fitParams; % saving params
+                behavioralData.fitSession(lineNo,plotID,columnRange)=fitParams;
                 %offwarning
                 modelFunc = @(b, x) (b(1) .* (x.^b(2)) ./ (b(3).^b(2) + x.^b(2))) + b(4); %remove epsilon
                 xplot= 0:1:100;
@@ -44,10 +50,10 @@ for columnRange=1:size(columnRanges,1)
                 plotFittedLine(xplot, fitParams.fittedMeanY, lineColor{lineNo}); hold on
             elseif lineNo==4
                 adjustedY = cellfun(@(y) 100 - y, binnedY, 'UniformOutput', false);
-                [fitParams] = fitNakaRushtonMLE(binnedX, adjustedY, initParams);
+                [fitParams] = fitNakaRushtonMLE(binnedX, adjustedY);
                 %fitParams = fitNakaRushtonRobustaBisquare(binnedX, 100-meanY, initParam);
                 % NR fit plot
-                behavioralData.fit(lineNo,plotID)=fitParams; % saving params
+                behavioralData.fitSession(lineNo,plotID,columnRange)=fitParams;
                 %offwarning
                 modelFunc = @(b, x) (b(1) .* (x.^b(2)) ./ (b(3).^b(2) + x.^b(2))) + b(4); %remove epsilon
                 xplot= 0:1:100;
@@ -89,15 +95,15 @@ for columnRange=1:size(columnRanges,1)
         numel(selectedBlocks)),'t',[.1 .1 .82 .84])
     upFontSize(24,0.01)
     if columnRange==1 && saveFlag==1
-        export_fig('Y:/Chip/Meta/biasingSeries/biasingSeriesSummaryRclean.pdf','-pdf','-nocrop');
+        export_fig(filenameA,'-pdf','-nocrop');
     elseif columnRange>1 && saveFlag==1
-        export_fig('Y:/Chip/Meta/biasingSeries/biasingSeriesSummaryRclean.pdf','-pdf','-append','-nocrop');
+        export_fig(filenameA,'-pdf','-append','-nocrop');
     end
 end
 
 %dupe to meetings
-copyfile('Y:/Chip/Meta/biasingSeries/biasingSeriesSummaryRclean.pdf', 'Y:/users/PK/Eyal/meetings/biasingSeries/biasingSeriesSummaryRclean.pdf')
-
+copyfile(filenameA, filenameB)
+%}
 %% Plot individual blocks
 % Filter by power
 [selectedBlocks, selectedBlockIDs]=powerfilter(bitmapData, analysisBlockID, 'fixed');
@@ -118,7 +124,7 @@ for blockNo=1:numel(selectedBlocks)
     [hAx,~]=tight_subplot(nRows,nCols,[gap gap], [marginV+.27 marginV+.13], [marginH marginH]);
     for plotID=1:3 % for H-stim, V-stim or combined
         axes(hAx(plotID));
-        for lineNo=1:4 % plot BL/H/V/Diff-opto
+        for lineNo=1:4 % plot BL/V/H/Diff-opto
             if lineNo==1
                 %line([0 0],[0 100],'Color',.6*[1 1 1],'LineStyle','--','LineWidth',.25,'HandleVisibility','off'); hold on
                 line([0 100],[50 50],'Color',.6*[1 1 1], 'LineStyle','--','LineWidth',.25,'HandleVisibility','off'); hold on
@@ -127,12 +133,11 @@ for blockNo=1:numel(selectedBlocks)
             y=squeeze(behavioralData.percentageCorrect(lineNo,plotID,:,selectedBlocks(blockNo)));
 
             %SEM plot
-            [binnedX, meanY]=plotSEMv2(x,y,lineColor{lineNo},markerType{lineNo}); hold on;
-
+            [binnedX, meanY, binnedY]=plotSEMv2(x,y,lineColor{lineNo},markerType{lineNo}); hold on;
             if lineNo<=3
-                fitParams = fitNakaRushtonRobustaBisquare(binnedX, meanY, initParams);
+                 [fitParams] = fitNakaRushtonMLE(binnedX, binnedY);
                 % NR fit plot
-                behavioralData.fit(lineNo,plotID)=fitParams; % saving params
+                behavioralData.fit(lineNo,plotID,selectedBlocks(blockNo))=fitParams; % saving params
                 %offwarning
                 modelFunc = @(b, x) (b(1) .* (x.^b(2)) ./ (b(3).^b(2) + x.^b(2))) + b(4); %remove epsilon
                 xplot= 0:1:100;
@@ -148,7 +153,7 @@ for blockNo=1:numel(selectedBlocks)
                 xplot= 0:1:100;
                 fitParams.fittedMeanY=modelFunc([fitParams.rmax, fitParams.exponent, fitParams.c50, fitParams.beta],xplot);
                 fitParams.fittedMeanY=100-fitParams.fittedMeanY;
-                plotFittedLine(xplot, fitParams.fittedMeanY, lineColor{lineNo}); hold on
+                plotFittedLine(xplot, fitParams.fittedMeanY, lineColor{lineNo}); hold ons
                 %}
             end
 
@@ -176,7 +181,7 @@ for blockNo=1:numel(selectedBlocks)
     axes(hAx(1)); title('Vertical stimuli','FontWeight','normal'); ylabel('Correct (%)'); xlabel('Absolute gabor contrast (%)'); 
     % legend order
     legend({'Incongruent','Congruent','Baseline'},'Location', 'east', 'FontSize',18);
-    h = get(gca,'Children'); set(gca,'Children',h([11 9 10 1:8]));    
+    h = get(gca,'Children'); set(gca,'Children',[h(1:end-3); h([end end-1 end-2])]);
     % Subplot #2    
     axes(hAx(2)); title('Horizontal stimuli','FontWeight','normal');
     % Subplot #3
@@ -192,14 +197,14 @@ for blockNo=1:numel(selectedBlocks)
     
     % Save
     if blockNo==1 && saveFlag==1
-        export_fig('Y:/Chip/Meta/biasingSeries/biasingSeriesR.pdf','-pdf','-nocrop');
+        export_fig(filenameC,'-pdf','-nocrop');
     elseif blockNo>1 && saveFlag==1
-        export_fig('Y:/Chip/Meta/biasingSeries/biasingSeriesR.pdf','-pdf','-append','-nocrop');
+        export_fig(filenameC,'-pdf','-append','-nocrop');
     end
 end
 
 
 % dupe to meetings
-copyfile('Y:/Chip/Meta/biasingSeries/biasingSeriesR.pdf', 'Y:/users/PK/Eyal/meetings/biasingSeries/biasingSeriesR.pdf')
+copyfile(filenameC, filenameD)
 
 end

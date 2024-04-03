@@ -289,6 +289,8 @@ switch paramName
         paramNameFull=['Naka-Rushton exponent'];
 end
 switch hypothesis
+    case ''
+        hypothesisNameFull='Base model';
     case 'snr'
         hypothesisNameFull='\Delta SNR (no opto-percept)';
     case 'decisionbias'

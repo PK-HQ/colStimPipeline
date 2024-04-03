@@ -1,4 +1,4 @@
-function [fitParams, negLogLikelihood] = fitNakaRushtonMLE(x, yCells, initParams)
+function [fitParams, negLogLikelihood] = fitNakaRushtonMLE(x, yCells)
     % Assume more informed initial guesses and bounds are set here
     yMeans = cellfun(@mean, cellfun(@double, yCells, 'UniformOutput', false));
     
@@ -7,16 +7,19 @@ function [fitParams, negLogLikelihood] = fitNakaRushtonMLE(x, yCells, initParams
     [initRmax, initExp, initC50, initBeta] = guessInitialParams(x, yMeans);
     initGuess = [initRmax, initExp, initC50, initBeta];
     bounds.min = [initRmax * 0.9, 0, initC50*.8, initBeta*.6]; % Example adjustment
-    bounds.max = [initRmax * 2, 4, initC50*2, initBeta*1.1]; % Example adjustment
+    bounds.max = [initRmax * 2, 5, initC50*1.2, initBeta*1.1]; % Example adjustment
 
     % Define the custom negative log-likelihood function
     negLogLikelihoodFunc = @(params) -sum(cellfun(@(y, xi) logLikelihoodPerContrast(params, xi, y), yCells, num2cell(x)));
 
     % Optimization options
-    options = optimoptions('fmincon', 'Display', 'none', 'Algorithm', 'sqp','MaxIterations',10000);
+    options = optimoptions('fmincon', 'Display', 'none', 'Algorithm', 'sqp','MaxIterations', 20000, 'TolFun', 1e-8, 'TolX', 1e-8);
+
+    % Nonlinear constraint to ensure Rmax + Beta <= 100
+    nonlcon = @(params) deal([], max(0, params(1) + params(4) - 100));
 
     % Minimize the negative log-likelihood with adjusted bounds
-    [outputParams, negLogLikelihood] = fmincon(negLogLikelihoodFunc, initGuess, [], [], [], [], bounds.min, bounds.max, [], options);
+    [outputParams, negLogLikelihood] = fmincon(negLogLikelihoodFunc, initGuess, [], [], [], [], bounds.min, bounds.max, nonlcon, options);
 
     % Pseudo R2
     pseudoR2 = NaN;%calculateNagelkerkeR2(yCells, negLogLikelihood);
@@ -30,15 +33,36 @@ function [initRmax, initExp, initC50, initBeta] = guessInitialParams(x, yMeans)
     initRmax = max(yMeans) - min(yMeans);
     
     % guess NR: exp (intermediate between min and max exponent)
-    initExp = mean([0 4]);
+    initExp = mean([3]);
     
     % guess NR: c50 (midpoint between the delta of mean responses)
-    closest_index = find(abs(yMeans - (initRmax/2 + min(yMeans))) == min(abs(yMeans - (initRmax/2 + min(yMeans)))));
-    flanking_indices = closest_index + [0, 1];
-    initC50 = mean(x(flanking_indices));
+    initC50 = computeInitC50(yMeans, initRmax, x);
     
     % guess vertical offset: beta (lowest mean response)
     initBeta = min(yMeans);
+end
+
+function initC50 = computeInitC50(yMeans, initRmax, x)
+    absoluteDelta = abs(yMeans - (initRmax / 2 + min(yMeans)));
+    closest_index = find(absoluteDelta == min(absoluteDelta));
+
+    % Adjust for cases with multiple equally close values
+    if numel(closest_index) > 2
+        closest_index = closest_index([1, 2]); % Take first two if more than two indices are equally close
+    elseif numel(closest_index) == 2
+        % Already ideal scenario, take them as they are
+    else
+        % For a single closest index, attempt to add the next index if it doesn't exceed bounds
+        if closest_index < numel(yMeans)
+            closest_index = [closest_index, closest_index + 1];
+        % If the closest index is the last element, consider the previous one as well, if possible
+        elseif closest_index > 1
+            closest_index = [closest_index - 1, closest_index];
+        end
+    end
+
+    % Compute the mean of the x values at the adjusted closest indices
+    initC50 = mean(x(closest_index));
 end
 
 function ll = logLikelihoodPerContrast(params, xi, yi)
