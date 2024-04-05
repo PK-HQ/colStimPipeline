@@ -109,7 +109,7 @@ switch analysisMode
         %export_fig('Y:\users\PK\Eyal\meetings\summary\summarypsychometrics1to40.pdf','-pdf','-nocrop');
 
         % === Power series ===
-        nColumns=20;
+        nColumns=20;  
         plotPowerSeries(bitmapData, behavioralData, nColumns);
         %export_fig('Y:/Chip/Meta/powerSeries/powerSeries.pdf','-pdf','-nocrop');
 

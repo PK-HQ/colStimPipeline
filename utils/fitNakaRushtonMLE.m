@@ -1,31 +1,65 @@
-function [fitParams, negLogLikelihood] = fitNakaRushtonMLE(x, yCells)
+function [fitParams, negLogLikelihood, pseudoR2] = fitNakaRushtonMLE(x, yCells, fixedParams)
     % Assume more informed initial guesses and bounds are set here
     yMeans = cellfun(@mean, cellfun(@double, yCells, 'UniformOutput', false));
     
-    %% Adjust initial guesses and bounds based on the data (rmax, exp, c50, beta)
-    % guess initial params
+    % Define bounds and initial guesses based on the data
     [initRmax, initExp, initC50, initBeta] = guessInitialParams(x, yMeans);
-    initGuess = [initRmax, initExp, initC50, initBeta];
-    bounds.min = [initRmax * 0.9, 0, initC50*.8, initBeta*.6]; % Example adjustment
-    bounds.max = [initRmax * 2, 5, initC50*1.2, initBeta*1.1]; % Example adjustment
-
-    % Define the custom negative log-likelihood function
-    negLogLikelihoodFunc = @(params) -sum(cellfun(@(y, xi) logLikelihoodPerContrast(params, xi, y), yCells, num2cell(x)));
+    bounds.min = [initRmax * 0.9, 0, initC50*.8, initBeta*.6]; 
+    bounds.max = [initRmax * 2, 5, initC50*1.2, initBeta*1.1]; 
 
     % Optimization options
-    options = optimoptions('fmincon', 'Display', 'none', 'Algorithm', 'sqp','MaxIterations', 20000, 'TolFun', 1e-8, 'TolX', 1e-8);
+    options = optimoptions('fmincon', 'Display', 'none', 'Algorithm', 'sqp', 'MaxIterations', 20000, 'TolFun', 1e-8, 'TolX', 1e-8);
+    
+    if ~isempty(fixedParams)
+        fprintf('Constrained fitting with fixed values... ')
+        % Adjust the fitting process based on fixedParams
+        fixedIndices = ~isnan(fixedParams); % Indices of fixed parameters
+        toFitIndices = isnan(fixedParams); % Indices of parameters to fit
 
-    % Nonlinear constraint to ensure Rmax + Beta <= 100
-    nonlcon = @(params) deal([], max(0, params(1) + params(4) - 100));
+        % Adjust initial guesses and bounds for parameters to fit
+        initGuessToFit = [initRmax, initExp, initC50, initBeta];
+        initGuessToFit=initGuessToFit(toFitIndices);
+        boundsToFit.min = bounds.min(toFitIndices);
+        boundsToFit.max = bounds.max(toFitIndices);
 
-    % Minimize the negative log-likelihood with adjusted bounds
-    [outputParams, negLogLikelihood] = fmincon(negLogLikelihoodFunc, initGuess, [], [], [], [], bounds.min, bounds.max, nonlcon, options);
+        if ~isempty(initGuessToFit)
+        
+            % Adjust negLogLikelihood function for partial fitting
+            negLogLikelihoodFunc = @(fitParams) negLogLikelihoodWithFixedParams(fitParams, fixedParams, fixedIndices, toFitIndices, x, yCells);
+    
+            % Nonlinear constraint to ensure Rmax + Beta <= 100, considering fixedParams
+            nonlcon = @(fitParams) deal([], constraintRmaxPlusBeta(fitParams, fixedParams, toFitIndices));
+            
+            % Perform fitting only for parameters that are NaN in fixedParams
+            [fittedParams, negLogLikelihood] = fmincon(negLogLikelihoodFunc, initGuessToFit, [], [], [], [], boundsToFit.min, boundsToFit.max, nonlcon, options);
+            
+            % Merge fitted parameters with non-NaN entries in fixedParams
+            outputParams = fixedParams;
+            outputParams(toFitIndices) = fittedParams;
+        else
+            outputParams=fixedParams;
+        end
+    else
+        fprintf('Free fitting with no fixed values... ')
+        % If fixedParams is empty, follow your existing fitting process
+        initGuess = [initRmax, initExp, initC50, initBeta];
+        nonlcon = @(params) deal([], max(0, params(1) + params(4) - 100)); % Existing constraint
+        [outputParams, negLogLikelihood] = fmincon(negLogLikelihoodFunc, initGuess, [], [], [], [], bounds.min, bounds.max, nonlcon, options);
+    end
 
-    % Pseudo R2
+    % Compute pseudo R2 as before
     pseudoR2 = NaN;%calculateNagelkerkeR2(yCells, negLogLikelihood);
 
     % Assign fitted parameters
     fitParams = struct('rmax', outputParams(1), 'exponent', outputParams(2), 'c50', outputParams(3), 'beta', outputParams(4), 'pseudoR2', pseudoR2);
+    
+    % Check that fixedParams are obeyed
+    checkTmp=vertcat(outputParams)==fixedParams;
+    if sum(checkTmp==fixedIndices)==numel(fixedIndices)
+        fprintf('Constrains are obeyed\n')
+    else
+        fprintf('Constrains are not obeyed\n')
+    end
 end
 
 function [initRmax, initExp, initC50, initBeta] = guessInitialParams(x, yMeans)
@@ -65,6 +99,28 @@ function initC50 = computeInitC50(yMeans, initRmax, x)
     initC50 = mean(x(closest_index));
 end
 
+function [c, ceq] = constraintRmaxPlusBeta(fitParams, fullParams, toFitIndices)
+    % Update the full parameter set with fitted parameters
+    fullParams(toFitIndices) = fitParams;
+    
+    % Nonlinear inequality constraint ensures Rmax + Beta <= 100
+    % Since 'fmincon' minimizes under the condition c <= 0,
+    % we rearrange Rmax + Beta <= 100 to Rmax + Beta - 100 <= 0.
+    c = fullParams(1) + fullParams(4) - 100;
+    
+    % No equality constraints
+    ceq = [];
+end
+
+
+% Define a sub-function to adjust the negLogLikelihood function to incorporate fixed parameters
+function negLL = negLogLikelihoodWithFixedParams(fitParams, fixedParams, fixedIndices, toFitIndices, x, yCells)
+    params = fixedParams;
+    params(toFitIndices) = fitParams; % Insert fitted parameters into their correct positions
+    % Calculate negative log-likelihood using the combined parameter vector
+    negLL = -sum(cellfun(@(y, xi) logLikelihoodPerContrast(params, xi, y), yCells, num2cell(x)));
+end
+
 function ll = logLikelihoodPerContrast(params, xi, yi)
     % Guard against division by zero or undefined behavior for xi = 0
     xi(xi == 0) = eps; % Small positive value close to zero
@@ -100,3 +156,11 @@ function pseudoR2 = calculateNagelkerkeR2(yCells, negLogLikelihood)
     % Adjust with Nagelkerke's formula to get Nagelkerke's R^2
     pseudoR2 = R2_CoxSnell / (1 - L0^(2 / n));
 end
+
+function ll = logLikelihoodConstantModel(yi, meanResponse)
+    sigmaYi = std(yi);
+    if sigmaYi == 0, sigmaYi = eps; end % Avoid division by zero in likelihood calculation
+    % Compute log-likelihood for a constant model
+    ll = -0.5 * numel(yi) * log(2 * pi * sigmaYi^2) + sum(((yi - meanResponse).^2) / (2 * sigmaYi^2));
+end
+

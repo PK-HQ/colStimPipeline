@@ -8,10 +8,8 @@ markerType={'o','^','v','diamond'};
 lineOrder=[2 1 3 4];xpos=0;ypos=-.20;
 
 % Filenames
-filenameA=['Y:/Chip/Meta/biasingSeries/biasingSeriesSummary' chamberWanted '.pdf'];
-filenameB=['Y:/users/PK/Eyal/meetings/biasingSeries/biasingSeriesSummary' chamberWanted '.pdf'];
-filenameC=['Y:/Chip/Meta/biasingSeries/biasingSeries' chamberWanted '.pdf'];
-filenameD=['Y:/users/PK/Eyal/meetings/biasingSeries/biasingSeries' chamberWanted '.pdf'];
+filename=['biasingSeriesSummaryConstrained' chamberWanted];
+monkeyName='Chip';
 
 %% Plot summary of all blocks
 columnRanges=[1 40];%[1 40; 20 40; 6 19; 1 5];
@@ -94,15 +92,11 @@ for columnRange=1:size(columnRanges,1)
     suplabel(sprintf('Session summary (n_{col}=%.0f - %.0f, n_{blocks}=%.0f)',columnRanges(columnRange,1), columnRanges(columnRange,2),...
         numel(selectedBlocks)),'t',[.1 .1 .82 .84])
     upFontSize(24,0.01)
-    if columnRange==1 && saveFlag==1
-        export_fig(filenameA,'-pdf','-nocrop');
-    elseif columnRange>1 && saveFlag==1
-        export_fig(filenameA,'-pdf','-append','-nocrop');
-    end
+    
+    %Save as PDF
+    savePDF(filename, monkeyName, saveFlag, columnRange)
 end
 
-%dupe to meetings
-copyfile(filenameA, filenameB)
 %}
 %% Plot individual blocks
 % Filter by power
@@ -135,7 +129,12 @@ for blockNo=1:numel(selectedBlocks)
             %SEM plot
             [binnedX, meanY, binnedY]=plotSEMv2(x,y,lineColor{lineNo},markerType{lineNo}); hold on;
             if lineNo<=3
-                 [fitParams] = fitNakaRushtonMLE(binnedX, binnedY);
+                % allow rmax and β to vary, c50 and exp fixed
+                fixedParams=behavioralData.initParams(:,lineNo); fixedParams([1 4])=NaN; 
+                if lineNo==1 && plotID==3
+                    %fixedParams([1 4])=50;
+                end
+                fitParams = fitNakaRushtonMLE(binnedX, binnedY, fixedParams);
                 % NR fit plot
                 behavioralData.fit(lineNo,plotID,selectedBlocks(blockNo))=fitParams; % saving params
                 %offwarning
@@ -195,16 +194,8 @@ for blockNo=1:numel(selectedBlocks)
         char(0177) ' ' num2str(std(bitmapData.adjustedSPD_uW(1,:,selectedBlock)),2) ' ' char(181) 'W mm^{-2})']},'t',[.1 .1 .87 .83]);
     upFontSize(24,0.01)
     
-    % Save
-    if blockNo==1 && saveFlag==1
-        export_fig(filenameC,'-pdf','-nocrop');
-    elseif blockNo>1 && saveFlag==1
-        export_fig(filenameC,'-pdf','-append','-nocrop');
-    end
+    % Save as PDF
+    savePDF(filename, monkeyName, saveFlag, blockNo)
 end
-
-
-% dupe to meetings
-copyfile(filenameC, filenameD)
 
 end
