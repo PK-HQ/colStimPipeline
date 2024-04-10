@@ -8,7 +8,7 @@ markerType={'o','^','v','diamond'};
 lineOrder=[2 1 3 4];xpos=0;ypos=-.20;
 
 % Filenames
-filename=['biasingSeriesSummaryConstrained' chamberWanted];
+filename=['biasingSeriesSummaryFree' chamberWanted];
 monkeyName='Chip';
 
 %% Plot summary of all blocks
@@ -130,8 +130,8 @@ for blockNo=1:numel(selectedBlocks)
             [binnedX, meanY, binnedY]=plotSEMv2(x,y,lineColor{lineNo},markerType{lineNo}); hold on;
             if lineNo<=3
                 % allow rmax and β to vary, c50 and exp fixed
-                fixedParams=behavioralData.initParams(:,lineNo); fixedParams([1 4])=NaN; 
-                if lineNo==1 && plotID==3
+                fixedParams=behavioralData.initParams(:,lineNo); fixedParams([1:4])=NaN; 
+                if lineNo==1
                     %fixedParams([1 4])=50;
                 end
                 fitParams = fitNakaRushtonMLE(binnedX, binnedY, fixedParams);

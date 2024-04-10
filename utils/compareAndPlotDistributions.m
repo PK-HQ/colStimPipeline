@@ -1,4 +1,4 @@
-function compareAndPlotDistributions(paramsStruct, chamberWanted, saveFlag, blockNo)
+function compareAndPlotDistributions(paramsStruct, chamberWanted, saveFlag)
     % Filenames
     filename=['fitParamsConstrained' chamberWanted];
     monkeyName='Chip';
@@ -58,16 +58,16 @@ function compareAndPlotDistributions(paramsStruct, chamberWanted, saveFlag, bloc
             colorIndex2 = colorPairs{i}(2);
 
             histogram(pair{1}, 'Normalization', 'probability', 'BinWidth', binWidth, 'FaceColor', lineColors{colorIndex1}, 'FaceAlpha', 0.7);
-            xline(median(pair{1}),'--','LineWidth',2,'HandleVisibility','off')
+            xline(median(pair{1}),'--','LineWidth',2,'HandleVisibility','off');
             hold on;
             histogram(pair{2}, 'Normalization', 'probability', 'BinWidth', binWidth, 'FaceColor', lineColors{colorIndex2}, 'FaceAlpha', 0.7);
-            xline(median(pair{2}),'--','LineWidth',2,'HandleVisibility','off')
+            xline(median(pair{2}),'--','LineWidth',2,'HandleVisibility','off');
 
             xlim(xlimits);
             ylim([0 1]);
             axis square;
             title(sprintf('p = %.3f', pVals(i)));
-            xlabel(fieldName);
+            xlabel([upper(fieldName(1)) fieldName(2:end)]);
             ylabel('Probability');
             upFontSize()
             legend(pairLegendNames{i}, 'Location', 'northwest');
@@ -75,6 +75,6 @@ function compareAndPlotDistributions(paramsStruct, chamberWanted, saveFlag, bloc
         suplabel(upper(fieldName),'t',[.1 .1 .835 .78]);upFontSize()
 
         % Save as PDF
-        savePDF(filename, monkeyName, saveFlag, blockNo)
+        savePDF(filename, monkeyName, saveFlag, fieldIndex)
     end
 end

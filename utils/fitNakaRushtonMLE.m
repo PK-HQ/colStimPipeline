@@ -126,11 +126,11 @@ function ll = logLikelihoodPerContrast(params, xi, yi)
     xi(xi == 0) = eps; % Small positive value close to zero
     
     % Naka-Rushton function calculation
-    Rmax = params(1);
+    Rmax = 100-params(4);
     n = params(2);
     C50 = params(3);
-    offset = params(4);
-    predicted = (Rmax .* xi.^n) ./ (C50.^n + xi.^n) + offset;
+    beta = params(4);
+    predicted = (Rmax .* xi.^n) ./ (C50.^n + xi.^n) + beta;
     
     % Standard deviation for yi observations
     sigmaYi = std(yi);
