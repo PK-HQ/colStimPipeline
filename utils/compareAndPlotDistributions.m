@@ -14,9 +14,9 @@ function compareAndPlotDistributions(paramsStruct, chamberWanted, saveFlag)
         fieldData = vertcat(paramsStruct.(fieldName));
         
         % Prepare the data subsets
-        param1 = fieldData(1:3:end);
-        param2 = fieldData(2:3:end);
-        param3 = fieldData(3:3:end);
+        param1 = fieldData(:,1);
+        param2 = fieldData(:,2);
+        param3 = fieldData(:,3);
 
         % Ensure vectors are the same length for pairwise comparison
         minLength = min([length(param1), length(param2), length(param3)]);
@@ -51,7 +51,7 @@ function compareAndPlotDistributions(paramsStruct, chamberWanted, saveFlag)
                 xlimits = [0, currentMax+5];
             else
                 binWidth = 10;
-                xlimits = [0, currentMax+10];
+                xlimits = [0, 100];
             end
 
             colorIndex1 = colorPairs{i}(1);

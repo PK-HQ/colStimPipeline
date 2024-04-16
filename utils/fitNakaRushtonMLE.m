@@ -1,166 +1,144 @@
-function [fitParams, negLogLikelihood, pseudoR2] = fitNakaRushtonMLE(x, yCells, fixedParams)
-    % Assume more informed initial guesses and bounds are set here
-    yMeans = cellfun(@mean, cellfun(@double, yCells, 'UniformOutput', false));
+function params = fitNakaRushtonMLE(xBlocks, yBlocks, objFunc)
+    %% Fits the 3D matrices of x and y (3 conditions x 6 contrast levels x 16 blocks) with a 
+    % Naka-Rushton function, and with MLE (binomial dist assumption)
+    % Input: 
+    %       x = contrast values (range 0:100%), 3 conditions x 6 contrast levels x 16 blocks
+    %       y = percentage correct (range 0:100%), 3 conditions x 6 contrast levels x 16 blocks
+    % Output:
+    %       params = [β, n, C50]
+
+    % Define the number of blocks and conditions
+    [nConditions, nContrasts, nBlocks] = size(xBlocks);
     
-    % Define bounds and initial guesses based on the data
-    [initRmax, initExp, initC50, initBeta] = guessInitialParams(x, yMeans);
-    bounds.min = [initRmax * 0.9, 0, initC50*.8, initBeta*.6]; 
-    bounds.max = [initRmax * 2, 5, initC50*1.2, initBeta*1.1]; 
-
-    % Optimization options
-    options = optimoptions('fmincon', 'Display', 'none', 'Algorithm', 'sqp', 'MaxIterations', 20000, 'TolFun', 1e-8, 'TolX', 1e-8);
+    % Initialize output
+    params = zeros(nBlocks, nConditions, 3); % For Beta, exponent, and C50 for each condition and block
     
-    if ~isempty(fixedParams)
-        fprintf('Constrained fitting with fixed values... ')
-        % Adjust the fitting process based on fixedParams
-        fixedIndices = ~isnan(fixedParams); % Indices of fixed parameters
-        toFitIndices = isnan(fixedParams); % Indices of parameters to fit
-
-        % Adjust initial guesses and bounds for parameters to fit
-        initGuessToFit = [initRmax, initExp, initC50, initBeta];
-        initGuessToFit=initGuessToFit(toFitIndices);
-        boundsToFit.min = bounds.min(toFitIndices);
-        boundsToFit.max = bounds.max(toFitIndices);
-
-        if ~isempty(initGuessToFit)
+    % Loop over blocks
+    for b = 1:nBlocks
+        % Baseline condition fitting with fixed Beta and Rmax
+        x = rmnan(squeeze(xBlocks(1,:,b))); % Contrast values for baseline
+        y = rmnan(squeeze(yBlocks(1,:,b))); % Percentage correct for baseline
+        params(b,1,:) = fitNakaRushtonBaseline(x, y, objFunc);
         
-            % Adjust negLogLikelihood function for partial fitting
-            negLogLikelihoodFunc = @(fitParams) negLogLikelihoodWithFixedParams(fitParams, fixedParams, fixedIndices, toFitIndices, x, yCells);
-    
-            % Nonlinear constraint to ensure Rmax + Beta <= 100, considering fixedParams
-            nonlcon = @(fitParams) deal([], constraintRmaxPlusBeta(fitParams, fixedParams, toFitIndices));
-            
-            % Perform fitting only for parameters that are NaN in fixedParams
-            [fittedParams, negLogLikelihood] = fmincon(negLogLikelihoodFunc, initGuessToFit, [], [], [], [], boundsToFit.min, boundsToFit.max, nonlcon, options);
-            
-            % Merge fitted parameters with non-NaN entries in fixedParams
-            outputParams = fixedParams;
-            outputParams(toFitIndices) = fittedParams;
-        else
-            outputParams=fixedParams;
-        end
-    else
-        fprintf('Free fitting with no fixed values... ')
-        % If fixedParams is empty, follow your existing fitting process
-        initGuess = [initRmax, initExp, initC50, initBeta];
-        nonlcon = @(params) deal([], max(0, params(1) + params(4) - 100)); % Existing constraint
-        [outputParams, negLogLikelihood] = fmincon(negLogLikelihoodFunc, initGuess, [], [], [], [], bounds.min, bounds.max, nonlcon, options);
-    end
-
-    % Compute pseudo R2 as before
-    pseudoR2 = NaN;%calculateNagelkerkeR2(yCells, negLogLikelihood);
-
-    % Assign fitted parameters
-    fitParams = struct('rmax', outputParams(1), 'exponent', outputParams(2), 'c50', outputParams(3), 'beta', outputParams(4), 'pseudoR2', pseudoR2);
-    
-    % Check that fixedParams are obeyed
-    checkTmp=vertcat(outputParams)==fixedParams;
-    if sum(checkTmp==fixedIndices)==numel(fixedIndices)
-        fprintf('Constrains are obeyed\n')
-    else
-        fprintf('Constrains are not obeyed\n')
+        % Fit con-opto and incon-opto conditions simultaneously
+        xCon = rmnan(squeeze(xBlocks(2,:,b))); % Contrast values for con-opto
+        yCon = rmnan(squeeze(yBlocks(2,:,b))); % Percentage correct for con-opto
+        xIncon = rmnan(squeeze(xBlocks(3,:,b))); % Contrast values for incon-opto
+        yIncon = rmnan(squeeze(yBlocks(3,:,b))); % Percentage correct for incon-opto
+        [params_con, params_incon] = fitNakaRushtonOptos(xCon, yCon, xIncon, yIncon, objFunc);
+        
+        params(b,2,:) = params_con;
+        params(b,3,:) = params_incon;
     end
 end
 
-function [initRmax, initExp, initC50, initBeta] = guessInitialParams(x, yMeans)
-    % guess NR: rmax (delta between mean responses)
-    initRmax = max(yMeans) - min(yMeans);
+%% Subfunctions
+function params = fitNakaRushtonBaseline(x, y, objFunc)
+    % N trials
+    N = 10*2; % trials per contrast level
     
-    % guess NR: exp (intermediate between min and max exponent)
-    initExp = mean([3]);
+    % Convert percent correct into success counts
+    y_counts = (y / 100) * N;
+
+    % Define the fixed beta and Rmax
+    beta = 50;
+    Rmax = 50;
     
-    % guess NR: c50 (midpoint between the delta of mean responses)
-    initC50 = computeInitC50(yMeans, initRmax, x);
+    % Define the Naka-Rushton function with fixed beta and Rmax
+    % Here, params = [n, C50]
+    nakaRushton = @(x, params) (Rmax .* x.^params(1)) ./ (params(2).^params(1) + x.^params(1)) + beta;
     
-    % guess vertical offset: beta (lowest mean response)
-    initBeta = min(yMeans);
+    % Objective function
+    switch objFunc
+        case {'SSE'}
+            objectiveFunction = @(params) sum((nakaRushton(x, params) - y).^2, 'omitnan');
+        case {'MLE'}
+            % Negative Log-Likelihood function
+            % NLL=-y*log(R(c)) - (N-y)*log(1?R(c))
+            objectiveFunction = @(params) -sum(y_counts .* log(nakaRushton(x, params)/100) + ...
+                               (N - y_counts) .* log(1 - nakaRushton(x, params)/100));
+    end
+    % Initial guesses for the parameters [n, C50]
+    initialParams = [2, 10];  % These should be adjusted based on your data
+    
+    % No constraints on parameters, but you could add bounds if necessary
+    lb = [2,      5];  % Lower bounds: no negative values for exponent and C50
+    ub = [6, 100];  % Upper bounds: allowing exponent and C50 to be any positive value
+    
+    % Options for fmincon
+    options = optimoptions('fmincon', 'Display', 'off', 'Algorithm', 'interior-point');
+    
+    % Solve the optimization problem
+    [bestParams, ~] = fmincon(objectiveFunction, initialParams, [], [], [], [], lb, ub, [], options);
+    
+    % Prepare the output with fixed beta included
+    % Output params = [beta, n, C50]
+    params = [beta, bestParams(1), bestParams(2)];
 end
 
-function initC50 = computeInitC50(yMeans, initRmax, x)
-    absoluteDelta = abs(yMeans - (initRmax / 2 + min(yMeans)));
-    closest_index = find(absoluteDelta == min(absoluteDelta));
+function [params_con, params_incon] = fitNakaRushtonOptos(xCon, yCon, xIncon, yIncon, objFunc)
+    % N trials
+    N_con = 10*2; % trials per contrast level
+    N_incon = N_con; 
 
-    % Adjust for cases with multiple equally close values
-    if numel(closest_index) > 2
-        closest_index = closest_index([1, 2]); % Take first two if more than two indices are equally close
-    elseif numel(closest_index) == 2
-        % Already ideal scenario, take them as they are
-    else
-        % For a single closest index, attempt to add the next index if it doesn't exceed bounds
-        if closest_index < numel(yMeans)
-            closest_index = [closest_index, closest_index + 1];
-        % If the closest index is the last element, consider the previous one as well, if possible
-        elseif closest_index > 1
-            closest_index = [closest_index - 1, closest_index];
-        end
+    % Convert percent correct into success counts
+    yCon_counts = (yCon / 100) * N_con;
+    yIncon_counts = (yIncon / 100) * N_incon;
+
+    % Estimate initial parameters for both conditions (assuming these functions exst and are correct)
+    [initBetaCon, initExpCon, initC50Con, ~] = guessInitialParams(xCon, yCon);
+    [~, initExpIncon, initC50Incon, ~] = guessInitialParams(xIncon, yIncon);
+    
+    % Initial parameter guesses now include only one beta value, for con condition
+    % The incon condition's beta is calculated as 1 - beta_con
+    initialParams = [initBetaCon, initExpCon, initC50Con, initExpIncon, initC50Incon];
+    
+    % Define bounds for the parameters
+    lb = [0,      2,     5,      2,       5]; % Lower bounds
+    ub = [100, 6, 100,      6,   100]; % Upper bounds
+
+    % Objective function incorporating shared beta
+    nakaRushtonCon = @(x, params) ((100-params(1)) .* x.^params(2)) ./ (params(3).^params(2) + x.^params(2)) + params(1); %params([1:3])
+    nakaRushtonIncon = @(x, params) ((100-(100-params(1))) .* x.^params(4)) ./ (params(5).^params(4) + x.^params(4)) + (100-params(1)); % params([1 4 5]), Using 1-beta_con for beta_incon
+
+    % Objective function
+    switch objFunc
+        case {'SSE'}
+            objectiveFunction = @(params) sum(((nakaRushtonCon(xCon, params) - yCon).^2), 'omitnan') + ...
+                                          sum(((nakaRushtonIncon(xIncon, params) - yIncon).^2), 'omitnan');
+        case {'MLE'}
+             % Negative Log-Likelihood function combining both conditions
+             % NLL=?y*log(R(c)) ? (N?y)*log(1?R(c))
+            objectiveFunction = @(params) ...
+                -sum(yCon_counts .* log(nakaRushtonCon(xCon, params)/100) + ...
+                (N_con - yCon_counts) .* log(1 - nakaRushtonCon(xCon, params)/100)) ...
+                -sum(yIncon_counts .* log(nakaRushtonIncon(xIncon, params)/100) + ...
+                (N_incon - yIncon_counts) .* log(1 - nakaRushtonIncon(xIncon, params)/100));
+
     end
 
-    % Compute the mean of the x values at the adjusted closest indices
+    % Options for fmincon
+    options = optimoptions('fmincon', 'Algorithm', 'sqp', 'Display', 'off', ...
+        'Maxterations', 20000, 'TolFun', 1e-10, 'TolX', 1e-10);
+
+    % Solve the optimization problem
+    bestParams = fmincon(objectiveFunction, initialParams, [], [], [], [], lb, ub, [], options);
+    
+    % Extract fitted parameters for each condition, ensuring beta_incon = 1 - beta_con
+    params_con = [bestParams(1), bestParams(2), bestParams(3)];
+    params_incon = [100 - bestParams(1), bestParams(4), bestParams(5)];
+end
+
+function [initBeta, initExp, initC50, initRmax] = guessInitialParams(x, y)
+    initBeta = min(y);
+    initRmax = max(y) - min(y);
+    initExp = mean([2:4]); % Assuming an intermediate exponent value
+    initC50 = computeInitC50(y, initRmax, x);
+end
+
+function initC50 = computeInitC50(y, initRmax, x)
+    absoluteDelta = abs(y - (initRmax / 2 + min(y)));
+    [~, closest_index] = min(absoluteDelta);
+    closest_index = unique([max(1, closest_index-1), closest_index, min(length(x), closest_index+1)]);
     initC50 = mean(x(closest_index));
 end
-
-function [c, ceq] = constraintRmaxPlusBeta(fitParams, fullParams, toFitIndices)
-    % Update the full parameter set with fitted parameters
-    fullParams(toFitIndices) = fitParams;
-    
-    % Nonlinear inequality constraint ensures Rmax + Beta <= 100
-    % Since 'fmincon' minimizes under the condition c <= 0,
-    % we rearrange Rmax + Beta <= 100 to Rmax + Beta - 100 <= 0.
-    c = fullParams(1) + fullParams(4) - 100;
-    
-    % No equality constraints
-    ceq = [];
-end
-
-
-% Define a sub-function to adjust the negLogLikelihood function to incorporate fixed parameters
-function negLL = negLogLikelihoodWithFixedParams(fitParams, fixedParams, fixedIndices, toFitIndices, x, yCells)
-    params = fixedParams;
-    params(toFitIndices) = fitParams; % Insert fitted parameters into their correct positions
-    % Calculate negative log-likelihood using the combined parameter vector
-    negLL = -sum(cellfun(@(y, xi) logLikelihoodPerContrast(params, xi, y), yCells, num2cell(x)));
-end
-
-function ll = logLikelihoodPerContrast(params, xi, yi)
-    % Guard against division by zero or undefined behavior for xi = 0
-    xi(xi == 0) = eps; % Small positive value close to zero
-    
-    % Naka-Rushton function calculation
-    Rmax = 100-params(4);
-    n = params(2);
-    C50 = params(3);
-    beta = params(4);
-    predicted = (Rmax .* xi.^n) ./ (C50.^n + xi.^n) + beta;
-    
-    % Standard deviation for yi observations
-    sigmaYi = std(yi);
-    if sigmaYi == 0, sigmaYi = eps; end % Avoid division by zero in likelihood
-
-    % Compute log-likelihood assuming normally distributed residuals
-    ll = -0.5 * sum(((yi - predicted).^2) / sigmaYi^2 + log(2 * pi * sigmaYi^2));
-end
-
-function pseudoR2 = calculateNagelkerkeR2(yCells, negLogLikelihood)
-    % Convert negative log-likelihood of the fitted model to likelihood
-    Lm = exp(-negLogLikelihood);
-
-    % Estimate the null model likelihood (L0)
-    yAll = cell2mat(yCells); % Combine all observations into a single array
-    meanResponse = mean(yAll);
-    L0 = exp(-sum(cellfun(@(yi) sum(logLikelihoodConstantModel(yi, meanResponse)), yCells)));
-
-    % Calculate Cox and Snell's R^2
-    n = numel(yAll); % Total number of observations
-    R2_CoxSnell = 1 - (L0 / Lm)^(2 / n);
-
-    % Adjust with Nagelkerke's formula to get Nagelkerke's R^2
-    pseudoR2 = R2_CoxSnell / (1 - L0^(2 / n));
-end
-
-function ll = logLikelihoodConstantModel(yi, meanResponse)
-    sigmaYi = std(yi);
-    if sigmaYi == 0, sigmaYi = eps; end % Avoid division by zero in likelihood calculation
-    % Compute log-likelihood for a constant model
-    ll = -0.5 * numel(yi) * log(2 * pi * sigmaYi^2) + sum(((yi - meanResponse).^2) / (2 * sigmaYi^2));
-end
-

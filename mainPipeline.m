@@ -95,7 +95,7 @@ switch analysisMode
                 
                 % === Save data ===
                 imagingData.intg=[];behavioralData.TS=[];
-                save(['Y:/Chip/Meta/summary/statistics' chamberWanted '.mat'],'bitmapData','behavioralData','imagingData','analysisBlockID','datastruct')
+                save(['Y:/Chip/Meta/summary/statisticsApr2024' chamberWanted '.mat'],'bitmapData','behavioralData','imagingData','analysisBlockID','datastruct')
                 CF; % close fig
         end
                 

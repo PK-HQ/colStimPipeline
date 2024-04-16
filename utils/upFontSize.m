@@ -7,7 +7,7 @@ else
     tickLength=0.01;
 end
     %INCREASE OVERALL FONT SIZE AND ADJUST FONT WEIGHT
-    fontSizeSmall=12;
+    fontSizeSmall=14;
     set(findall(gcf, '-property', 'FontSize'), 'FontSize', size) % Increase font size globally
     set(findall(gcf, '-property', 'FontWeight'), 'FontWeight', 'Normal') % Set font weight to normal globally
 
