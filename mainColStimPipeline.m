@@ -18,6 +18,7 @@ nColumnsWanted=[];
 [datastructChamberLeft, datastructChamberRight] = organizeBlocks(datastruct, nColumnsWanted);
 analysisBlockID=setdiff(datastructChamberRight,10)%setdiff(datastructChamberLeft,[44 45 45 52:55 95]);
 set(0,'DefaultFigureWindowStyle','docked')
+set(groot,'defaultFontName','Arial')
 
 %% Run the desired bitmap generation pipeline variant
 switch pipelineMode

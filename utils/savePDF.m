@@ -4,8 +4,13 @@ function savePDF(filename, monkeyName, saveFlag, plotNo)
 % monkeyname is a string for monkey name
 % saveFlag == 1 means save
 % plotNo == 1 means save as a new file, >1 means append
-filenameMonkey=['Y:/' monkeyName '/Meta/' filename '.pdf'];
-filenameMeetings=['Y:/users/PK/Eyal/meetings/' filename '.pdf'];
+if ispc
+  mainPath='Y:/';
+elseif contains(getenv('HOSTNAME'),'psy.utexas.edu')
+  mainPath='/eslab/data/';
+end
+filenameMonkey=[mainPath monkeyName '/Meta/' filename '.pdf'];
+filenameMeetings=[mainPath 'users/PK/Eyal/meetings/' filename '.pdf'];
 if plotNo==1 && saveFlag==1
     export_fig(filenameMonkey,'-pdf','-nocrop');
     copyfile(filenameMonkey, filenameMeetings)

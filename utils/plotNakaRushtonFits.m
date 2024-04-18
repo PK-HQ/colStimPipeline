@@ -1,4 +1,4 @@
-function plotFittedNakaRushtonCurves(behavioralData, bitmapData, datastruct, analysisBlockID, fitParams, x, saveFlag, savefilename, monkeyName)
+function plotNakaRushtonFits(behavioralData, bitmapData, datastruct, analysisBlockID, fitParams, x, saveFlag, savefilename, monkeyName)
    
     % Number of blocks and conditions
     [nBlocks, nConditions, ~] = size(fitParams);
@@ -15,6 +15,8 @@ function plotFittedNakaRushtonCurves(behavioralData, bitmapData, datastruct, ana
             beta = fitParams(block, cond, 1);
             n = fitParams(block, cond, 2);
             C50 = fitParams(block, cond, 3);
+            deltax = fitParams(block, cond, 4);
+            aicc = fitParams(block, cond, 5);
             
             % Define the Naka-Rushton functions with the fitted parameters
             switch cond
@@ -62,15 +64,15 @@ function plotFittedNakaRushtonCurves(behavioralData, bitmapData, datastruct, ana
             patchSaturationVal=1;
             shadedErrorBar(xBlock, yBlock, semY, 'patchSaturation', patchSaturationVal, 'lineprops', ...
                            {'Color', lineColor, 'LineStyle', 'none', 'LineWidth', 3, 'Marker', markerType, ...
-                            'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize});
+                            'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize}); hold on;
 
             % Annotate markers
-            nTrials=20*ones(1,numel(yBlock));
-            annotateDataPoints(xBlock, yBlock, nTrials, markerFaceColor);
+            nTrials=[40*ones(1,sum(xBlock==0)) 20*ones(1,sum(xBlock>0))];
+            annotateDataPoints(xBlock, yBlock, nTrials, markerFaceColor); hold on;
             
             % Display fitParams
             lineOrder=[2 1 3 4];
-            drawParamText([beta, n, C50], lineOrder, lineColor, cond)
+            drawParamText([beta, n, C50, deltax, aicc], lineOrder, lineColor, cond)
 
             % Customizations for readability
             xlabel('Absolute gabor contrast (%)');
@@ -83,7 +85,7 @@ function plotFittedNakaRushtonCurves(behavioralData, bitmapData, datastruct, ana
         % Labels etc
         axis square
         hold off;
-        addSkippedTicks(0,100,12.5,'x');addSkippedTicks(0,100,12.5,'y');xlim([0 100]); ylim([0 100])
+        xlim([0 100]); ylim([0 100]); addSkippedTicks(0,100,12.5,'x');addSkippedTicks(0,100,12.5,'y');
         % Adding legend after plotting to ensure it covers all conditions
         moveLines()
         h2 = get(gca,'Children');
@@ -106,19 +108,21 @@ beta=fitParams(1);
 rmax=100-fitParams(1);
 exponent=fitParams(2);
 c50=fitParams(3);
+deltax=fitParams(4);
+aicc=fitParams(5);
 pseudoR2=[];
 if  lineNo==1 % Add header
     % State fit parameters
     headerText = sprintf(...
-     [' {\\bf\\beta}        {\\bfR_{max}}        {\\bfC_{50}}          {\\bfn}         {\\bfR_{pseudo}^{2}}']);
+     [' {\\bf\\beta}        {\\bfR_{max}}        {\\bfC_{50}}          {\\bfn}          {\\bf\\Deltax}         {\\bfAICc}']);
      text(xpos,ypos,headerText,'Units','normalized', 'VerticalAlignment','top', 'HorizontalAlignment','left','Color','k')
 end
 if lineNo<=3
     % Add param text
     newlineStr=repmat('\n',1,lineOrder(lineNo));
     paramsText=sprintf(...
-    [newlineStr '%.0f         %.0f            %02.f          %02.f          %0.2f'], ...
-    beta, rmax, c50, exponent, pseudoR2);
+    [newlineStr '%.0f         %.0f            %02.f          %0.1f         %02.f           %03.f'], ...
+    beta, rmax, c50, exponent, deltax, aicc);
     text(xpos,ypos-.02,paramsText,'Units','normalized', 'VerticalAlignment','top', 'HorizontalAlignment','left','Color',lineColor);
     upFontSize(24,0.01)
 end
