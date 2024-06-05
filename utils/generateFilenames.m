@@ -134,7 +134,7 @@ switch dataStruct.modality %isequal(dataStruct.modality,'GCaMP')
        %% 2D Gaussian fit
         filenameStruct.gaussianFit=[imagePath 'gaussianFit.mat'];
 
-        if ~isempty(dataStruct.gaussianResponse)
+        if ~isempty(dataStruct.gaussianResponse)  & ~isnan(dataStruct.gaussianResponse)
             % Find the last occurrence of '/'
             lastSlashIndex = find(dataStruct.gaussianResponse == '/', 3, 'last');
             % Extract the substring from the last '/' to the end

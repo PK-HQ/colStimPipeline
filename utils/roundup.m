@@ -1,3 +1,3 @@
-function nRoundUp=roundup(n,desiredScale)
+function nRoundUp=roundn(n,desiredScale)
 nRoundUp=ceil(n/desiredScale)*desiredScale;
 end

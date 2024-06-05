@@ -3,8 +3,19 @@ function bitmapData = loadBitmapData(datastruct, currentBlockStruct, currentBloc
     if length(datastruct(currentBlockID).gammaCorrFactor)==1
         datastruct(currentBlockID).gammaCorrFactor=repmat(datastruct(currentBlockID).gammaCorrFactor,1,2);
     end
+    
     bitmapData.gammaCorrFactor(:,:,blockID) = datastruct(currentBlockID).gammaCorrFactor;
-    bitmapData.sensitivity(:,blockID) = datastruct(currentBlockID).sensitivity;
+    
+    newThresholdFn=~isnan(datastruct(currentBlockID).sensitivity);
+    switch newThresholdFn
+        case 1
+            bitmapData.sensitivity(blockID) = datastruct(currentBlockID).sensitivity;
+            bitmapData.adaptthresh(blockID)= NaN;
+        case 0
+            bitmapData.sensitivity(blockID) = NaN;
+            bitmapData.adaptthresh(blockID)=datastruct(currentBlockID).adaptthresh;
+    end
+
     bitmapData.orts(1,:,blockID) = [0 90];
     if ~isempty(datastruct(currentBlockID).gaussianContourLevel) && numel(datastruct(currentBlockID).gaussianContourLevel)<2
         bitmapData.gaussianContourLevel(:,:,blockID)=repmat(datastruct(currentBlockID).gaussianContourLevel,1,2);
@@ -35,5 +46,6 @@ function bitmapData = loadBitmapData(datastruct, currentBlockStruct, currentBloc
     
     % copy original bitmaps to run folder
     cloneLoadFlag='clone';
-    cloneBitmaps(currentBlockStruct, cloneLoadFlag)
+    cloneBitmaps(currentBlockStruct, cloneLoadFlag);
 end
+

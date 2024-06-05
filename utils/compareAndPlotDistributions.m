@@ -1,13 +1,16 @@
-function compareAndPlotDistributions(paramsStruct, chamberWanted, savefilename, saveFlag)
+function compareAndPlotDistributions(paramsStruct, fieldID, savefilename, saveFlag)
     monkeyName='Chip';
 
     % Naming and colors
-    fieldNames = {'beta', 'rmax', 'exponent', 'c50', 'xDelta'};
-    titleStrs = {'\beta', 'R_{max}', 'Exponent', 'C_{50}', '\Deltax'};
+    fieldNames = {'beta', 'exponent', 'c50', 'xDelta'};
+    titleStrs = {'\beta', 'Exponent', 'C_{50}', '\Deltax'};
+    fieldNames = fieldNames(fieldID);  nFieldNames=numel(fieldNames);
+    titleStrs = titleStrs(fieldID);
+    
     lineColors = {[0.2, 0.2, 0.2], [0.9294, 0.1098, 0.1373] * 1.05, [0, 0.0941, 0.6627] * 1.25};
     legendNames = {'Baseline', 'Con-opto', 'Incon-opto'}; % Legend names for param1, param2, param3
 
-    for fieldIndex = 1:numel(fieldNames)
+    for fieldIndex = 1:nFieldNames
         fieldName = fieldNames{fieldIndex};
         % Extract the full field data
         fieldData = vertcat(paramsStruct.(fieldName));
@@ -79,7 +82,7 @@ function compareAndPlotDistributions(paramsStruct, chamberWanted, savefilename, 
         suplabel(titleStrs{fieldIndex},'t',[.1 .1 .835 .78]);upFontSize();
 
         % Save as PDF
-        savePDF(savefilename, monkeyName, saveFlag, fieldIndex)
+        savePDF(savefilename, monkeyName, saveFlag, fieldIndex, nFieldNames)
     end
 end
 

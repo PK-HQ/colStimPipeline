@@ -35,5 +35,5 @@ function [adjustedSPD_uW, estimatedTotalPower_mW] = calculateSPD(behavioralData,
     adjustedSPD_uW = SPD * 1000 * (effectiveONTime_s/effectiveTotalTime_s); % Normalize by effective total stimulation time (ON+OFF)
     
     % Display results
-    %fprintf(['Surface Power Density: %.2f ' char(181) 'W mm-2 (%.0f pixels)\n'], adjustedSPD_uW, pixelsON_bitmap);
+    fprintf(['Surface Power Density: %.2f ' char(181) 'W mm-2 (%.0f pixels)\n'], adjustedSPD_uW, pixelsON_bitmap);
 end

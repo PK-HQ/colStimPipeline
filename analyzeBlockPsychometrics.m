@@ -40,9 +40,12 @@ end
 
 % Sort by baseline/congruent/incongruent for each subplot
 [gaborContrasts,percentageCorrect]=sortByCongruence(gaborContrasts,percentageCorrect);
-
+% Store
+behavioralData.gaborContrasts(:,:,blockID)=[gaborContrasts.baselineRaw; gaborContrasts.horizontalOptoRaw; gaborContrasts.verticalOptoRaw];
+behavioralData.percentageCorrect(:,:,blockID)=[percentageCorrect.baselineRaw; percentageCorrect.horizontalOptoRaw; percentageCorrect.verticalOptoRaw];
 
 % Fit psychometric function and plot
+%{
 [behavioralData] = fitPsychometricData(behavioralData, hAx, gaborContrasts.baseline, percentageCorrect.baseline, 'baseline', blockID);upFontSize(24, 0.01);
 hold on;
 [behavioralData] = fitPsychometricData(behavioralData, hAx, gaborContrasts.congruent, percentageCorrect.congruent, 'congruent', blockID);upFontSize(24, 0.01);
@@ -55,13 +58,13 @@ axes(hAx(1)); title('Vertical stimuli','FontWeight','normal'); ylabel('Correct (
 axes(hAx(2)); title('Horizontal stimuli','FontWeight','normal');
 axes(hAx(3)); title('Combined','FontWeight','normal');
 
-
-
+%}
 % Supertitle
+%{
 [~,h]=suplabel({'Behavioral biasing',...
-    [filenameStructCurrent.date 'R' filenameStructCurrent.run ' (' num2str(bitmapData.nColumns(1,blockID)) ' & ' num2str(bitmapData.nColumns(2,blockID)) ' column @ ' num2str(mean(bitmapData.adjustedSPD_uW(1,:,blockID)),2) ' ' char(0177) ' ' num2str(std(bitmapData.adjustedSPD_uW(1,:,blockID)),2) ' ' char(181) 'W mm^{-2})']},'t',[.1 .1 .795 .78]);
+    [filenameStructCurrent.date 'R' filenameStructCurrent.run ' (' num2str(bitmapData.nColumnsWanted(1,blockID)) ' & ' num2str(bitmapData.nColumnsWanted(2,blockID)) ' column @ ' num2str(mean(bitmapData.adjustedSPD_uW(1,:,blockID)),2) ' ' char(0177) ' ' num2str(std(bitmapData.adjustedSPD_uW(1,:,blockID)),2) ' ' char(181) 'W mm^{-2})']},'t',[.1 .1 .795 .78]);
 h.FontSize=28;
-
+%}
 % Saving 
 if saveFlag
     if blockID==1 && strcmp(reportType,'psychometric')
@@ -77,14 +80,6 @@ end
 
 % Finalize plot
 %finalizePlot(dsCurrentSess, betaSorted, muSorted, sigmaSorted, contrastsSorted, percentVerticalSorted);
-
-
-
-
-
-
-
-
 
 
 %% === Processing data ===
@@ -103,7 +98,7 @@ if baselineSeparate
     muSorted = [muCurrent(2), muBaseline(1), muCurrent(1)];
     sigmaSorted = [sigmaCurrent(2), sigmaBaseline(1), sigmaCurrent(1)];
     contrastsSorted = [contrastsCurrent(:, 2), contrastsBaseline(:, 2), contrastsCurrent(:, 1)];
-    percentVerticalSorted = [percentVerticalCurrent(:, 2), percentVerticalBaseline(:, 2), percentVerticalCurrent(:, 1)];
+    percentVerticalSorted = [percentVerticalCurrent(:, 2), percentVerticalBaseline(:, 2), p ercentVerticalCurrent(:, 1)];
 else
     % Data sorting for combined conditions
     betaSorted = betaCurrent;
@@ -212,24 +207,46 @@ condsOpto90 = [vis0_opto90; vis90_opto90];
 end
 
 function [gaborContrasts,percentageCorrect]=sortByCongruence(gaborContrasts,percentageCorrect)
-gaborContrasts.baseline=[-gaborContrasts.V0(1,:);...
-                                               gaborContrasts.V90(1,:); ...
-                                               mean([-gaborContrasts.V0(1,:); gaborContrasts.V90(1,:)])];
-gaborContrasts.congruent=[-gaborContrasts.V0(2,:);...
-                                                  gaborContrasts.V90(3,:); ...
-                                                  mean([-gaborContrasts.V0(2,:);gaborContrasts.V90(3,:)])];
-gaborContrasts.incongruent=[-gaborContrasts.V0(3,:);...
-                                                    gaborContrasts.V90(2,:); ...
-                                                    mean([-gaborContrasts.V0(3,:);gaborContrasts.V90(2,:)])];
-percentageCorrect.baseline=[percentageCorrect.V0(1,:);...
-                                               percentageCorrect.V90(1,:); ...
-                                               mean([percentageCorrect.V0(1,:);percentageCorrect.V90(1,:)])];
-percentageCorrect.congruent=[percentageCorrect.V0(2,:);...
-                                                  percentageCorrect.V90(3,:); ...
-                                                  mean([percentageCorrect.V0(2,:);percentageCorrect.V90(3,:)])];
-percentageCorrect.incongruent=[percentageCorrect.V0(3,:);...
-                                                    percentageCorrect.V90(2,:); ...
-                                                    mean([percentageCorrect.V0(3,:);percentageCorrect.V90(2,:)])];
+    %{
+    gaborContrasts.baseline=[-gaborContrasts.V0(1,:);...
+                                                   gaborContrasts.V90(1,:); ...
+                                                   mean([-gaborContrasts.V0(1,:); gaborContrasts.V90(1,:)])];
+    gaborContrasts.congruent=[-gaborContrasts.V0(2,:);...
+                                                      gaborContrasts.V90(3,:); ...
+                                                      mean([-gaborContrasts.V0(2,:);gaborContrasts.V90(3,:)])];
+    gaborContrasts.incongruent=[-gaborContrasts.V0(3,:);...
+                                                        gaborContrasts.V90(2,:); ...
+                                                        mean([-gaborContrasts.V0(3,:);gaborContrasts.V90(2,:)])];
+    percentageCorrect.baseline=[percentageCorrect.V0(1,:);...
+                                                   percentageCorrect.V90(1,:); ...
+                                                   mean([percentageCorrect.V0(1,:);percentageCorrect.V90(1,:)])];
+    percentageCorrect.congruent=[percentageCorrect.V0(2,:);...
+                                                      percentageCorrect.V90(3,:); ...
+                                                      mean([percentageCorrect.V0(2,:);percentageCorrect.V90(3,:)])];
+    percentageCorrect.incongruent=[percentageCorrect.V0(3,:);...
+                                                        percentageCorrect.V90(2,:); ...
+                                                        mean([percentageCorrect.V0(3,:);percentageCorrect.V90(2,:)])];
+    %}
+
+
+    % Formatted to percent correct
+    gaborContrasts = fillStructField(-gaborContrasts.V0(1,:), gaborContrasts.V90(1,:), 'baseline', gaborContrasts);
+    gaborContrasts = fillStructField(-gaborContrasts.V0(2,:), gaborContrasts.V90(3,:), 'congruent', gaborContrasts);
+    gaborContrasts = fillStructField(-gaborContrasts.V0(3,:), gaborContrasts.V90(2,:), 'incongruent', gaborContrasts);
+    
+    percentageCorrect = fillStructField(percentageCorrect.V0(1,:), percentageCorrect.V90(1,:), 'baseline', percentageCorrect);
+    percentageCorrect = fillStructField(percentageCorrect.V0(2,:), percentageCorrect.V90(3,:), 'congruent', percentageCorrect);
+    percentageCorrect = fillStructField(percentageCorrect.V0(3,:), percentageCorrect.V90(2,:), 'incongruent', percentageCorrect);
+
+    % Raw percent vertical
+    gaborContrasts = fillStructField(gaborContrasts.V0(1,:), gaborContrasts.V90(1,:), 'baselineRaw', gaborContrasts);
+    gaborContrasts = fillStructField(gaborContrasts.V0(2,:), gaborContrasts.V90(2,:), 'horizontalOptoRaw', gaborContrasts);
+    gaborContrasts = fillStructField(gaborContrasts.V0(3,:), gaborContrasts.V90(3,:), 'verticalOptoRaw', gaborContrasts);
+    
+    percentageCorrect = fillStructField(100-percentageCorrect.V0(1,:), percentageCorrect.V90(1,:), 'baselineRaw', percentageCorrect);
+    percentageCorrect = fillStructField(100-percentageCorrect.V0(2,:), percentageCorrect.V90(2,:), 'horizontalOptoRaw', percentageCorrect);
+    percentageCorrect = fillStructField(100-percentageCorrect.V0(3,:), percentageCorrect.V90(3,:), 'verticalOptoRaw', percentageCorrect);
+
 end
 %% === Fit and plotting code ===
 function behavioralData = fitPsychometricData(behavioralData, hAx, gaborContrastSlice, percentCorrectSlice, optoTypeStr, blockID)
@@ -330,4 +347,23 @@ function finalizePlot(dsCurrentSess, betaSorted, muSorted, sigmaSorted, contrast
 axis square;
 [~, h] = suplabel([dsCurrentSess.date 'R' dsCurrentSess.run], 't', [.08 .08 .84 .8]);
 hold off;
+end
+
+
+function structOut = fillStructField(DataV0, DataV90, fieldName, structIn)
+    % Subfunction to fill a field of a struct based on field name and two input arrays
+
+    switch contains(fieldName,'Raw')
+        case 1
+            fieldData=[DataV0,DataV90];
+        case 0
+            % Calculate the values for the struct field
+            fieldData = [
+                DataV0; 
+                 DataV90;
+                 mean([DataV0; DataV90])];
+    end
+    % Update the struct
+    structIn.(fieldName) = fieldData;
+    structOut = structIn;
 end

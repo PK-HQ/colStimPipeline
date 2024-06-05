@@ -34,10 +34,23 @@ for ortNo=1:size(responseImages,3)
     gammaCol(:,:,ortNo)=imadjust(histEqCol(:,:,ortNo),[],[],bitmapData.gammaCorrFactor(1,ortNo,blockID));
      
      %% do adaptive thresholding
-    nbhdSize=2*floor(size(gammaCol(:,:,ortNo))/16)+1; % 2*(64/16) +1
-    threshold = adaptthresh(double(gammaCol(:,:,ortNo)),bitmapData.sensitivity(:,blockID),...
-        'NeighborhoodSize',nbhdSize);
-    columnarBitmap(:,:,ortNo) = double(imbinarize(double(gammaCol(:,:,ortNo)),threshold)).*imagingData.mask(:,:,blockID); %zero mask
+     newThresholdFn=unique(~isnan(bitmapData.sensitivity(blockID)));
+    switch newThresholdFn
+        case 1
+            % Uses adaptthresh and sensitivity value
+            nbhdSize=2*floor(size(gammaCol(:,:,ortNo))/16)+1; % 2*(64/16) +1
+            threshold = adaptthresh(double(gammaCol(:,:,ortNo)),bitmapData.sensitivity(blockID),...
+                'NeighborhoodSize',nbhdSize);
+            columnarBitmap(:,:,ortNo) = double(imbinarize(double(gammaCol(:,:,ortNo)),threshold)).*imagingData.mask(:,:,blockID); %zero mask
+        case 0
+            % Uses simple percentile-based thresholding
+            gammaProcessedImage=gammaCol(:,:,ortNo);
+            threshold=prctile(gammaProcessedImage(:),bitmapData.adaptthresh(blockID)); % get threshold as percentile
+            thresholdMask=double(gammaCol(:,:,ortNo)>threshold); % Mask image
+            thresholdMask(thresholdMask==0)=NaN; % convert 0 to nan
+            columnarBitmap(:,:,ortNo)=(gammaCol(:,:,ortNo).*thresholdMask)>0; % apply threshold mask to image
+
+    end
 
     %% calculate bitmap statistocs: duty cycle and pixel density
     bitmapNaN=columnarBitmap(:,:,ortNo).*ROImaskNaN;

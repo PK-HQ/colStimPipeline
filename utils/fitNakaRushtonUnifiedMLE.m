@@ -1,4 +1,4 @@
-function params = fitNakaRushtonMLE(xBlocks, yBlocks, objFunc, hypothesisType, fixedParams)
+function params = fitNakaRushtonUnifiedMLE(xBlocks, yBlocks, objFunc, hypothesisType, fixedParams)
     %% Fits the 3D matrices of x and y (3 conditions x 6 contrast levels x 16 blocks) with a 
     % Naka-Rushton function, and with MLE (binomial dist assumption)
     % Input: 
@@ -19,15 +19,23 @@ function params = fitNakaRushtonMLE(xBlocks, yBlocks, objFunc, hypothesisType, f
     % Loop over blocks
     for b = 1:nBlocks
         % Baseline condition fitting with fixed Beta and Rmax
-        x = rmnan(squeeze(xBlocks(1,:,b))); % Contrast values for baseline
-        y = rmnan(squeeze(yBlocks(1,:,b))); % Percentage correct for baseline
-        params_bl = fitNakaRushtonBaseline(x, y, objFunc, options, hypothesisType, fixedParams);
-        
+        xBL = rmnan(squeeze(xBlocks(1,:,b))); % Contrast values for baseline
+        yBL = rmnan(squeeze(yBlocks(1,:,b))); % Percentage correct for baseline
         % Fit con-opto and incon-opto conditions simultaneously
         xCon = rmnan(squeeze(xBlocks(2,:,b))); % Contrast values for con-opto
         yCon = rmnan(squeeze(yBlocks(2,:,b))); % Percentage correct for con-opto
         xIncon = rmnan(squeeze(xBlocks(3,:,b))); % Contrast values for incon-opto
         yIncon = rmnan(squeeze(yBlocks(3,:,b))); % Percentage correct for incon-opto
+
+
+        % Define bounds for the parameters
+        lb = [0,      2,     5,      2,       5,     0]; % Lower bounds
+        ub = [100, 6, 100,      6,   100,    30]; % Upper bounds
+
+
+        params_bl = fitNakaRushtonBaseline(xBL, yBL, objFunc, options, hypothesisType, fixedParams);
+        
+
         [params_con, params_incon] = fitNakaRushtonOptos(xCon, yCon, xIncon, yIncon, objFunc, options, hypothesisType, fixedParams);
         
         params(b,1,:)= params_bl;
@@ -38,6 +46,21 @@ end
 
   
 %% Subfunctions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function params = fitNakaRushtonBaseline(x, y, objFunc, options, hypothesisType, fixedParams)
     % N trials
     N =  [(40*ones(1,sum(x==0))),...
@@ -144,7 +167,7 @@ function [params_con, params_incon] = fitNakaRushtonOptos(xCon, yCon, xIncon, yI
             lb = [0,      2,     5,      2,       5,     0]; % Lower bounds
             ub = [100, 6, 100,      6,   100,    30]; % Upper bounds
     end
-    
+
     % Objective function, calculate NR error
     switch objFunc
         case {'SSE'}
@@ -177,7 +200,7 @@ function [params_con, params_incon] = fitNakaRushtonOptos(xCon, yCon, xIncon, yI
             % Extract fitted parameters for each condition, ensuring beta_incon = 1 - beta_con
             params_con = [bestParams(1), bestParams(2), bestParams(3), bestParams(6), aicc];
             params_incon = [100 - bestParams(1), bestParams(4), bestParams(5), bestParams(6), aicc];
-            endbest
+    end
 end
 
 function [initBeta, initExp, initC50, initRmax] = guessInitialParams(x, y)

@@ -121,7 +121,7 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 %[gaussianMask, bitmapCamspacePostMask] = isolateColumns(bitmapData, imagingData, blockID, bitmapNo, bitmapCamspace);
                
                 %% Reverse camera-projector transformation
-                bitmapProjSpaceUnaligned(:,:,bitmapNo)=applyCamProjAlignment(imagingData, blockID, bitmapProjSpaceAligned(:,:,bitmapNo+1), conversionType);
+                bitmapProjSpaceUnaligned(:,:,bitmapNo)=applyCamProjAlignment(imagingData, blockID, bitmapProjSpaceAligned(:,:,bitmapNo), conversionType);
 
                %% Un-cropping (of y) and removing black bars (of x)
                 bitmapProjSpaceUnBB(:,:,bitmapNo) = addBlackBars(bitmapData, bitmapProjSpaceUnaligned(:,:,bitmapNo), conversionType);
@@ -137,7 +137,7 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 % save
                 bitmapData.pixelsON(bitmapNo,blockID)=nansum(contourROI(:)>0);
                 bitmapData.pixelsONDensity(bitmapNo,blockID)=nansum(contourROI(:)>0)*100/nansum(contourROI(:)==0); %prctPixON=((DC/(5/10))^2)/(2/100);
-                bitmapData.columnarbitmapTFprojspace(:,:,bitmapNo,blockID)=bitmapProjSpaceAligned(:,:,bitmapNo+1); %first bitmap is black bmp
+                bitmapData.columnarbitmapTFprojspace(:,:,bitmapNo,blockID)=bitmapProjSpaceAligned(:,:,bitmapNo); %first bitmap is black bmp
                 bitmapData.columnarbitmapTFcamspace(:,:,bitmapNo,blockID)=bitmapCamspace(:,:,bitmapNo);
                 bitmapData.nColumns(bitmapNo,blockID)=numel(columnAreas);
                 bitmapData.medianColumnAreas(bitmapNo,blockID)=median(columnAreas);
