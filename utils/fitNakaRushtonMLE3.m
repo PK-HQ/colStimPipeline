@@ -39,7 +39,7 @@ for block = 1:nBlocks
     mdl = calculateTotalError(mdl, initialParams, xBaseline, yBaseline, xOpto, yOpto, lb, ub,...
         options, modelType, baselineModelFlag, block);
 end
-
+%{
 % Fitting for binned average
 opts=[];
 %opts = optimset('fminsearch');
@@ -56,10 +56,10 @@ options.TolFun = 1e-8;           % Function tolerance for convergence
 options.TolX = 1e-8;             % Parameter tolerance for convergence
 mdlAvg = calculateTotalError(mdlAvg, initialParams, xBaselineAverage, yBaselineAverage, xOptoAverage, yOptoAverage, lb, ub,...
     options, modelType, baselineModelFlag, 1);
-
+%}
 fprintf('Done!\n\n')
-displayTable(mdl.fittedParams(:,:,1), mdl.headers(1:end-4))
-displayTable(mdlAvg.fittedParams(:,:,1), mdlAvg.headers(1:end-4))
+displayTable(mdl.fittedParams(:,:,1), mdl.headers(1:end))%mdl.headers(1:end-4))
+%displayTable(mdlAvg.fittedParams(:,:,1), mdl.headers(1:end))%mdlAvg.headers(1:end-4))
 fprintf('\n=========\n\n')
 
 end
@@ -627,7 +627,7 @@ function yPredicted = normMdlSim(x, params, optoStr)
     end
 
     % stimulation setup
-    nTrials = 100000; % Trials per level of stimulus contrast
+    nTrials = 1000; % Trials per level of stimulus contrast
     contrasts = x; % Stimulus contrast levels
     nContrasts = numel(x);
 
@@ -779,7 +779,7 @@ function yPredicted = normMdlSim(x, params, optoStr)
                            output.incongruentVHTrialCount + output.baselineTrialCount);
 
     % Define indices
-    zeroIdx = (contrasts == 0); % Index for zero contrast
+    zeroIdx = find(contrasts == 0); % Index for zero contrast
     inconIdx = find(contrasts < 0); % Indices for incongruent contrasts
     conIdx = find(contrasts > 0); % Indices for congruent contrasts
 
@@ -787,171 +787,17 @@ function yPredicted = normMdlSim(x, params, optoStr)
     switch optoStr
         case 'baseline'
             yPredicted = [100 - (probCorrectBaseline(inconIdx) * 100); ...
-                          rmnan(mean([100 - (probCorrectBaseline(zeroIdx) * 100), probCorrectBaseline(zeroIdx) * 100])); ...
+                          rmnan(mean([100 - (probCorrectBaseline(zeroIdx) * 100), probCorrectBaseline(zeroIdx) * 100]))'; ...
                           probCorrectBaseline(conIdx) * 100]';
+            %fprintf('%.0f ',contrasts)
+            %fprintf('\nBaseline Lengths: %.0f into %.0f\n', numel(zeroIdx), numel(rmnan(mean([100 - (probCorrectBaseline(zeroIdx) * 100), probCorrectBaseline(zeroIdx) * 100]))'));
         case 'opto'
             yPredicted = [100 - (probCorrectIncongruent(inconIdx) * 100); ...
-                          rmnan(mean([100 - (probCorrectIncongruent(zeroIdx) * 100), probCorrectCongruent(zeroIdx) * 100])); ...
+                          rmnan(mean([100 - (probCorrectIncongruent(zeroIdx) * 100), probCorrectCongruent(zeroIdx) * 100]))'; ...
                           probCorrectCongruent(conIdx) * 100]';
+            %fprintf('%.0f ',contrasts)
+            %fprintf('\nOpto Lengths: %.0f into %.0f\n', numel(zeroIdx), numel(rmnan(mean([100 - (probCorrectIncongruent(zeroIdx) * 100), probCorrectCongruent(zeroIdx) * 100]))'));
     end
 
-end
-function yPredicted = normMdlSimCopilot(x, params, optoStr)
-    % Visual + Opto-stim Psychometric Functions
-    % Inputs:
-    %   x - Stimulus contrast levels
-    %   params - Structure containing model parameters
-    % Outputs:
-    %   yOpto - Correct percentages for congruent and incongruent optostim
-    %   yBaseline - Correct percentages for baseline
-    
-    %% Parameters
-    a = params(1); % Weight of iso-tuned visual input
-    b = params(2); % Weight of ortho-tuned visual input
-    l = params(3); % Weight of iso-tuned visual input norm
-    w = params(4); % Weight of ortho-tuned visual input norm
-    g0 = params(5); % Normalization constant
-    n = params(6); % Spiking exponent
-    rmx = params(7); % Max response
-    e = params(8); % Relative weight of optostim effects on excitation
-    switch optoStr
-        case 'baseline'
-            o = 0; % Zero opto-stim effective contrast
-        case 'opto'
-            o = params(9); % Opto-stim effective contrast
-    end
-
-    % stimulation setup
-    nTrials = 100000; % Trials per level of stimulus contrast
-    contrasts = x; % Stimulus contrast levels
-    nContrasts = numel(x);
-
-    %% Calculate responses and normalizations
-    resp_cH_vH_oV = contrasts + b * (1 - e) * o;
-    norm_cH_vH_oV = contrasts + w * e * o;
-    normresp_cH_vH_oV = rmx * (resp_cH_vH_oV.^n) ./ (norm_cH_vH_oV.^n + g0^n);
-
-    resp_cV_vH_oV = a * contrasts + (1 - e) * o;
-    norm_cV_vH_oV = l * contrasts + e * o;
-    normresp_cV_vH_oV = rmx * (resp_cV_vH_oV.^n) ./ (norm_cV_vH_oV.^n + g0^n);
-
-    resp_cH_vH_oH = contrasts + (1 - e) * o;
-    norm_cH_vH_oH = contrasts + e * o;
-    normresp_cH_vH_oH = rmx * (resp_cH_vH_oH.^n) ./ (norm_cH_vH_oH.^n + g0^n);
-
-    resp_cV_vH_oH = a * contrasts + b * (1 - e) * o;
-    norm_cV_vH_oH = l * contrasts + w * e * o;
-    normresp_cV_vH_oH = rmx * (resp_cV_vH_oH.^n) ./ (norm_cV_vH_oH.^n + g0^n);
-
-    resp_cH_vV_oV = a * contrasts + b * (1 - e) * o;
-    norm_cH_vV_oV = l * contrasts + w * e * o;
-    normresp_cH_vV_oV = rmx * (resp_cH_vV_oV.^n) ./ (norm_cH_vV_oV.^n + g0^n);
-
-    resp_cV_vV_oV = contrasts + (1 - e) * o;
-    norm_cV_vV_oV = contrasts + e * o;
-    normresp_cV_vV_oV = rmx * (resp_cV_vV_oV.^n) ./ (norm_cV_vV_oV.^n + g0^n);
-
-    resp_cH_vV_oH = a * contrasts + (1 - e) * o;
-    norm_cH_vV_oH = l * contrasts + e * o;
-    normresp_cH_vV_oH = rmx * (resp_cH_vV_oH.^n) ./ (norm_cH_vV_oH.^n + g0^n);
-
-    resp_cV_vV_oH = contrasts + b * (1 - e) * o;
-    norm_cV_vV_oH = contrasts + w * e * o;
-    normresp_cV_vV_oH = rmx * (resp_cV_vV_oH.^n) ./ (norm_cV_vV_oH.^n + g0^n);
-
-    %% Simulate trials and compute performance
-    trials = randi([0 1], nTrials, 2, 'single'); % Binary inputs for trials
-    contrastIdx = randi([1 nContrasts], nTrials, 1); % Random contrast index
-    visualOrt = trials(:, 1); % 0=0, 1=90
-    optoOrt = trials(:, 2); % 0=0, 1=90
-    trials(:, 3) = contrastIdx;
-
-    % Determine responses based on input conditions
-    respH = randn(nTrials, 1) + ...
-        (visualOrt == 0 & optoOrt == 0) .* normresp_cH_vV_oV(contrastIdx)' + ...
-        (visualOrt == 0 & optoOrt == 1) .* normresp_cH_vV_oH(contrastIdx)' + ...
-        (visualOrt == 1 & optoOrt == 0) .* normresp_cH_vH_oV(contrastIdx)' + ...
-        (visualOrt == 1 & optoOrt == 1) .* normresp_cH_vH_oH(contrastIdx)';
-
-    respV = randn(nTrials, 1) + ...
-        (visualOrt == 0 & optoOrt == 0) .* normresp_cV_vV_oV(contrastIdx)' + ...
-        (visualOrt == 0 & optoOrt == 1) .* normresp_cV_vV_oH(contrastIdx)' + ...
-        (visualOrt == 1 & optoOrt == 0) .* normresp_cV_vH_oV(contrastIdx)' + ...
-        (visualOrt == 1 & optoOrt == 1) .* normresp_cV_vH_oH(contrastIdx)';
-
-    % Calculate likelihood ratio
-    lr = sum(exp(-0.5 * ((respH - [normresp_cH_vH_oV, normresp_cH_vH_oH]).^2 + ...
-                         (respV - [normresp_cV_vH_oV, normresp_cV_vH_oH]).^2)), 2) ./ ...
-         sum(exp(-0.5 * ((respH - [normresp_cH_vV_oV, normresp_cH_vV_oH]).^2 + ...
-                         (respV - [normresp_cV_vV_oV, normresp_cV_vV_oH]).^2)), 2);
-
-    % Determine trial outcome
-    trials(:, 4) = double(lr > 1.0 | (lr == 1.0 & rand(nTrials, 1) > 0.5));
-
-    %% Initialize output structure
-    output = struct(...
-        'stimulusContrast', zeros(nContrasts, 1), ...
-        'effectiveOptoContrast', zeros(nContrasts, 1), ...
-        'congruentTrialCount', zeros(nContrasts, 1), ...
-        'incongruentHVTrialCount', zeros(nContrasts, 1), ...
-        'incongruentVHTrialCount', zeros(nContrasts, 1), ...
-        'baselineTrialCount', zeros(nContrasts, 1), ...
-        'correctCongruentTrialCount', zeros(nContrasts, 1), ...
-        'correctIncongruentHVTrialCount', zeros(nContrasts, 1), ...
-        'correctIncongruentVHTrialCount', zeros(nContrasts, 1), ...
-        'correctBaselineTrialCount', zeros(nContrasts, 1));
-
-    %% Process trials vectorized
-    stimCon = trials(:, 1); % [10000 x 1]
-    optoCon = trials(:, 2); % [10000 x 1]
-    contrastIndices = trials(:, 3); % [10000 x 1]
-    trialOutcomes = trials(:, 4); % [10000 x 1]
-
-    % Create logical masks for all conditions
-    isCongruent = stimCon == 1 & optoCon == 1;
-    isIncongruentHV = stimCon == 1 & optoCon == 0;
-    isIncongruentVH = stimCon == 0 & optoCon == 1;
-    isBaseline = stimCon == 0 & optoCon == 0;
-
-    % Count trials for each contrast level using accumarray
-    output.congruentTrialCount = accumarray(contrastIndices(isCongruent), 1, [nContrasts, 1]);
-    output.incongruentHVTrialCount = accumarray(contrastIndices(isIncongruentHV), 1, [nContrasts, 1]);
-    output.incongruentVHTrialCount = accumarray(contrastIndices(isIncongruentVH), 1, [nContrasts, 1]);
-    output.baselineTrialCount = accumarray(contrastIndices(isBaseline), 1, [nContrasts, 1]);
-
-    % Count correct trials
-    output.correctCongruentTrialCount = accumarray(contrastIndices(isCongruent & stimCon == trialOutcomes), 1, [nContrasts, 1]);
-    output.correctIncongruentHVTrialCount = accumarray(contrastIndices(isIncongruentHV & stimCon == trialOutcomes), 1, [nContrasts, 1]);
-    output.correctIncongruentVHTrialCount = accumarray(contrastIndices(isIncongruentVH & stimCon == trialOutcomes), 1, [nContrasts, 1]);
-    output.correctBaselineTrialCount = accumarray(contrastIndices(isBaseline & stimCon == trialOutcomes), 1, [nContrasts, 1]);
-
-    %% Compute probabilities [rest remains unchanged]
-    probCorrectCongruent = (output.correctCongruentTrialCount + output.correctBaselineTrialCount) ./ ...
-                           (output.congruentTrialCount + output.baselineTrialCount);
-
-    probCorrectIncongruent = (output.correctIncongruentHVTrialCount + output.correctIncongruentVHTrialCount) ./ ...
-                             (output.incongruentHVTrialCount + output.incongruentVHTrialCount);
-
-    probCorrectBaseline = (output.correctCongruentTrialCount + output.correctIncongruentHVTrialCount + ...
-                           output.correctIncongruentVHTrialCount + output.correctBaselineTrialCount) ./ ...
-                          (output.congruentTrialCount + output.incongruentHVTrialCount + ...
-                           output.incongruentVHTrialCount + output.baselineTrialCount);
-
-    % Define indices
-    zeroIdx = (contrasts == 0);
-    inconIdx = find(contrasts < 0);
-    conIdx = find(contrasts > 0);
-
-    % Baseline and optostim outputs
-    switch optoStr
-        case 'baseline'
-            yPredicted = [100 - (probCorrectBaseline(inconIdx) * 100); ...
-                          rmnan(mean([100 - (probCorrectBaseline(zeroIdx) * 100), probCorrectBaseline(zeroIdx) * 100])); ...
-                          probCorrectBaseline(conIdx) * 100]';
-        case 'opto'
-            yPredicted = [100 - (probCorrectIncongruent(inconIdx) * 100); ...
-                          rmnan(mean([100 - (probCorrectIncongruent(zeroIdx) * 100), probCorrectCongruent(zeroIdx) * 100])); ...
-                          probCorrectCongruent(conIdx) * 100]';
-    end
 end
 
