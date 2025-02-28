@@ -20,7 +20,7 @@ yOptoAverage=rmnan(reshape(yOptoAll,1,numel(yOptoAll)));
 options = optimoptions('fmincon', 'Algorithm', 'interior-point', 'Display', 'off', 'TolFun', 1e-14, 'TolX', 1e-14);
 %options = optimoptions('fmincon', 'Algorithm', 'sqp', 'Display', 'off', 'TolFun', 1e-14, 'TolX', 1e-14);
 fprintf('Fitting model, independent parameters per session...')
-for block = 1:nBlocks
+for block = 1%:nBlocks
     xBaseline=rmnan(xBaselineAll(block,:));
     yBaseline=rmnan(yBaselineAll(block,:));
     
@@ -469,9 +469,10 @@ function mdl = calculateTotalError(mdl, params, xBaseline, yBaseline, xOpto, yOp
         case 'bill'
             minBound = 1e-10;
             maxBound = 100 - minBound;
-            
-            mdlBaseline = @(x, params) max(minBound, min(maxBound, normMdlSim(x, params,'baseline'))); % zero opto input
-            mdlOpto = @(x, params) max(minBound, min(maxBound, normMdlSim(x, params,'opto'))); % nonzero opto input
+            % GPU/ParPool options
+            options = struct('useGPU', true, 'useParallel', false, 'nTrials', 100000, 'verbose', false);
+            mdlBaseline = @(x, params) max(minBound, min(maxBound, normMdlSimOptimized(x, params,'baseline',options))); % zero opto input
+            mdlOpto = @(x, params) max(minBound, min(maxBound, normMdlSimOptimized(x, params,'opto',options))); % nonzero opto input
             
             % Define NLL objective function
             objectiveFunction = @(params) ...
@@ -572,6 +573,7 @@ function mdl = calculateTotalError(mdl, params, xBaseline, yBaseline, xOpto, yOp
     mdl.params(block,:)=params;
     mdl.options=opts;
     mdl.fittedParams(block,:,baselineModelFlag+1)=[fittedParams aicc];
+    fprintf('Fitted block #%.0f',block)
 end
 
 function [sumY, successY] = convert2counts(x,y)
