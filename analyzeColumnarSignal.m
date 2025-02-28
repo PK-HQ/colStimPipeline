@@ -25,11 +25,11 @@ columnSelectionMethod='MapOrt';
 
 %% Get filenames
 filenameStruct=generateFilenames(dataStruct);
-pdfFilename=filenameStruct.neurometricPDF;
+pdfFilename=filenameStruct.psychneuroPDF;
 
 
 %% Load raw and PCA-ed activity for all orientations, and SNR mask
-load(filenameStruct.FFTAmp,'DataCond');
+load(filenameStruct.Intg,'DataCond');
 load(filenameStruct.Orientation,'Ort','RespCondPCA','Mask','MapOrt','MapAmpOrt','ColorMap'); %contains mask, RespCondPCA
 load(filenameStruct.colmapMat,'')
 load(filenameStruct.TS);
@@ -56,15 +56,15 @@ vis090_BCI=[vis0_BCI;vis90_BCI];
 vis090_BCI=vis090_BCI';
 %% Raw
 figure
-nRows=size(vis090_BCI,2);
-nCols=size(vis090_BCI,1);
+nRows=size(vis090_BCI,1);
+nCols=size(vis090_BCI,2);
 [hAx,~]=tight_subplot(nRows,nCols,[.05 .05]);
 for condID=1:size(DataCondBlankSubt,3)
     condImgID=vis090_BCI(condID);
     axes(hAx(condID))
     imgsc(DataCondBlankSubt(:,:,condImgID).*ROImaskNaN)
-    addPix2MM(1,512,1,512,condID,nRows,nCols);
-    caxis([0 3]*10^-2)
+    addPix2MM(DataCondBlankSubt(:,:,condImgID).*ROImaskNaN,condID,nRows,nCols);
+    caxis([0 3]*10^-1)
 end
 upFontSize(14,.015)
 suplabel('Raw signals','t',[.08 .08 .84 .9]);
@@ -77,8 +77,8 @@ for condID=1:size(DataCondColumn,3)
     condImgID=vis090_BCI(condID);
     axes(hAx(condID))
     imgsc(DataCondColumn(:,:,condImgID).*ROImaskNaN)
-    addPix2MM(1,512,1,512,condID,nRows,nCols);
-    caxis([-3.5 3.5]*10^-3)
+    addPix2MM(DataCondColumn(:,:,condImgID).*ROImaskNaN,condID,nRows,nCols);
+    caxis([-3.5 3.5]*10^-2)
 end
 upFontSize(14,.015)
 suplabel('Columnar signals (0.8-1.2cpmm)','t',[.08 .08 .84 .9]);

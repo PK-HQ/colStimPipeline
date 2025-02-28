@@ -14,19 +14,19 @@ end
 switch powerFlag
     case {'fixed'}
         % Extract the mean adjusted SPD across trials
-        adjustedSPD_uW = squeeze(mean(bitmapData.adjustedSPD_uW, 2));
+        energy = squeeze(mean(bitmapData.energy, 2));
     
         % Extract by blockID, 5-40 nColumns
         nonPowerSeries=find(analysisBlockID<=105 & ... % avoid power series
             mean(bitmapData.nColumns,1)>=nColumnRange(1) & mean(bitmapData.nColumns,1)<=nColumnRange(2)); % within range of columns wanted
         
         % Calculate IQR and identify outliers
-        Q1 = quantile(adjustedSPD_uW, 0.25);
-        Q3 = quantile(adjustedSPD_uW, 0.75);
+        Q1 = quantile(energy, 0.25);
+        Q3 = quantile(energy, 0.75);
         IQR = Q3 - Q1;
         lowerBound = Q1 - 1.5 * IQR;
         upperBound = Q3 + 1.5 * IQR;
-        selectedBlocks = intersect(nonPowerSeries, find(adjustedSPD_uW >= lowerBound & adjustedSPD_uW <= upperBound))';
+        selectedBlocks = intersect(nonPowerSeries, find(energy >= lowerBound & energy <= upperBound))';
 end
 selectedBlockIDs = analysisBlockID(selectedBlocks);
 end

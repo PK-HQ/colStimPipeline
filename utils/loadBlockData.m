@@ -18,7 +18,4 @@ function [currentBlockStruct,referenceBlockStruct,...
     
     % Load bitmap params
     bitmapData = loadBitmapData(datastruct, currentBlockStruct, currentEntryID, bitmapData, blockID);
-    
-    %
-    
 end

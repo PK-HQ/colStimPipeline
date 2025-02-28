@@ -5,7 +5,8 @@ function displayTableWithHeaders(matrix, headers)
     end
     
     % Extract the first 5 rows of the first slice of the matrix
-    data = matrix(1:5, :, 1);
+    minLength=min([3,size(matrix,1)]);
+    data = matrix(1:minLength, :, 1);
 
     % Determine the maximum width for each column for proper alignment
     colWidths = max([cellfun(@length, headers); cellfun(@(x) length(num2str(x, '%.4f')), num2cell(data))], [], 1);

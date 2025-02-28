@@ -4,11 +4,11 @@ function filenameStruct=generateFilenames(dataStruct)
 % pdfFilename=filenameStructSession.neurometricPDF;
 % mapsFilename=filenameStructSession.colmapMat;
 
-% def mainPath
+% def filenameStruct.mainPath
 if ispc
-  mainPath='Y:/';
+  filenameStruct.mainPath='Y:/';
 elseif contains(getenv('HOSTNAME'),'psy.utexas.edu')
-  mainPath='/eslab/data/';
+  filenameStruct.mainPath='/eslab/data/';
 end
 
 % set general calibration session (unused)
@@ -18,16 +18,18 @@ PCAsuffix='P2';%70%
 
 %% Set dir, folder paths
 filenameStruct.monkey=dataStruct.monkey;
+filenameStruct.monkeyNo=dataStruct.monkeyNo;
 filenameStruct.date=dataStruct.date;
 filenameStruct.run=dataStruct.run;
+filenameStruct.modality=dataStruct.modality;
 
-dataPathOrt=[mainPath dataStruct.monkey '/' dataStruct.monkey dataStruct.date '/run0/']; %usually its run 0
-dataPath=[mainPath dataStruct.monkey '/' dataStruct.monkey dataStruct.date '/run' dataStruct.run '/'];
-baselinePath=[mainPath dataStruct.monkey '/' dataStruct.monkey dataStruct.date '/run' dataStruct.baselineTS '/'];
+dataPathOrt=[filenameStruct.mainPath dataStruct.monkey '/' dataStruct.monkey dataStruct.date '/run' dataStruct.run '/']; %usually its run 0
+dataPath=[filenameStruct.mainPath dataStruct.monkey '/' dataStruct.monkey dataStruct.date '/run' dataStruct.run '/'];
+baselinePath=[filenameStruct.mainPath dataStruct.monkey '/' dataStruct.monkey dataStruct.date '/run' dataStruct.baselineTS '/'];
 
-imagePath=[mainPath dataStruct.monkey '/' dataStruct.monkey dataStruct.date '/'];
+imagePath=[filenameStruct.mainPath dataStruct.monkey '/' dataStruct.monkey dataStruct.date '/'];
 plotPath=imagePath;
-calImagePath=[mainPath dataStruct.monkey '/' dataStruct.monkey calibrationDate 'Calibration/'];
+calImagePath=[filenameStruct.mainPath dataStruct.monkey '/' dataStruct.monkey calibrationDate 'Calibration/'];
 dataPrefixStr=[dataPath 'M' dataStruct.monkeyNo 'D' dataStruct.date 'R' dataStruct.run];
 baselinePrefixStr=[baselinePath 'M' dataStruct.monkeyNo 'D' dataStruct.date 'R' dataStruct.baselineTS];
 filePrefixStr=['M' dataStruct.monkeyNo 'D' dataStruct.date 'R' dataStruct.run];
@@ -43,27 +45,35 @@ switch dataStruct.modality %isequal(dataStruct.modality,'GCaMP')
     case {'GCaMP','GEVI'}
         %% Trial structure file (TS)
         filenameStruct.TS=[dataPrefixStr 'TS.mat'];
-        
-        %% Visual baseline TS.mat
+         
+        %% Load baseline imaging
+        filenameStruct.baselineTS=[baselinePrefixStr 'TS.mat'];
+        baselineIntg=dir([baselinePrefixStr '*Intg*.mat']);
         if ~isempty(dataStruct.baselineTS)
-            filenameStruct.baselineTS=[baselinePrefixStr 'TS.mat'];
-            baselineIntg=dir([baselinePrefixStr '*Intg*.mat']);
             % if integration exists
             if ~isempty(baselineIntg)
-                filenameStruct.baselineIntg=[baselinePrefixStr(1:end-numel(filePrefixStr)) baselineIntg.name];
+                filenameStruct.baselineIntg=fullfile(baselineIntg(1).folder, baselineIntg(1).name);%[baselinePrefixStr(1:end-numel(filePrefixStr)) baselineIntg.name];
             else
                 filenameStruct.baselineIntg='';
             end
         else
             filenameStruct.baselineTS=[];
             filenameStruct.baselineIntg='';
-        end 
+        end
         
         %% Functional responses (FFT/Intg)
         % Search for filenames filenames
         tmpRaw=dir([dataPrefixStr '*StabBin*.mat']);
         tmpFFT=dir([dataPrefixStr '*FFTAmp*PF0400.mat']);
         tmpIntg=dir([dataPrefixStr '*Intg*.mat']);
+        tmpStab=dir([dataPrefixStr '*StabCfg.mat']);
+
+        % if raw binned exists         
+        if ~isempty(tmpRaw)
+            filenameStruct.Stab=[dataPrefixStr(1:end-numel(filePrefixStr)) tmpStab.name];
+        else
+            filenameStruct.Stab='';
+        end
         % if raw binned exists         
         if ~isempty(tmpRaw)
             filenameStruct.Raw=[dataPrefixStr(1:end-numel(filePrefixStr)) tmpRaw.name];
@@ -72,33 +82,34 @@ switch dataStruct.modality %isequal(dataStruct.modality,'GCaMP')
         end
         % if fft exists         
         if ~isempty(tmpFFT)
-            filenameStruct.FFTAmp=[dataPrefixStr(1:end-numel(filePrefixStr)) tmpFFT.name];
+            filenameStruct.FFTAmp=fullfile(tmpFFT(1).folder, tmpFFT(1).name);%[dataPrefixStr(1:end-numel(filePrefixStr)) tmpFFT.name];
         else
             filenameStruct.FFTAmp='';
         end
-        % if integration exists
+        %% Load opto/opto+baseline imaging
         if ~isempty(tmpIntg)
-            prefix=dataPrefixStr(1:end-numel(filePrefixStr));
-            suffix=tmpIntg.name;
-            filenameStruct.Intg=[prefix suffix];
+            %prefix=dataPrefixStr(1:end-numel(filePrefixStr));
+            %suffix=tmpIntg.name;
+            filenameStruct.Intg=fullfile(tmpIntg(1).folder, tmpIntg(1).name);%[prefix suffix];
         else
             filenameStruct.Intg='';
         end
 
         %% Orientation map
-        tmpOrientationP2=dir([dataPrefixStr '*OrientationP2*.mat']); %find with Orientation regex
-        tmpOrientation=dir([dataPrefixStr '*Orientation.mat']); %find with Orientation regex
+        tmpOrientationP2=dir([dataPathOrt '*OrientationP2*.mat']); %find with Orientation regex
+        tmpOrientation=dir([dataPathOrt '*Orientation.mat']); %find with Orientation regex
 
         %[folderfilePrefixStr 'Orientation' PCAsuffix '.mat'];
         if ~isempty(tmpOrientationP2) %to get orientation map for analysis of vis+opto block 
-            filenameStruct.Orientation=[dataPrefixStr(1:end-numel(filePrefixStr)) tmpOrientationP2.name];
+            filenameStruct.Orientation=fullfile(tmpOrientationP2(1).folder, tmpOrientationP2(1).name);%[tmpOrientationP2.folder '\' tmpOrientationP2.name];
         elseif ~isempty(tmpOrientation) && isempty(tmpOrientationP2)
-            filenameStruct.Orientation=[dataPrefixStr(1:end-numel(filePrefixStr)) tmpOrientation.name];%filenameStruct.Orientation=[dataPathOrt 'M' dataStruct.monkeyNo 'D' dataStruct.date 'R0Orientation.mat'];
+            filenameStruct.Orientation=fullfile(tmpOrientation(1).folder, tmpOrientation(1).name);%filenameStruct.Orientation=[dataPathOrt 'M' dataStruct.monkeyNo 'D' dataStruct.date 'R0Orientation.mat'];
         else 
             filenameStruct.Orientation='';
         end
 
         %% Static images
+        filenameStruct.greenImgID=dataStruct.greenImgID;
         % Binned gain for quality check
         %{
         filenameStruct.greenStatic=getFirstFile(imagePath,'*EX540L_binned.tif');
@@ -114,7 +125,7 @@ switch dataStruct.modality %isequal(dataStruct.modality,'GCaMP')
         %}
 
         %% Green images for coreg
-        filenameStruct.greenServer=[mainPath  dataStruct.monkey '/' dataStruct.monkey dataStruct.date '/green' num2str(dataStruct.greenImgID) '_binned.bmp'];
+        filenameStruct.greenServer=[filenameStruct.mainPath  dataStruct.monkey '/' dataStruct.monkey dataStruct.date '/green' num2str(dataStruct.greenImgID) '_binned.bmp'];
         filenameStruct.greenOI=['D:/' dataStruct.monkey dataStruct.date '/green' num2str(dataStruct.greenImgID) '_binned.bmp'];
         
        %% ROI timecourse
@@ -139,18 +150,17 @@ switch dataStruct.modality %isequal(dataStruct.modality,'GCaMP')
             lastSlashIndex = find(dataStruct.gaussianResponse == '/', 3, 'last');
             % Extract the substring from the last '/' to the end
             extractedString = dataStruct.gaussianResponse(lastSlashIndex(1)+1:end);
-            filenameStruct.gaussianResponse=[mainPath dataStruct.monkey '/'  extractedString];
+            filenameStruct.gaussianResponse=[filenameStruct.mainPath dataStruct.monkey '/'  extractedString];
         else
-            filenameStruct.gaussianResponse=[mainPath dataStruct.monkey '/gaussianResponse.mat'];
+            filenameStruct.gaussianResponse=[filenameStruct.mainPath dataStruct.monkey '/gaussianResponse.mat'];
         end
             
        %% Save file names
         filenameStruct.colmapPDF=[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date PCAsuffix '.pdf'];
-        filenameStruct.psychneuroPDF=[mainPath 'Chip/Meta/summary/' 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date  'R' dataStruct.run 'Summary.pdf'];%[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date 'NeurometricSummary.pdf'];
+        filenameStruct.psychneuroPDF=[filenameStruct.mainPath 'Chip/Meta/summary/' 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date  'R' dataStruct.run 'Summary.pdf'];%[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date 'NeurometricSummary.pdf'];
         filenameStruct.colmapMat=[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date PCAsuffix '.mat'];
-        filenameStruct.psychfitPDF=[mainPath 'Chip/Meta/summary/' 'M' dataStruct.monkeyNo 'Psychometrics.pdf'];%[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date 'NeurometricSummary.pdf'];
-        filenameStruct.recruitmentPDF=[mainPath 'Chip/Meta/recruitment/' 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date  'R' dataStruct.run 'Recruitment.pdf'];%[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date 'NeurometricSummary.pdf'];
-
+        filenameStruct.psychfitPDF=[filenameStruct.mainPath 'Chip/Meta/summary/' 'M' dataStruct.monkeyNo 'Psychometrics.pdf'];%[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date 'NeurometricSummary.pdf'];
+        filenameStruct.recruitmentPDF=[filenameStruct.mainPath 'Chip/Meta/recruitment/' 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date  'R' dataStruct.run 'Recruitment.pdf'];%[filenameStruct.plotPath 'M' dataStruct.monkeyNo uniqueStr dataStruct(1).date 'NeurometricSummary.pdf'];
 
 
 

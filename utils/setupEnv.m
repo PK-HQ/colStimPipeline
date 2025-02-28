@@ -12,7 +12,7 @@ function [mainPath,datastruct]=setupEnv(dataStructPath)
     scriptPath = fullfile(mainPath, dataStructPath);
 
     % Check if the script exists before attempting to run it
-    if exist(scriptPath, 'file')
+    if exist(scriptPath, 'file')==2
         run(scriptPath);
     else
         error('The specified script does not exist: %s', scriptPath);

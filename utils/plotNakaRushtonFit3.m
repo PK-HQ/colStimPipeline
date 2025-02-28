@@ -1,14 +1,26 @@
-function plotNakaRushtonFit3(behavioralData, bitmapData, datastruct, analysisBlockID, mdl, fitParams, x, monkeyName, saveFlag, savefilename)
+function mdl=plotNakaRushtonFit3(behavioralData, bitmapData, datastruct, analysisBlockID,...
+    mdl, fitParams, x, monkeyName, clusterBlocks, plotAverageFlag,...
+    saveFlag, cluster, modelTypeStr, savefilename)
    
     % Number of blocks and conditions
-    [nConditions, ~, nBlocks] = size(behavioralData.gaborContrasts);
-        
+    [nConditions, ~, nBlocks] = size(behavioralData.gaborContrasts(:, :, clusterBlocks));
+    if plotAverageFlag==1
+        nBlocks=1;
+    end
     for block = 1:nBlocks
+        % Init figure
+        make_it_tight = true;
+        hmarg=.15;
+        subplot = @(m,n,p) subtightplot (m, n, p, [0.1 0.1], [hmarg hmarg], [0.1 0.1]);
+        if ~make_it_tight,  clear subplot;  end
+       
         figure('Name', ['Block #', datastruct(analysisBlockID(block)).date]);
+        subplot(1,2,1)
+
         hold on;
         yline(50,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
         xline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on
-        for cond = 1:nConditions
+        for cond = 1:4%nConditions
             % Extract fitted parameters for current condition and block
             beta = fitParams(block, 1);
             n = fitParams(block, 2);
@@ -24,45 +36,81 @@ function plotNakaRushtonFit3(behavioralData, bitmapData, datastruct, analysisBlo
             
             % Define the Naka-Rushton functions with the fitted parameters
             betaBL=50;
-
             switch cond
                 case 1 % Baseline
-                    xPlot=x;
-                    beta=50;
-                    Rmax = 100 - beta; % Assuming Rmax is derived from beta
-                    predictedCurve = mdl.nakaRushtonBaseline(xPlot,fitParams(block,1:end-1)); %(Rmax .* (xPlot-deltax).^n) ./ (C50^n + (xPlot-deltax).^n) + beta;
+                    idx=x>=0;
+                    xPlot = x(idx);
+                    predictedCurve = mdl.mdlBaseline(xPlot, fitParams(block, 1:end-1)); 
                     lineColor = [0 0 0]; % Black for baseline
                     markerFaceColor = [1 1 1]; 
                     edgeColor = 'k';
-                    markerType='o';
-                    
-                    xBlock=rmnan(mdl.xBaseline(block,:));
-                    yBlock=rmnan(mdl.yBaseline(block,:));
+                    markerType = 'o';
+                    xBlock = rmnan(mdl.xBaseline(block, :));
+                    yBlock = rmnan(mdl.yBaseline(block, :));
+                    [~, idx] = find(xBlock >= 0);
+                    xBlock = xBlock(idx);
+                    yBlock = yBlock(idx);
+                    mdl.thresholdContrast(block, 1) = getThreshold(xPlot, predictedCurve, 70);
 
                 case 2 % Con-Opto
-                    xPlot=x(x>=0);
-                    predictedCurve = mdl.nakaRushtonOpto(xPlot,fitParams(block,1:end-1)); %((100-beta) .* (xPlot-deltax).^n) ./ (C50^n + (xPlot-deltax).^n) + beta;
-                    lineColor = [0.9294, 0.1098, 0.1373]*1.05; % Red for con-opto
+                    if strcmp(modelTypeStr,'bill')
+                        xPlot = x; % Positive contrasts for congruent condition
+                        predictedCurve = mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)); 
+                        xPlot = x(x >= 0); % Positive contrasts for congruent condition
+                        predictedCurve=predictedCurve(x >= 0);
+                    else
+                        xPlot = x(x >= 0); % Positive contrasts for congruent condition
+                        predictedCurve = mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)); 
+                    end
+                    lineColor = [0.9294, 0.1098, 0.1373] * 1.05; % Red for con-opto
                     markerFaceColor = lineColor;
                     edgeColor = 'k';
-                    markerType='^';
-                    xBlock=rmnan(mdl.xOpto(block,:));
-                    yBlock=rmnan(mdl.yOpto(block,:));
-                    [~,idx]=find(xBlock>=0);
-                    xBlock=xBlock(idx);
-                    yBlock=yBlock(idx);
+                    markerType = '^';
+                    xBlock = rmnan(mdl.xOpto(block, :));
+                    yBlock = rmnan(mdl.yOpto(block, :));
+                    [~, idx] = find(xBlock >= 0);
+                    xBlock = xBlock(idx);
+                    yBlock = yBlock(idx);
+            
                 case 3 % Incon-Opto
-                    xPlot=x(x<=0);
-                    predictedCurve = mdl.nakaRushtonOpto(xPlot,fitParams(block,1:end-1)); %(100-(100-(beta)) .* (xPlot+deltax).^n) ./ (C50^n + (xPlot+deltax).^n) + (100-beta);
-                    lineColor = [0, 0.0941, 0.6627]*1.25; % Blue for incon-opto
+                    if strcmp(modelTypeStr,'bill')
+                        xPlot = x; % Positive contrasts for congruent condition
+                        predictedCurve = mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)); 
+                        xPlot = x(x <= 0); % Neg contrasts for congruent condition
+                        predictedCurve=predictedCurve(x <= 0);
+                    else
+                        xPlot = x(x <= 0);
+                        predictedCurve = 100-mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)); 
+                        xPlot = -1.* x(x <= 0); % Neg contrasts for congruent condition
+
+                    end
+                    lineColor = [0, 0.0941, 0.6627] * 1.25; % Blue for incon-opto
                     markerFaceColor = lineColor;
                     edgeColor = 'k';
-                    markerType='v';
-                    xBlock=rmnan(mdl.xOpto(block,:));
-                    yBlock=rmnan(mdl.yOpto(block,:));
-                    [~,idx]=find(xBlock<0);
-                    xBlock=xBlock(idx);
-                    yBlock=yBlock(idx);
+                    markerType = 'v';
+                    idx=find(rmnan(mdl.xOpto(block, :))<1);
+                    xBlock = rmnan(mdl.xOpto(block, :));
+                    yBlock = rmnan(mdl.yOpto(block, :));
+                    [~, idx] = find(xBlock < 0);
+                    xBlock = -1.*xBlock(idx);
+                    yBlock = 100-yBlock(idx);
+                    
+                case 4
+                    xBlock = rmnan(mdl.xOpto(block, :));
+                    yBlock = rmnan(mdl.yOpto(block, :));
+                    [~, idxCon] = find(xBlock >= 0);
+                    [~, idxIncon] = find(xBlock <= 0);
+
+                    xBlock = xBlock(idxCon);
+                    yBlock = yBlock(idxCon) - fliplr(100-yBlock(idxIncon));
+
+                    markerType = 'square';
+
+                    lineColor =[127, 0, 255]/255; % Gray for combined case
+                    markerFaceColor =lineColor;
+                    edgeColor = 'k';
+                    
+                    
                 otherwise
                     lineColor = 'g'; % Fallback lineColor
                     markerFaceColor = lineColor;
@@ -70,66 +118,133 @@ function plotNakaRushtonFit3(behavioralData, bitmapData, datastruct, analysisBlo
                     markerType='.';
             end
             %% Plots
-            % Plot line fit
-            plot(xPlot, predictedCurve, 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'on'); hold on;
-            
-            % Plot scatterplot
-            semY=std(yBlock, 'omitnan') / sqrt(length(yBlock));
-            counts=size(yBlock,2);
-            if size(yBlock,1) > 1 % if no sem, don't shade
-                patchSaturationVal = 0.2;
-            else
-                semY=zeros(counts,1);
-                patchSaturationVal = 0;
-            end
-            
-            % Add data points and shaded error bar
-            markerSize = 25;
-            patchSaturationVal=1;
-            shadedErrorBar(xBlock, yBlock, semY', 'patchSaturation', patchSaturationVal, 'lineprops', ...
-                           {'Color', lineColor, 'LineStyle', 'none', 'LineWidth', 3, 'Marker', markerType, ...
-                            'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize}); hold on;
+            if cond<=3
+                % Plot line fit
+                plot(xPlot, predictedCurve, 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'on'); hold on;
 
-            % Add datapoints's count annotation
-            zeroConstrastPoint=xBlock==0;
-            if sum(zeroConstrastPoint)>0
-                nTrials=[20*ones(1,numel(zeroConstrastPoint)) 20*ones(1,numel(~zeroConstrastPoint))];
-            else
-                 nTrials=[20*ones(1,numel(~zeroConstrastPoint))];
-            end
-            annotateDataPoints(xBlock, yBlock, nTrials, markerFaceColor); hold on;
-            
-            xlabel('Gabor contrast (%)');
+                % Plot scatterplot
+                semY=std(yBlock, 'omitnan') / sqrt(length(yBlock));
+                counts=size(yBlock,2);
+                if size(yBlock,1) > 1 % if no sem, don't shade
+                    patchSaturationVal = 0.2;
+                else
+                    semY=zeros(counts,1);
+                    patchSaturationVal = 0;
+                end
 
+                % Add data points and shaded error bar
+                markerSize = 25;
+                patchSaturationVal=1;
+                shadedErrorBar(xBlock, yBlock, semY', 'patchSaturation', patchSaturationVal, 'lineprops', ...
+                               {'Color', lineColor, 'LineStyle', 'none', 'LineWidth', 3, 'Marker', markerType, ...
+                                'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize}); hold on;
+
+                % Add datapoints's count annotation
+                zeroConstrastPoint=xBlock==0;
+                if sum(zeroConstrastPoint)>0
+                    nTrials=[20*ones(1,numel(zeroConstrastPoint)) 20*ones(1,numel(~zeroConstrastPoint))];
+                elseif sum(zeroConstrastPoint)>0 && plotAverageFlag==1
+                    nTrials=[nBlocks*ones(1,numel(zeroConstrastPoint)) nBlocks*ones(1,numel(~zeroConstrastPoint))];
+                elseif sum(zeroConstrastPoint)==0
+                     nTrials=[20*ones(1,numel(~zeroConstrastPoint))];
+                elseif sum(zeroConstrastPoint)==0 && plotAverageFlag==1
+                     nTrials=[nBlocks*ones(1,numel(~zeroConstrastPoint))];
+                end
+                annotateDataPoints(xBlock, yBlock, nTrials, markerFaceColor); hold on;
+
+            end
         end
-        if isfield(bitmapData, 'adjustedSPD_uW') & ~isempty(bitmapData.adjustedSPD_uW(:,:,block))
-            bitmapSPD=squeeze(bitmapData.adjustedSPD_uW(:,:,block));
+        if isfield(bitmapData, 'energy') & ~isempty(bitmapData.energy(:,:,clusterBlocks(block)))
+            if plotAverageFlag % for plotting the average across all blocks
+                bitmapSPD=squeeze(bitmapData.energy(:,:,clusterBlocks));
+                bitmapColumns=bitmapData.nColumns(:,clusterBlocks)';
+            else
+                bitmapSPD=squeeze(bitmapData.energy(:,:,clusterBlocks(block)));
+                bitmapColumns=bitmapData.nColumns(:,block)';
+            end
         else
             bitmapSPD=[0 0];
         end
         
-        title({[datastruct(analysisBlockID(block)).date 'R' datastruct(analysisBlockID(block)).run],...
-            ['Adj. SPD: ' num2str(mean(bitmapSPD),2) ' \pm ' num2str(std(bitmapSPD),1) ' \muW']});
+        bitmapColumnhv=nanmean(bitmapColumns,1);
+        bitmapSPDhv=nanmean(bitmapSPD,1);
+        bitmapSPDmean=nanmean(bitmapSPD,'all');
+        bitmapSPDstd=nanstd(bitmapSPD,[],'all');
+        if plotAverageFlag==1
+            title({[modelTypeStr ', cluster ' num2str(cluster) ' average'],...
+                ['Energy: ' num2str(bitmapSPDhv(1),2) ' & ' num2str(bitmapSPDhv(2),2) ' mW (' num2str(bitmapSPDmean,2) ' \pm ' num2str(bitmapSPDstd,1) ' mW)',...
+                ', Columns: ' num2str(bitmapColumnhv(1),2) ' & ' num2str(bitmapColumnhv(2),2)]});
+        else
+            title({[datastruct(analysisBlockID(block)).date 'R' datastruct(analysisBlockID(block)).run],...
+                ['Energy: ' num2str(bitmapSPDhv(1),2) ' & ' num2str(bitmapSPDhv(2),2) ' mW, ',...
+                'Columns: ' num2str(bitmapColumnhv(1),2) ' & ' num2str(bitmapColumnhv(2),2)]});
+        end
+
         % Labels etc
-        axis square
+        %axis square
         hold off;
-        addSkippedTicks(-100,100,12.5,'x'); yticks([0:25:100]); xlim([-100 100]); ylim([0 100]); 
+        addSkippedTicks(-100,100,12.5,'x'); yticks([0:25:100]); xlim([0 100]); ylim([0 100]); axis square
         % Adding legend after plotting to ensure it covers all conditions
         moveLines()
         h2 = get(gca,'Children');
-        legend(h2([end-2:end]), {'Baseline', 'Con-Opto', 'Incon-Opto'}, 'Location', 'northwest',...
+        legend(h2([end-2:end]), {'Baseline', 'Con-Opto', 'Incon-Opto'}, 'Location', 'southeast',...
             'NumColumns',1,'FontSize',20);
         upFontSize(32, 0.01)
 
+        
+        % Add text for biasing
+        xOffset=.53;
+        yOffset=.05;
+        %text('Units', 'Normalized', 'Position', [1 1]-[xOffset yOffset], 'string', 'More biasing', 'color', 'k','FontWeight','bold', 'Fontsize',14)
+
+       % Dual axes
+        ax = gca;
+        xx = abs([-100:12.5:100]);  
+        cellArray = cellstr(num2str(xx(:))); cellArray(2:2:end) = {''}; xticklabels(cellArray)
+
+        ax = gca;
+        ylabel('Correct %'); ylim([0 100]); yticks([0:10:100]); set(gca,'ycolor','k') 
+        xlabel('Gabor contrast (%)');
+
+        % Plot inset for difference plot
+        if cond==4
+            subplot(1,2,2)
+            
+            plot(xBlock, yBlock, 'Color', lineColor, 'LineWidth',2, ...
+                'Marker', markerType, 'MarkerSize', 15, 'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor);
+
+            ylabel('\Delta%');
+
+            yline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on
+            xline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on
+            
+            % Set limits if necessary (optional)
+            box off
+            xlim([0 100]);
+            ylim([0 100]);
+            addSkippedTicks(-20, 100,10,'y')
+            addSkippedTicks(-0,100,12.5,'x')
+            set(gca,'FontSize', 10); % Smaller font size for inset        
+            set(gca,'linewidth',2)
+            upFontSize(32, 0.01)            
+            % Add text for biasing
+            xOffset=.6;
+            yOffset=.05;
+            text('Units', 'Normalized', 'Position', [1 1]-[xOffset yOffset], 'string', 'Correct biasing', 'color', 'k','FontWeight','normal', 'Fontsize',14)
+            title('Con-Incon optostim', 'FontWeight','normal')
+            % Add text for biasing
+            axis square
+        end
+        
+        
         % Add params table
-        header={'Beta','n','C50','DeltaX','AICc'};
-        %header = {'\Beta';'n';'C_{50}';'\DeltaX_{H-opto}';'\DeltaX_{V-opto}'};
         if isnan(fitParams(block,1))
             dat=round([50 fitParams(block,[2:4 end])],1);
         else
             dat=round([fitParams(block,1) fitParams(block,[2:4 end])],1);
+            headers=[mdl.headers(1) mdl.headers([2:4 end])];
         end
-        T = array2table(dat,'VariableNames',header);
+        T = array2table(dat,'VariableNames',headers);
         % Get the table in string form.
         TString = evalc('disp(T)');
         % Use TeX Markup for bold formatting and underscores.
@@ -140,23 +255,14 @@ function plotNakaRushtonFit3(behavioralData, bitmapData, datastruct, analysisBlo
         FixedWidth = get(0,'FixedWidthFontName');
         % Output the table using the annotation command.
         annotation(gcf,'Textbox','String',TString,'Interpreter','Tex','FontName',FixedWidth,'FontSize',12,'EdgeColor','none',...
-            'Units','Normalized','Position',[.72 -.85 1 1]);
+           'Units','Normalized','Position',[.18 -.65 1 1]);
         
-        % Dual axes
-        ax = gca;
-        xx = abs([-100:12.5:100]);  
-        cellArray = cellstr(num2str(xx(:))); cellArray(2:2:end) = {''}; xticklabels(cellArray)
-        yyaxis left; ylabel('Correct, incongruent (%)'); 
-        ax = gca;
-        ax.YTickLabel = flipud(ax.YTickLabel);
-        yyaxis right; ylabel('Correct, congruent (%)'); ylim([0 100]); yticks([0:25:100]); set(gca,'ycolor','k') 
-        
-        % Add text for biasing
-        xOffset=.569;
-        yOffset=.02;
-        text('Units', 'Normalized', 'Position', [1 1]-[xOffset yOffset], 'string', 'More bias', 'color', 'k','FontWeight','bold', 'Fontsize',14)
-        
-        savePDF(savefilename, monkeyName, saveFlag, block, nBlocks)
+        if plotAverageFlag==1
+            [nConditions, ~, nBlocks] = size(behavioralData.gaborContrasts(:, :, clusterBlocks));
+            nBlocks=1;
+            block=1;
+        end
+        savePDF(savefilename, monkeyName, 1, block, nBlocks)
 
     end
 end
@@ -189,4 +295,21 @@ h = [h; elementsToMove];
 % Set the new order of children
 set(gca, 'Children', h);
 
+
+%{
+if billplot==1
+    clf
+    plot(xPlot, predictedCurve, 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'on'); hold on;
+end
+%}
+end
+
+function thresholdContrast=getThreshold(xData,yData,target);
+% Find threshold value
+
+% Find the index of the closest value
+[~, index] = min(abs(yData - target));
+
+% Get the closest value
+thresholdContrast = xData(index);
 end

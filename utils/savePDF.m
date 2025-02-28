@@ -23,7 +23,7 @@ if saveFlag
     checkDirExists(filenameMeetings)
 
     %% Save as a new pdf per plot (if its not the final plot)
-    export_fig(filenameMonkeyPlot,'-pdf','-nocrop'); offwarning()
+    export_fig(filenameMonkeyPlot,'-pdf','-nocrop'); 
     %fig=gcf; close(fig)
 
     %% If final plot, merge all plots that match filename and delete the individual pdfs
@@ -39,7 +39,7 @@ if saveFlag
         end
         append_pdfs(filenameMonkey,filenameMonkeyPlots{1:end})
         % copy to meetings folder
-        copyfile(filenameMonkey, filenameMeetings)
+        %copyfile(filenameMonkey, filenameMeetings)
         % Delete individual files
         if exist(filenameMonkey,'file') && exist(filenameMeetings,'file')
             for i = 1:length(filenameMonkeyPlots)-1

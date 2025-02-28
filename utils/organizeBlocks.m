@@ -55,7 +55,7 @@ end
     switch chamberWanted
         case 'L'
             datastructChamber=datastructLeft;
-            excludeBlocks=[44 45 45 52:55 60 95];
+            excludeBlocks=[44 45 45 50 51 52:55 60 95];
             analysisBlockID=setdiff(datastructChamber,excludeBlocks);
         case 'R'
             datastructChamber=datastructRight;

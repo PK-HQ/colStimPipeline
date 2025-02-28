@@ -8,14 +8,18 @@ referenceDate = datetime('20230209', 'InputFormat', 'yyyyMMdd');
 if currentDate > referenceDate
     % Perform action X if currentDate is after referenceDate
     chamberid='L';
-    led_percent = [5 10 20 30 40 50 60 70 80 90 100];
-    power_measurements = [0.14 0.16 0.2 0.24 0.26 0.66 0.73 0.79 0.85 0.91 0.96];
+    led_percent = [5 10 15 20 25 30 40 50 60 70 75 80 90 100];
+    powers = [25.3 32.7 40.2 47.7 54.8 62.6 77.6 92.2 106.0 120.3 127.0 133.5 146.3 159.0];
+    area = 1080 * 1920 * .0054^2; % x y pixSize
+    powerDensities = powers ./ area;
     ledpercenttoestimate=30; % 30OD16?
 else
     % Perform action Y otherwise
     chamberid='R';
-    led_percent = [5 10 20 30 40 50 60 70 80 90 100];
-    power_measurements = [0.14 0.16 0.2 0.24 0.26 0.66 0.73 0.79 0.85 0.91 0.96];
+    led_percent = [5 10 15 20 25 30 40 50 60 70 75 80 90 100];
+    powers = [25.3 32.7 40.2 47.7 54.8 62.6 77.6 92.2 106.0 120.3 127.0 133.5 146.3 159.0];
+    area = 1080 * 1920 * .0054^2; % x y pixSize
+    powerDensities = powers ./ area;
     ledpercenttoestimate=100; % 100OD10?
 end
 
@@ -28,11 +32,11 @@ bestbreakpoint = nan;
 for breakpointindex = 2:length(led_percent)-1
     % segment 1 data
     x1 = led_percent(1:breakpointindex);
-    y1 = power_measurements(1:breakpointindex);
+    y1 = powerDensities(1:breakpointindex);
     
     % segment 2 data
     x2 = led_percent(breakpointindex+1:end);
-    y2 = power_measurements(breakpointindex+1:end);
+    y2 = powerDensities(breakpointindex+1:end);
     
     % linear fit for segment 1
     p1 = polyfit(x1, y1, 1);
@@ -54,7 +58,7 @@ end
 % plot results if a best fit was found and plotflag==1
 if ~isempty(bestfit) && plotflag==1
     figure; hold on;
-    plot(led_percent, power_measurements, 'ko', 'markerfacecolor', 'k'); % original data points
+    plot(led_percent, powerDensities, 'ko', 'markerfacecolor', 'k'); % original data points
     
     % plot segment 1 best fit
     x1fit = linspace(min(led_percent(1:bestbreakpoint)), max(led_percent(1:bestbreakpoint)), 100);

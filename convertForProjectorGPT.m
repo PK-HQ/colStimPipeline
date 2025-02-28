@@ -118,7 +118,7 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 bitmapProjSpaceAligned=cloneBitmaps(currentBlockStruct,'load');
 
                %% Plot 1: Select central n-columns with a contour (from 2D gaussian)
-                %[gaussianMask, bitmapCamspacePostMask] = isolateColumns(bitmapData, imagingData, blockID, bitmapNo, bitmapCamspace);
+                [gaussianMask, bitmapCamspacePostMask] = isolateColumns(bitmapData, imagingData, blockID, bitmapNo, bitmapCamspace);
                
                 %% Reverse camera-projector transformation
                 bitmapProjSpaceUnaligned(:,:,bitmapNo)=applyCamProjAlignment(imagingData, blockID, bitmapProjSpaceAligned(:,:,bitmapNo), conversionType);
@@ -131,20 +131,26 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
 
                 %% Save to bitmapData
                 % Calculate bitmap stats for columns within the contour (total pixels on, % pixel on, spatial duty cycle)
-                contourROI=bitmapCamspace(:,:,bitmapNo);
-               [labeledImage,columnAreas,boundaryBox]=getBlobAreas(contourROI);
+                contourROI=gaussianMask;%bitmapCamspace(:,:,bitmapNo);
+               [labeledImage,columnAreas,boundaryBox]=getBlobAreas(bitmapCamspace(:,:,bitmapNo));
 
-                % save
-                bitmapData.pixelsON(bitmapNo,blockID)=nansum(contourROI(:)>0);
-                bitmapData.pixelsONDensity(bitmapNo,blockID)=nansum(contourROI(:)>0)*100/nansum(contourROI(:)==0); %prctPixON=((DC/(5/10))^2)/(2/100);
+                % Save
+                % Mask areas, pixels on count and density
+                bitmapData.areaOrtMask(bitmapNo,blockID)=sum(imagingData.mask(:,:,blockID)==1, 'all')*(imagingData.pixelsizemm(blockID)^2);
+                bitmapData.areaGaussMask(bitmapNo,blockID)=sum(contourROI==1, 'all')*(imagingData.pixelsizemm(blockID)^2);
+                bitmapData.areaPixelsON(bitmapNo,blockID)=sum(bitmapCamspace(:,:,bitmapNo)>0,'all')*(imagingData.pixelsizemm(blockID)^2);%nansum(contourROI(:)==1);
+                bitmapData.pixelsONDensity(bitmapNo,blockID)=bitmapData.areaPixelsON(bitmapNo,blockID)*100 / bitmapData.areaGaussMask(bitmapNo,blockID); %nansum(contourROI(:)>0)*100/nansum(contourROI(:)==0); %prctPixON=((DC/(5/10))^2)/(2/100);
+                bitmapData.pixelsON(bitmapNo,blockID)=sum(bitmapCamspace(:,:,bitmapNo)>0,'all'); %nansum(contourROI(:)==1);
+
                 bitmapData.columnarbitmapTFprojspace(:,:,bitmapNo,blockID)=bitmapProjSpaceAligned(:,:,bitmapNo); %first bitmap is black bmp
                 bitmapData.columnarbitmapTFcamspace(:,:,bitmapNo,blockID)=bitmapCamspace(:,:,bitmapNo);
                 bitmapData.nColumns(bitmapNo,blockID)=numel(columnAreas);
                 bitmapData.medianColumnAreas(bitmapNo,blockID)=median(columnAreas);
                 
                 %% Power density calculations
-                [bitmapData.adjustedSPD_uW(1,bitmapNo,blockID), bitmapData.ledpower_mW(1,bitmapNo,blockID)] = calculateSPD(behavioralData, imagingData, bitmapData, currentBlockStruct,...
-                    bitmapNo,blockID,0);
+                [bitmapData.energy(1,bitmapNo,blockID), bitmapData.powerdensity(1,bitmapNo,blockID),...
+                    bitmapData.timeONPercent(1,bitmapNo,blockID)] = calculateSPD(behavioralData, imagingData,...
+                    bitmapData, currentBlockStruct, bitmapNo,blockID,0);
                                 
                 %% Plots
                 figure('name',['Bitmap generation: ' num2str(ort) char(0176)]) 
@@ -251,27 +257,36 @@ function [gaussianMask, bitmapCamspacePostMask] = isolateColumns(bitmapData, ima
     if ~isempty(bitmapData.nColumnsWanted)
         nColumnsWanted = bitmapData.nColumnsWanted(1, bitmapNo, blockID);
         contourMaskLevel = bitmapData.gaussianContourLevel(1, bitmapNo, blockID);
-        disp(['Columns wanted: ' num2str(nColumnsWanted)]);
-        
-        % Single column, special case with contour level 200
-        if nColumnsWanted == 1 && contourMaskLevel == 200
-            disp('Loop 1');
-            gaussianMask, bitmapCamspacePostMask = processSingleColumnSpecial(bitmapCamspace, imagingData.centerCoords(:, :, blockID));
-        % Single or multiple columns, general case
-        elseif (nColumnsWanted == 1 && contourMaskLevel < 200) || nColumnsWanted > 1
-            disp('Loop 2');
-            gaussianMask = imagingData.gaussfit(1, contourMaskLevel, blockID).area;
-            bitmapCamspacePostMask = gaussianMask .* bitmapCamspace;
-        
-        % No columns wanted
-        elseif nColumnsWanted == 0
-            disp('Loop 3');
-            gaussianMask = zeros(imagingData.pixels(1), imagingData.pixels(1));
-            bitmapCamspacePostMask = gaussianMask .* bitmapCamspace;
-        else
-            disp('Loop 4');
-            gaussianMask = ones(imagingData.pixels(1), imagingData.pixels(1));
-            bitmapCamspacePostMask = gaussianMask .* bitmapCamspace;
+
+        if ~isnan(contourMaskLevel)
+            disp(['Columns wanted: ' num2str(nColumnsWanted)]);
+
+            % Single column, special case with contour level 200
+            if nColumnsWanted == 1 && contourMaskLevel == 200
+                disp('Loop 1');
+                gaussianMask, bitmapCamspacePostMask = processSingleColumnSpecial(bitmapCamspace, imagingData.centerCoords(:, :, blockID));
+            % Single or multiple columns, general case
+            elseif (nColumnsWanted == 1 && contourMaskLevel < 200) || nColumnsWanted > 1
+                disp('Loop 2');
+                gaussianMask = imagingData.gaussfit(1, contourMaskLevel, blockID).area;
+                bitmapCamspacePostMask = gaussianMask .* bitmapCamspace;
+
+            % No columns wanted
+            elseif nColumnsWanted == 0
+                disp('Loop 3');
+                gaussianMask = zeros(imagingData.pixels(1), imagingData.pixels(1));
+                bitmapCamspacePostMask = gaussianMask .* bitmapCamspace;
+            else
+                disp('Loop 4');
+                gaussianMask = ones(imagingData.pixels(1), imagingData.pixels(1));
+                bitmapCamspacePostMask = gaussianMask .* bitmapCamspace;
+            end
+            
+            % Pre-gaussian fit
+            elseif isnan(contourMaskLevel)
+                disp('Pre-gaussian fit')
+                gaussianMask = imagingData.mask(:,:, blockID);
+                bitmapCamspacePostMask = gaussianMask .* bitmapCamspace;
         end
     end
 end

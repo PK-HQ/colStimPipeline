@@ -1,12 +1,12 @@
 function plotMinColumns(bitmapData, behavioralData, analysisBlockID)
 
     % Filter by power
-    selectedBlocks=powerfilter(bitmapData, analysisBlockID, 'fixedpower');
+    selectedBlocks=powerfilter(bitmapData, analysisBlockID, 'fixed');
 
     % Extract the relevant data for plotting
-    aucData = squeeze(behavioralData.auc(4,3,usableBlocks));
-    nColumns = squeeze(bitmapData.nColumns(:,usableBlocks));
-    nColumnsMean = squeeze(mean(bitmapData.nColumns(:,usableBlocks), 1));
+    aucData = squeeze(behavioralData.auc(4,3,selectedBlocks));
+    nColumns = squeeze(bitmapData.nColumns(:,selectedBlocks));
+    nColumnsMean = squeeze(mean(bitmapData.nColumns(:,selectedBlocks), 1));
 
     % Scatter plot
     cmap=fireice; markerColor = [cmap([43-10 1+10],:); 1 1 1; .52 0 .84]; % colors:  Black, blue, red
@@ -26,7 +26,7 @@ function plotMinColumns(bitmapData, behavioralData, analysisBlockID)
             lineColor=markerColor;
         end
         x=nColumns(set,:);
-        y=squeeze(behavioralData.auc(set+1,3,usableBlocks))';
+        y=squeeze(behavioralData.auc(set+1,3,selectedBlocks))';
         plotFitCurve(x, y, markerColor(set,:), markerType{set}, hAx, 1);
         upFontSize(24,0.01)
         xlim([0 60])
@@ -51,7 +51,7 @@ function plotMinColumns(bitmapData, behavioralData, analysisBlockID)
             lineColor=markerColor;
         end
         x=mean(nColumns(:,:),1);
-        y=squeeze(behavioralData.auc(4,3,usableBlocks))';
+        y=squeeze(behavioralData.auc(4,3,selectedBlocks))';
         plotFitCurve(x, y, markerColor(set,:), markerType{set}, hAx, 2);
         upFontSize(24,0.01)
         xlim([0 60])
@@ -68,7 +68,7 @@ function plotMinColumns(bitmapData, behavioralData, analysisBlockID)
 
 
     suplabel({'Minimum column series',...
-        ['n_{blocks}=' num2str(numel(usableBlocks))]}, 't', [0.1 0.1 .8 .80])
+        ['n_{blocks}=' num2str(numel(selectedBlocks))]}, 't', [0.1 0.1 .8 .80])
     upFontSize(24,0.01)
 end
 

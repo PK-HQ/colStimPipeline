@@ -162,8 +162,8 @@ if isfield(runData.TS.Header.Conditions,'GaborSize')%'GaborSize')
         %pubfig(h,12,2,0.005);
 
         % axis labels
-        ylabel('% Vertical reports')
-        xlabel('Gabor orientation')
+        ylabel('Vertical reports (%)')
+        xlabel('Signed gabor contrast')
 
         % legend
         legend({'Baseline','H stim (0\circ)','V-stim (90\circ)'})
@@ -172,7 +172,7 @@ if isfield(runData.TS.Header.Conditions,'GaborSize')%'GaborSize')
         % ax ticks
         
         xlims=[-1 1].*roundup(abs(unique(xlim)),10);
-        addSkippedTicks(xlims(1),xlims(2),20,'x')
+        xticks([-100:25:100])%addSkippedTicks(xlims(1),xlims(2),5,'x')
         addSkippedTicks(0,100,12.5,'y')
       case {'split'}
         % relevant DV
@@ -317,7 +317,7 @@ if isfield(runData.TS.Header.Conditions,'GaborSize')%'GaborSize')
         % ax ticks
         
         xlims=[-1 1].*roundup(abs(unique(xlim)),10);
-        addSkippedTicks(xlims(1),xlims(2),20,'x')
+        xticks([-100:25:100]);%addSkippedTicks(xlims(1),xlims(2),20,'x')
         addSkippedTicks(0,100,12.5,'y')
     end
 end

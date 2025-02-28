@@ -3,22 +3,19 @@ function plotParamDistributions(data1,data2,fieldName,titleStr, modelType, monke
     nPlots=size(fieldName,1);
     
     lineColors = {.3*[1 1 1], [0.9294, 0.1098, 0.1373] * 1.07, [0, 0.0941, 0.6627] * 1.25};
-    legendNames = { [(modelType{1}) '_{median}'], [(modelType{2}) '_{median}' ]}; % Legend names for param1, param2, param3
+    legendNames = { [(modelType{1}) '_{median}'], [(modelType{2}) '_{median}' ]}; % Legend names for data1, data2, param3
     
     % Prepare the data subsets
-    param1 = data1.fittedParams(:,end);
-    param2 = data2.fittedParams(:,end);
-    fieldData=[param1;param2];
+    fieldData=[data1;data2];
     
     % Statistical tests
-    [pVal12, ~, ~] = signrank(param1, param2, 'tail', 'right');
-
+    [pVals,h]=ranksum(data1, data2, 'tail', 'right');
+    
     % Plot distributions
     figure('Name', sprintf('%s Comparisons', fieldName));
-    pairs = {{param1, param2}};
-    pVals = [pVal12];
+    pairs = {{data1, data2}};
     colorPairs = {[1, 2]};
-    pairLegendNames = {[legendNames{1} ' = ' num2str(round(median(param1)))], [legendNames{2} ' = ' num2str(round(median(param2)))]};
+    pairLegendNames = {[legendNames{1} ' = ' num2str(round(median(data1, 'omitnan')))], [legendNames{2} ' = ' num2str(round(median(data2, 'omitnan')))]};
 
     for subplt = 1%length(pairs)
         subplot(1, 1, subplt);
@@ -43,10 +40,10 @@ function plotParamDistributions(data1,data2,fieldName,titleStr, modelType, monke
         colorIndex2 = colorPairs{subplt}(2);
 
         plotCenteredHistogram(pair{1}, binWidth, xlimits, lineColors{colorIndex1});
-        xline(median(pair{1}),'--','LineWidth',2,'Color',lineColors{colorIndex1},'HandleVisibility','off');
+        xline(median(pair{1}, 'omitnan'),'--','LineWidth',2,'Color',lineColors{colorIndex1},'HandleVisibility','off');
         hold on;
         plotCenteredHistogram(pair{2}, binWidth, xlimits, lineColors{colorIndex2})
-        xline(median(pair{2}),'--','LineWidth',2,'Color',lineColors{colorIndex2},'HandleVisibility','off'); hold on;
+        xline(median(pair{2}, 'omitnan'),'--','LineWidth',2,'Color',lineColors{colorIndex2},'HandleVisibility','off'); hold on;
 
         xlim(xlimits);
         ylim([0 1]);

@@ -1,4 +1,4 @@
-function fitSaturatingCurve(x, y, linecolor, hAx, subaxes)
+function fitSaturatingCurve(x, y, linecolor)
     % Define the logistic function
     logisticFunc = @(b,x) b(1) ./ (1 + exp(-b(2)*(x-b(3))));
     
@@ -18,9 +18,7 @@ function fitSaturatingCurve(x, y, linecolor, hAx, subaxes)
     yFit = logisticFunc(coefficients, xFit);
     
     % Plot the original data
-    axes(hAx(subaxes));
     hold on;
     % Overlay the fitted curve
     plot(xFit, yFit, '--', 'Color', linecolor, 'LineWidth', 2); % Fitted curve in red    
-    hold off;
 end

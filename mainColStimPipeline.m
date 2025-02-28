@@ -1,6 +1,6 @@
 %% Define reference and current session
 pipelineMode='';% beta/stable
-analysisType='summary2024'; %summary/psychometrics/beta/neurometric/stability/neurometricsfix
+analysisType='psychfit'; %summary/psychfit/beta/neurometric/stability/neurometricsfix
 
 %for biasing expt
 currentSessID=112; %81;
@@ -15,10 +15,10 @@ elseif contains(getenv('HOSTNAME'),'psy.utexas.edu')
 end
 run([mainPath 'users/PK/colStimPipeline/exptListBiasingFull.m'])
 nColumnsWanted=[];
-[datastructChamberLeft, datastructChamberRight] = organizeBlocks(datastruct, nColumnsWanted);
-analysisBlockID=setdiff(datastructChamberRight,10)%setdiff(datastructChamberLeft,[44 45 45 52:55 95]);
+analysisBlockID = organizeBlocks(datastruct, 'L', nColumnsWanted);
+datastructChamberLeft=datastruct(analysisBlockID);
+%analysisBlockID=setdiff(datastructChamberRight,10)%setdiff(datastructChamberLeft,[44 45 45 52:55 95]);
 set(0,'DefaultFigureWindowStyle','docked')
-set(groot,'defaultFontName','Arial')
 
 %% Run the desired bitmap generation pipeline variant
 switch pipelineMode
@@ -260,36 +260,41 @@ switch analysisType
     
     
     case {'summary'}        
-        for blockID=1:numel(analysisBlockID)%1:numel(analysisBlockID)%1:numel(analysisBlockID)%1:numel(analysisBlockID)
+        if ~exist('behavioralData','var')
+            behavioralData=[];
+            imagingData=[];
+            bitmapData=[];
+        end
+        for blockID=find(analysisBlockID==76)%1:numel(analysisBlockID)%1:numel(analysisBlockID)%1:numel(analysisBlockID)%1:numel(analysisBlockID)
             saveFlag=0;
             saveFlagBMP=0;
             plotFlag=1;
 
         % === Load block data ===
          [currentBlockStruct,referenceBlockStruct,...
-            behavioralData, imagingData, bitmapData]=loadBlockData(datastruct, analysisBlockID, blockID);
+            behavioralData, imagingData, bitmapData]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID);
        
          pdfFilename=currentBlockStruct.psychneuroPDF;
 
           % ===  Get orientation map ===
-          bitmapData=getColumnarBitmapV4(currentBlockStruct, imagingData, bitmapData, ...
-            plotFlag, saveFlag, pdfFilename);
+          bitmapData=getColumnarBitmapV4(currentBlockStruct, imagingData, bitmapData, blockID, ...
+            pdfFilename, plotFlag, saveFlag);
 
           % === Transform columnar positions to current cortical view ===
           bitmapData=coregisterBitmap2GreenImgV2(currentBlockStruct,referenceBlockStruct, ...
-            imagingData,bitmapData,plotFlag,saveFlag, pdfFilename);
+            imagingData,bitmapData,blockID,pdfFilename,plotFlag,saveFlag);
 
           % === Generate bitmap, correct for projector properties and camera-projector alignment===
           orts=[0 90];%0:15:165;
           HE=1000;
           [bitmapData]=convertForProjector(behavioralData,imagingData,bitmapData,...
-              currentBlockStruct,'cam2proj',plotFlag,saveFlagBMP,saveFlag,pdfFilename);
+              currentBlockStruct,'cam2proj',blockID,pdfFilename,plotFlag,saveFlagBMP,saveFlag);
 
             % === Plot behavioral biasing results ===
             hAx=gca;
             reportType='optostim';
-            [behavioralData, betaSorted, muSorted, sigmaSorted, contrastsSorted, percentVerticalSorted]=...
-                analyzeBlockPsychometrics(currentBlockStruct, behavioralData, bitmapData, reportType, saveFlag);
+            [behavioralData]=...
+                analyzeBlockPsychometrics(currentBlockStruct, behavioralData, bitmapData, blockID, pdfFilename, reportType, saveFlag);
             if saveFlag
                 if blockID==1
                     export_fig(filenameStructCurrent.psychfitPDF,'-pdf','-nocrop');
@@ -814,43 +819,80 @@ switch analysisType
     case {'psychfit'} %% Psychfit
         psychometrics=[];
         contrastsSortedCont=nan(6*2,3,numel(analysisBlockID));
-        for blockID=1:numel(analysisBlockID)%1:numel(analysisBlockID)%1:numel(analysisBlockID)
-            currentSessID=analysisBlockID(blockID);
-            dsCurrentSess=datastruct(currentSessID); %fixed, to get ort map projected onto
-            dsReferenceSess=datastruct(dsCurrentSess.referenceBlockNo);
-            alignmentSession=datastruct(dsCurrentSess.alignmentBlockNo).date;
-
-            saveFlag=1;
-            plotFlag=1;
-            isSummary=1;
-
-            % slope and intercept
-            % --- Behavioral biasing ---
-            figure()
-            hAx=gca;
-            [betaSorted,muSorted,sigmaSorted,contrastsSorted,percentVerticalSorted]=analyzeBiasingBlock(dsCurrentSess,hAx,saveFlag,'psychfit');
-           
-            % Behavioral biasing
-            betaSortedCont(blockID,:)=betaSorted;
-            muSortedCont(blockID,:)=muSorted;
-            sigmaSortedCont(blockID,:)=sigmaSorted;
-            contrastsSortedCont(1:size(contrastsSorted,1),:,blockID)=contrastsSorted;
-            percentVerticalSortedCont(1:size(contrastsSorted,1),:,blockID)=percentVerticalSorted;
+        clusterIdx=[5,5,5,5,3,4,3,4,3,3,3,4,3,4,3,3,3,3,3,4,4,4,3,3,3,3,4,4,3,3,3,2,3,2,3,1,2,3,3,1,2,1,1];
+        for cluster=[3]%sort(unique(clusterIdx))
+            disp(['=== Cluster ' num2str(cluster) '===='])
+            clusterBlocks=find(clusterIdx==cluster);
             
-            psychometrics(blockID).betaSorted=betaSorted;
-            psychometrics(blockID).muSorted=muSorted;
-            psychometrics(blockID).sigmaSorted=sigmaSorted;
-            psychometrics(blockID).contrastsSorted=contrastsSorted;
-            psychometrics(blockID).percentVerticalSorted=percentVerticalSorted;
-            psychometrics(blockID).percentHorizontalSorted=100-percentVerticalSorted;
-            
-            % calculate correct
-            horzCond=find(contrastsSorted<0);
-            percentVerticalSorted(horzCond)=100-percentVerticalSorted(horzCond);
-            psychometrics(blockID).percentCorrectSorted=percentVerticalSorted;
-            %nColumnsCont(blockID,:)=dsCurrentSess.nColumns;
-            xticks(-100:10:100)
+            for blockID=18%clusterBlocks(find(bitmapData.nColumns(2,clusterBlocks) ==1))%clusterBlocks%1:numel(analysisBlockID)%1:numel(analysisBlockID)
+                currentSessID=analysisBlockID(blockID);
+                dsCurrentSess=datastruct(currentSessID); %fixed, to get ort map projected onto
+                dsReferenceSess=datastruct(dsCurrentSess.referenceBlockNo);
+                alignmentSession=datastruct(dsCurrentSess.alignmentBlockNo).date;
+
+                saveFlag=0;
+                plotFlag=1;
+                isSummary=1;
+
+                % slope and intercept
+                % --- Behavioral biasing ---
+                figure()
+                hAx=gca;
+                [betaSorted,muSorted,sigmaSorted,contrastsSorted,percentVerticalSorted]=analyzeBiasingBlock(dsCurrentSess, bitmapData, blockID,hAx,saveFlag,'psychfit');
+
+                % Behavioral biasing
+                betaSortedCont(blockID,:)=betaSorted;
+                muSortedCont(blockID,:)=muSorted;
+                sigmaSortedCont(blockID,:)=sigmaSorted;
+                contrastsSortedCont(1:size(contrastsSorted,1),:,blockID)=contrastsSorted;
+                percentVerticalSortedCont(1:size(contrastsSorted,1),:,blockID)=percentVerticalSorted;
+
+                psychometrics(blockID).betaSorted=betaSorted;
+                psychometrics(blockID).muSorted=muSorted;
+                psychometrics(blockID).sigmaSorted=sigmaSorted;
+                psychometrics(blockID).contrastsSorted=contrastsSorted;
+                psychometrics(blockID).percentVerticalSorted=percentVerticalSorted;
+                psychometrics(blockID).percentHorizontalSorted=100-percentVerticalSorted;
+
+                % calculate correct
+                horzCond=find(contrastsSorted<0);
+                percentVerticalSorted(horzCond)=100-percentVerticalSorted(horzCond);
+                psychometrics(blockID).percentCorrectSorted=percentVerticalSorted;
+                %nColumnsCont(blockID,:)=dsCurrentSess.nColumns;
+                xticks(-100:25:100)
+            end
         end
+        
+        %% Per cluster: Minimum columns x beta\
+        nClusters=sort(unique(clusterIdx));
+        mkrColors=slanCM('bold',20);mkrColors=mkrColors([2 6 4 8 10],:);
+        figure('Name','Min. columns')
+        yline(0,'LineStyle','--', 'LineWidth', 2.5); hold on
+        for cluster=nClusters
+            disp(['=== Cluster ' num2str(cluster) '===='])
+            clusterBlocks=find(clusterIdx==cluster);
+            nClusterBlocks=numel(clusterBlocks);
+            % Get values
+            nColumnsCluster=mean(bitmapData.nColumns(:,clusterBlocks)',2);
+            bitmapEnergyCluster=mean(squeeze(bitmapData.energy(:,:,clusterBlocks))',2);
+            betaCluster = vertcat(psychometrics(clusterBlocks).betaSorted) .* 100;
+            deltaBeta=(betaCluster(:,3)-betaCluster(:,1)) ./ 2;
+            % plot
+            plot(nColumnsCluster,deltaBeta, 'square', 'MarkerSize', 15, 'MarkerFaceColor', mkrColors(cluster,:), 'MarkerEdgeColor', 'k', 'linewidth', 2.5); hold on
+            ylabel('$\bar{\Delta\beta}$', 'FontName', 'Arial','Interpreter','latex'); % Label the x-axis as 'AUC'
+            xlabel('No. of columns (block average)'); % Label the y-axis as 'Mean nColumns'
+            title('Effect of power and no. of columns stimulated','FontWeight','normal', 'Interpreter', 'none') % Title for the plot
+            legend({'Chance','C1','C2','C3','C4','C5'},'Location','eastoutside', 'NumColumns', 1)
+            xticks([0:5:40])
+            yticks([-50:10:50])
+            xlim([0 40])
+            ylim([-50 50])
+            upFontSize(24,.01)
+        end
+        hold off
+
+        
+        
         % Session summary
         sessionSEM
         
@@ -867,6 +909,7 @@ switch analysisType
         xlim([0 40])
         upFontSize(13,0.005)
         1;
+    
     case {'stability'}
         referenceSessID=12; % 1-VSD or 4-GCaMP 20220920
         dsReferenceSess=datastruct(referenceSessID);
@@ -942,7 +985,8 @@ switch analysisType
             upFontSize(13, 0.02)
             suplabel(sprintf('%.0f columns(averaged, %d sessions)',ortAllStandard(ort),size(columnarMapSessions,3)),'t',[.08 .08 .84 .86]);
             export_fig(pdfFilename,'-pdf','-nocrop');
-        end    
+        end
+        
     case {'neurometric'}
         open analyzeNeurometrics
         saveFlag=1;

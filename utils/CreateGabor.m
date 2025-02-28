@@ -29,7 +29,11 @@ end
 
 %% Parameters
 RatioPxlPerDeg = 50;  % pixels/deg, ratio of screen to visul field
-GaborSizes=[1.6:.1:1.9];
+refSF=2.75;
+refSize=1.5;
+GaborSizes=[1.6];
+% Calculate new spatial frequency using inverse scaling
+GaborSFs=round(refSF * (refSize / GaborSizes),3,'significant');
 GaborOrts=[0 90];%[0:10:180,22.5,45,67.5,112.5,135,157.5];
 %% Create BMP
 for GaborSize = GaborSizes % deg, size (square)
@@ -51,9 +55,9 @@ for GaborSize = GaborSizes % deg, size (square)
 
   % Gabor
   for GaborOrt = GaborOrts  % deg, orientation
-    for GaborPhs = 0:90:270  % deg, phase
+    for GaborPhs = 0%:90:270  % deg, phase
       % Spatial frequency
-      for GaborSF = 0.25*2.^(0:7)  % oct, band width
+      for GaborSF =GaborSFs%0.25*2.^(0:7)  % oct, band width
         A = Gabor2D(X,Y,[GaborOrt,GaborSF/RatioPxlPerDeg, ...
                          GaborSDX,GaborSDY,GaborPhs]);
         A = A/max(abs(A(:)))*0.5+0.5;  % nomalize A to [0,1]
@@ -63,6 +67,7 @@ for GaborSize = GaborSizes % deg, size (square)
                   GaborSize*100,GaborSF*100,GaborOrt*100,GaborPhs*100);
         imwrite(A,fullfile(PathName,FileName),'bmp');
       end
+      %{
       % Bandwidth
       for GaborBW = 0.25:0.25:2  % oct, band width
         GaborSF = ...
@@ -78,6 +83,7 @@ for GaborSize = GaborSizes % deg, size (square)
                   GaborSize*100,GaborBW*100,GaborOrt*100,GaborPhs*100);
         imwrite(A,fullfile(PathName,FileName),'bmp');
       end
+      %}
     end
   end
 end

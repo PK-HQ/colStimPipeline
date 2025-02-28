@@ -45,7 +45,7 @@ function bitmapData = loadBitmapData(datastruct, currentBlockStruct, currentBloc
     bitmapData.pixelsizemm=.0054;
     
     % copy original bitmaps to run folder
-    cloneLoadFlag='clone';
+    cloneLoadFlag='load';
     cloneBitmaps(currentBlockStruct, cloneLoadFlag);
 end
 

@@ -697,6 +697,7 @@ datastruct(entryNo).powercycle=10/50; %ON-OFF timing
 datastruct(entryNo).blueLED='L8OD13';
 datastruct(entryNo).orangeLED='L50OD0'; %ON-OFF timing
 datastruct(entryNo).nColumnsWanted=[20 20];
+datastruct(entryNo).greenImgID=3;
 
 entryNo=48; % B;
 datastruct(entryNo).monkeyNo='28';
@@ -714,6 +715,7 @@ datastruct(entryNo).powercycle=20/50; %ON-OFF timing
 datastruct(entryNo).blueLED='L8OD13';
 datastruct(entryNo).orangeLED='L50OD0';
 datastruct(entryNo).nColumnsWanted=[20 20];
+datastruct(entryNo).greenImgID=2;
 
 % ***First gaussian fit***
 entryNo=49; % O; PCAvar=85%;
@@ -746,6 +748,8 @@ datastruct(entryNo).gaussianCond=3; %1deg
 datastruct(entryNo).gaussianContourLevel=[4 4];%of10
 datastruct(entryNo).gaussianContourLevelMax=10;
 datastruct(entryNo).nColumnsWanted=[0 0];
+datastruct(entryNo).greenImgID=3;
+
 entryNo=51; % Bx ; wrong angle for optostim dichroic
 datastruct(entryNo).monkeyNo='28';
 datastruct(entryNo).monkey='Chip';
@@ -786,6 +790,7 @@ datastruct(entryNo).gaussianResponse='Y:/Chip/Chip20230810/run0/Data_vdaqlog.mat
 datastruct(entryNo).gaussianCond=2;
 datastruct(entryNo).gaussianContourLevel=[48 38];%48(3);%45(5-6);%19(33);%38(11-12);%of 50
 datastruct(entryNo).gaussianContourLevelMax=50;
+datastruct(entryNo).greenImgID=2;
 entryNo=53; % B; truncated blurry
 datastruct(entryNo).monkeyNo='28';
 datastruct(entryNo).monkey='Chip';
@@ -805,6 +810,7 @@ datastruct(entryNo).gaussianResponse='Y:/Chip/Chip20230810/run0/Data_vdaqlog.mat
 datastruct(entryNo).gaussianCond=2;
 datastruct(entryNo).gaussianContourLevel=[42 48]; %48(3);%42(8-11); %of 50
 datastruct(entryNo).gaussianContourLevelMax=50; 
+datastruct(entryNo).greenImgID=2;
 entryNo=54; % B; truncated blurry
 datastruct(entryNo).monkeyNo='28';
 datastruct(entryNo).monkey='Chip';
@@ -824,6 +830,7 @@ datastruct(entryNo).gaussianResponse='Y:/Chip/Chip20230810/run0/Data_vdaqlog.mat
 datastruct(entryNo).gaussianCond=2;
 datastruct(entryNo).gaussianContourLevel=[30 42 48]; %48(3);%42(8-11); %of 50
 datastruct(entryNo).gaussianContourLevelMax=50; 
+datastruct(entryNo).greenImgID=2;
 entryNo=55; % B; truncated blurry 
 datastruct(entryNo).monkeyNo='28';
 datastruct(entryNo).monkey='Chip';
@@ -843,6 +850,7 @@ datastruct(entryNo).gaussianResponse='Y:/Chip/Chip20230810/run0/Data_vdaqlog.mat
 datastruct(entryNo).gaussianCond=2;
 datastruct(entryNo).gaussianContourLevel=[30 42 48]; %48(3);%42(8-11); %of 50
 datastruct(entryNo).gaussianContourLevelMax=50; 
+datastruct(entryNo).greenImgID=2;
 
 entryNo=56; % O; PCAvar=85% but lower d' (hole)
 datastruct(entryNo).monkeyNo='28';
@@ -873,6 +881,7 @@ datastruct(entryNo).gaussianResponse='Y:/Chip/Chip20230811/run7/Data_vdaqlog.mat
 datastruct(entryNo).gaussianCond=2;
 datastruct(entryNo).gaussianContourLevel=23; %48(3);%42(8-11); %of 50
 datastruct(entryNo).gaussianContourLevelMax=50; 
+datastruct(entryNo).greenImgID=3;
 
 entryNo=58; % B; N=20 %potential error, different session gaussian
 datastruct(entryNo).monkeyNo='28';
@@ -2049,7 +2058,7 @@ datastruct(entryNo).monkeyNo='28';
 datastruct(entryNo).monkey='Chip';
 datastruct(entryNo).date='20240202';
 datastruct(entryNo).run='4';
-datastruct(entryNo).baselineTS='2';
+datastruct(entryNo).baselineTS='99'; %Run 2 corrupted
 datastruct(entryNo).site='1';
 datastruct(entryNo).modality='GCaMP';
 datastruct(entryNo).alignmentBlockNo=97;
@@ -2071,7 +2080,7 @@ datastruct(entryNo).monkeyNo='28';
 datastruct(entryNo).monkey='Chip';
 datastruct(entryNo).date='20240202';
 datastruct(entryNo).run='5';
-datastruct(entryNo).baselineTS='2';
+datastruct(entryNo).baselineTS='99';
 datastruct(entryNo).site='1';
 datastruct(entryNo).modality='GCaMP';
 datastruct(entryNo).alignmentBlockNo=97;
@@ -2093,7 +2102,7 @@ datastruct(entryNo).monkeyNo='28';
 datastruct(entryNo).monkey='Chip';
 datastruct(entryNo).date='20240202';
 datastruct(entryNo).run='6';
-datastruct(entryNo).baselineTS='2';
+datastruct(entryNo).baselineTS='99';
 datastruct(entryNo).site='1';
 datastruct(entryNo).modality='GCaMP';
 datastruct(entryNo).alignmentBlockNo=97;

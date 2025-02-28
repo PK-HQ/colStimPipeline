@@ -44,6 +44,9 @@ end
     % Optionally, if you want to remove the upper and right axis lines (spines) explicitly
     ax = gca; % Get current axis handle
     ax.Box = 'off'; % Turn off the box to remove top and right lines
-    ax.XAxis.TickDirection = 'out'; % Ensure X-axis ticks are outward
-    ax.YAxis.TickDirection = 'out'; % Ensure Y-axis ticks are outward
+    %ax.XAxis.TickDirection = 'out'; % Ensure X-axis ticks are outward
+    %ax.YAxis.TickDirection = 'out'; % Ensure Y-axis ticks are outward
+
+    ax = gca; % Get current axes
+    ax.FontName='FreeSans'; % Get the font name
 end

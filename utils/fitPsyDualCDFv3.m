@@ -23,14 +23,14 @@ hAx=varargin{6};
 %% Find optimal parameter values
 % --- Initial values, lower and upper bounds --- 
 smoothingFlag=0;
-mu = 40/2; %is signed during fitting
-sigma = 40/6;
+mu = 25; %is signed during fitting
+sigma = 10;
 beta = 0.5;
 lapseLower=0;
 lapseUpper=0;
 initialParams=[mu     sigma    beta     lapseLower lapseUpper];
-paramLB      =[10     10/6       0          0.0               0.0];
-paramUB      =[100     40/6      1          00               0];
+paramLB      =[5          1/6         0          0.0               0.0];
+paramUB      =[60        100/6      10             0              0];
 %% Run parameter optimization
 sOptOptm = ...
     optimset('LargeScale','On', ...
@@ -152,7 +152,7 @@ function threshold=plotFitCurve(param,logLikelihood,x,y,sessionStr,...
      hold on
      
      % --- Plot curve --- 
-     xFit = linspace(min(x),max(x),100);
+     xFit = -100:1:100;% linspace(min(x),max(x),100);
      yFit = dualNormCDF(param,xFit,smoothingFlag);
      plot(xFit,yFit*100,'Color',markerColor,'LineWidth',2.5);hold on;
      [~, indexOfMin] = min(abs(yFit-.70));
@@ -180,16 +180,16 @@ function threshold=plotFitCurve(param,logLikelihood,x,y,sessionStr,...
      
      % Add ticks
      if max(x)-min(x)<10
-        addSkippedTicks(min(x),max(x),.5,'x')
+        %addSkippedTicks(min(x),max(x),.5,'x')
      else
-         addSkippedTicks(-100,100,10,'x')
+         %addSkippedTicks(-100,100,10,'x')
      end
-     addSkippedTicks(0,100,100/8,'y')
+     %addSkippedTicks(0,100,100/8,'y')
      % Add limits
      xlim([min(x),max(x)])
      ylim([0,100])
      % Add title
-     h=title(sessionStr,'FontWeight','normal','FontSize',14,'FontName','Arial','interpreter','latex');
+     h=title(sessionStr,'FontWeight','normal','FontSize',14,'FontName','Arial','interpreter','tex');
      % Add verbose title (edit to add params 1-7)
      %{
      h=title({sessionStr,...

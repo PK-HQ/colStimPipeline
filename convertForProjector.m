@@ -92,6 +92,7 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 nanContour(nanContour==0)=NaN;
                 contourROI=nanContour.*camspaceBitmap;
                 bitmapData.pixelsON(bitmapNo,blockID)=nansum(contourROI(:)>0);
+                bitmapData.areaPixelsON(bitmapNo,blockID)=bitmapData.pixelsON(bitmapNo,blockID) * .0054^2;
                 bitmapData.pixelsONDensity(bitmapNo,blockID)=nansum(contourROI(:)>0)*100/nansum(contourROI(:)==0); %prctPixON=((DC/(5/10))^2)/(2/100);
                 %bitmapData.pixelsONDutyCycle(1,bitmapNo,blockID)=sqrt(bitmapData.pixelsONDensity(bitmapNo)*2/100)*5/10; %DC=sqrt(prctPixON*2/100)*5/10;
                 
@@ -248,7 +249,7 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 chamberID='L';
                 LEDpercent=30;
                 [bitmapData.adjustedSPD_uW(1,bitmapNo,blockID), bitmapData.ledpower_mW(1,bitmapNo,blockID)] = calculateSPD(behavioralData, imagingData, bitmapData,...
-                    bitmapNo, chamberID,LEDpercent,blockID,0);
+                    currentBlockStruct, bitmapNo, blockID, 0);
 
                 
                 %% Save the figures
@@ -265,7 +266,7 @@ end
                  
                  
                  
-                 
+                 %{
             case {'calibrate'}
                 %imread(filenameStruct.bmpOriginal);
                 %imread(filenameStruct.responseOriginal);
@@ -396,8 +397,10 @@ end
                 camspaceBitmap=imresize(camspaceBitmap, [camX camY]);
 
         end
+
     end
 end
+%}
 if plotFlag==0
     close
 end

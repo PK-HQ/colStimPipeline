@@ -24,13 +24,12 @@ trialOIID=double(extractfield(TS.Trial, 'FlagOIBLK'));
 trialOIID(trialOIID==0)=NaN;
 
 % Get trialID of each outcome type (with imaging, correct and error)
-%get trials with OI BLK
-trialOutcomeID=trialOutcomeID.*trialOIID;
+trialOutcomeID=trialOutcomeID.*trialOIID;% get trials with saved image, those without are set to nan (FlagOIBLK==1)
 completedTrialIdx=find(trialOutcomeID == allegroCodingScheme.successCode | trialOutcomeID == allegroCodingScheme.failedCode |...
-    trialOutcomeID == allegroCodingScheme.successSpecialCode | trialOutcomeID == allegroCodingScheme.failedSpecialCode)'; 
+    trialOutcomeID == allegroCodingScheme.successSpecialCode | trialOutcomeID == allegroCodingScheme.failedSpecialCode)'; % get completed trials (Outcome==10,11,-10,-11)
   
 % get index of all correct and error trials
-usableTrialIdxTmp=find(trialOutcomeID == allegroCodingScheme.successCode | trialOutcomeID == allegroCodingScheme.failedCode); % indexes it to be within 1:nTotalTrials, e.g. 1:363
+usableTrialIdxTmp=find(trialOutcomeID == allegroCodingScheme.successCode | trialOutcomeID == allegroCodingScheme.failedCode); % filter for Outcome==10,11 and indexes it to be within 1:nTotalTrials, e.g. 1:363
 % get index of all correct trials
 usableCorrTrialIdxTmp=find(trialOutcomeID == allegroCodingScheme.successCode); % indexes it to be within 1:nTotalTrials, e.g. 1:363
 % get index of all error trials
@@ -50,47 +49,40 @@ trials.Error=trialCondID(usableErrTrialIdxTmp)'; % grabs trials using index of 1
 if ndims(ImagingData)==3
     
     %% Sort condIDs into visual x opto conditions
-    % Grouped by optostim condition
+    % Find conditions that are blank, baseline (visual only), opto0, opto90
     condIDs.blankConds = find(cellfun(@isempty,TS.Header.Conditions.ProjImg)); nBlanks=numel(condIDs.blankConds);
     condIDs.baselineConds = findMatch(TS.Header.Conditions.ProjImg,'Dot');
     condIDs.opto0Conds = findMatch(TS.Header.Conditions.ProjImg,'O000');
     condIDs.opto90Conds = findMatch(TS.Header.Conditions.ProjImg,'O090');
-    % Grouped by visual x optostim condition
-    condIDs.V0=condIDs.baselineConds(1:numel(condIDs.baselineConds)/2);%[1:3:nOptoConds/2]+nblank; 
-    condIDs.V90=condIDs.baselineConds(numel(condIDs.baselineConds)/2 + 1 : numel(condIDs.baselineConds));%[nOptoConds/2+1:3:nOptoConds]+nblank;
-    condIDs.V0O0=condIDs.opto0Conds(1:numel(condIDs.opto0Conds)/2);
-    condIDs.V90O0=condIDs.opto0Conds(numel(condIDs.opto0Conds)/2 + 1 : numel(condIDs.opto0Conds));
-    condIDs.V0O90=condIDs.opto90Conds(1:numel(condIDs.opto90Conds)/2);
-    condIDs.V90O90=condIDs.opto90Conds(numel(condIDs.opto90Conds)/2 + 1 : numel(condIDs.opto90Conds));
+    % find conditions where visual gabor is 0 and 90
+    gabor0=find(TS.Header.Conditions.GaborOrt==0 & TS.Header.Conditions.TypeCond == 3);
+    gabor90=find(TS.Header.Conditions.GaborOrt==90 & TS.Header.Conditions.TypeCond == 3);
+    % Sort the above into the following visual and opto pairings
+    condIDs.V0=condIDs.baselineConds(ismember(condIDs.baselineConds, gabor0)); %condIDs.baselineConds(1:numel(condIDs.baselineConds)/2);%[1:3:nOptoConds/2]+nblank; 
+    condIDs.V90=condIDs.baselineConds(ismember(condIDs.baselineConds, gabor90)); %condIDs.baselineConds(numel(condIDs.baselineConds)/2 + 1 : numel(condIDs.baselineConds));%[nOptoConds/2+1:3:nOptoConds]+nblank;
+    condIDs.V0O0=condIDs.opto0Conds(ismember(condIDs.opto0Conds, gabor0)); %condIDs.opto0Conds(1:numel(condIDs.opto0Conds)/2);
+    condIDs.V90O0=condIDs.opto0Conds(ismember(condIDs.opto0Conds, gabor90));
+    condIDs.V0O90=condIDs.opto90Conds(ismember(condIDs.opto90Conds, gabor0));
+    condIDs.V90O90=condIDs.opto90Conds(ismember(condIDs.opto90Conds, gabor90));
 
     %% Subtract blank, remove blank
     [blankTrialIdx,~]=find(trials.All==condIDs.blankConds);
     blankTrialsAvg=mean(ImagingData(:,:,blankTrialIdx),3);
     ImagingDataBlankSubt=ImagingData-blankTrialsAvg;
     
-    maxTrials=numel(trials.All);%max(groupcounts(trials.All));
-    maxConds=max(trials.All);
-    maxNonblankConds=maxConds-nBlanks;
-    images.trials=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),maxNonblankConds,maxTrials);
-    images.trialsCorrect=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),maxNonblankConds,maxTrials);
-    images.trialsError=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),maxNonblankConds,maxTrials);
-
-    images.average=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),maxNonblankConds);
-    images.averageCorrect=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),maxNonblankConds);
-    images.averageError=nan(size(ImagingDataBlankSubt,1),size(ImagingDataBlankSubt,2),maxNonblankConds);
-    
     %% Average the imaging data by condition
-    nonblankConds=1:max(trials.All);
-    nonblankConds(condIDs.blankConds)=[];
-    for condNo=1:max(trials.All)-nBlanks
-        condID=nonblankConds(condNo);
+    exptConds=1:max(trials.All);
+    exptConds(condIDs.blankConds)=[];
+    for condNo=1:numel(exptConds)
+        condID=exptConds(condNo);
         % get trial indices
         [condTrialIdx,~]=find(trials.All==condID);
+        allTrialIdx=intersect([usableCorrTrialIdx;usableErrTrialIdx],condTrialIdx); % EDIT added 10/29 to combine correct and error 
         correctTrialIdx=intersect(usableCorrTrialIdx,condTrialIdx);
         errorTrialIdx=intersect(usableErrTrialIdx,condTrialIdx);
 
         % store trial images by condition x correct/error
-        images.trials(:,:,condNo,1:numel(condTrialIdx))=ImagingDataBlankSubt(:,:,condTrialIdx);
+        images.trials(:,:,condNo,1:numel(allTrialIdx))=ImagingDataBlankSubt(:,:,allTrialIdx);
         images.trialsCorrect(:,:,condNo,1:numel(correctTrialIdx))=ImagingDataBlankSubt(:,:,correctTrialIdx);
         images.trialsError(:,:,condNo,1:numel(errorTrialIdx))=ImagingDataBlankSubt(:,:,errorTrialIdx);
         
