@@ -2,12 +2,13 @@ function [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, 
 % FITBAYESIANMODEL - Fit normalization model parameters to psychometric data
 %
 % Usage:
-%   [bestParams, fitInfo] = fitBayesianModel(xData, yDataBaseline, yDataOpto, initialGuess)
+%   [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, xDataOpto, yDataOpto, initialGuess)
 %   [bestParams, fitInfo] = fitBayesianModel(..., 'OptionName', OptionValue)
 %
 % Inputs:
-%   xData - Contrast levels
+%   xDataBaseline - Contrast levels for baseline condition
 %   yDataBaseline - Baseline condition performance data
+%   xDataOpto - Contrast levels for opto condition
 %   yDataOpto - Optogenetic condition performance data
 %   initialGuess - Initial parameter values [a, b, l, w, g0, n, rmx, e, o]
 
@@ -15,8 +16,8 @@ function [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, 
     persistent bestNLL iterCount;
     
     % Default parameter bounds if not provided
-    defaultLB = [0.01, 0.01, 0.01, 0.01, 25, 2, 10, 0.2, 10];
-    defaultUB = [1.0, 1.0, 1.0, 1.0, 150, 10, 100, 0.8, 100];
+    defaultLB = [0.01, 0.01, 0.01, 0.01, 40, 4, 10, 0.3, 10];
+    defaultUB = [1.0, 1.0, 1.0, 1.0, 100, 10, 100, 0.7, 100];
     
     % Parse inputs
     p = inputParser;
@@ -27,6 +28,7 @@ function [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, 
     addParameter(p, 'UseParallel', false, @islogical);
     addParameter(p, 'Verbose', true, @islogical);
     addParameter(p, 'MaxIterations', 1000, @isnumeric);
+    addParameter(p, 'StrictBoundsEnforcement', true, @islogical); % New parameter for strict bounds enforcement
     parse(p, varargin{:});
     
     lb = p.Results.LowerBounds;
@@ -36,13 +38,23 @@ function [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, 
     useParallel = p.Results.UseParallel;
     verbose = p.Results.Verbose;
     maxIter = p.Results.MaxIterations;
+    strictBounds = p.Results.StrictBoundsEnforcement;
     
     % Reset persistent variables
     bestNLL = Inf;
     iterCount = 0;
     
+    % Helper function to enforce bounds
+    function params = enforceParameterBounds(params)
+        for i = 1:length(params)
+            if params(i) < lb(i) || params(i) > ub(i)
+                params(i) = max(min(params(i), ub(i)), lb(i));
+            end
+        end
+    end
+    
     % Ensure initial parameters are within bounds
-    initialGuess = max(min(initialGuess, ub), lb);
+    initialGuess = enforceParameterBounds(initialGuess);
     
     % Initialize output structure
     fitInfo = struct();
@@ -58,10 +70,18 @@ function [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, 
     
     % Define objective function (negative log-likelihood)
     function nll = objectiveNLL(params)
+        % Ensure parameters are within bounds - strictly enforce if enabled
+        if strictBounds
+            params = enforceParameterBounds(params);
+        end
+        
         % Get model predictions
         try
-            predBaseline = normMdlSimOptimized(xDataBaseline, params, 'baseline', modelOptions);
-            predOpto = normMdlSimOptimized(xDataOpto, params, 'opto', modelOptions);
+            % Add an extra bounds check before model evaluation
+            boundedParams = enforceParameterBounds(params);
+            
+            predBaseline = normMdlSimOptimized(xDataBaseline, boundedParams, 'baseline', modelOptions);
+            predOpto = normMdlSimOptimized(xDataOpto, boundedParams, 'opto', modelOptions);
             
             % Ensure predictions are within valid range for probability
             predBaseline = max(0.001, min(0.999, predBaseline/100));
@@ -85,23 +105,46 @@ function [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, 
                 bestNLL = nll;
                 if verbose
                     fprintf('Iteration %d: NLL = %.4f, [a=%.2f b=%.2f l=%.2f w=%.2f g0=%.1f n=%.1f rmx=%.1f e=%.2f o=%.1f]\n', ...
-                        iterCount, nll, params(1), params(2), params(3), params(4), params(5), ...
-                        params(6), params(7), params(8), params(9));
+                        iterCount, nll, boundedParams(1), boundedParams(2), boundedParams(3), boundedParams(4), boundedParams(5), ...
+                        boundedParams(6), boundedParams(7), boundedParams(8), boundedParams(9));
                 end
             end
             iterCount = iterCount + 1;
             
         catch ME
             % If error occurs, return large value
-            %warning('Error in objective function: %s', ME.message);
+            if verbose
+                warning('Error in objective function: %s', ME.message);
+            end
             nll = 1e10;
         end
+    end
+    
+    % Create wrapper functions for optimizers that enforce bounds
+    function [x, fval, exitflag, output] = fminconWrapper(fun, x0, A, b, Aeq, beq, lb, ub, nonlcon, options)
+        % Wrapper for fmincon with bounds enforcement
+        function y = boundedFun(x)
+            if strictBounds
+                x = enforceParameterBounds(x);
+            end
+            y = fun(x);
+        end
+        
+        [x, fval, exitflag, output] = fmincon(@boundedFun, x0, A, b, Aeq, beq, lb, ub, nonlcon, options);
+        x = enforceParameterBounds(x); % Ensure final result is within bounds
     end
     
     % Start timing
     if verbose
         fprintf('Starting parameter fitting using %s method...\n', optimMethod);
         tic;
+    end
+    
+    % Set display option based on verbose flag
+    if verbose
+        display_opt = 'iter';
+    else
+        display_opt = 'off';
     end
     
     % Perform optimization based on selected method
@@ -137,6 +180,9 @@ function [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, 
                         testParams(6) = n_values(n_idx);    % n
                         testParams(8) = e_values(e_idx);    % e
                         
+                        % Ensure test parameters are within bounds
+                        testParams = enforceParameterBounds(testParams);
+                        
                         % Calculate NLL
                         nll = objectiveNLL(testParams);
                         
@@ -162,54 +208,45 @@ function [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, 
             end
             
             % Setup GA options
-            gaOptions = optimoptions('ga', 'Display', 'iter', ...
+            gaOptions = optimoptions('ga', 'Display', display_opt, ...
                 'PopulationSize', 50, ...
                 'MaxGenerations', ceil(maxIter/50), ...
                 'UseParallel', useParallel, ...
                 'MaxStallGenerations', 20, ...
                 'FunctionTolerance', 1e-6);
             
-            if ~verbose
-                gaOptions.Display = 'off';
-            end
+            % Create constraint function to enforce bounds
+            nonlcon = [];
             
-            % Run GA
-            [bestParams, nll] = ga(@objectiveNLL, length(initialGuess), [], [], [], [], lb, ub, [], gaOptions);
+            % Run GA with strictly enforced bounds
+            [bestParams, nll] = ga(@objectiveNLL, length(initialGuess), [], [], [], [], lb, ub, nonlcon, gaOptions);
+            
+            % Double-check bounds compliance
+            bestParams = enforceParameterBounds(bestParams);
+            
             fitInfo.finalNLL = nll;
             
         case 'Local'
-            % Local optimization using fminsearch with bounds
+            % Local optimization using fmincon with interior-point
             if verbose
-                fprintf('Running local optimization with fminsearchbnd...\n');
-            end
-            
-            % Setup fminsearch options
-            options = optimset('fminsearch');
-            options = optimset(options, 'MaxIter', maxIter);
-            options = optimset(options, 'MaxFunEvals', maxIter * 2);
-            options = optimset(options, 'TolX', 1e-6);
-            options = optimset(options, 'TolFun', 1e-6);
-            
-            if verbose
-                options = optimset(options, 'Display', 'iter');
-            else
-                options = optimset(options, 'Display', 'off');
+                fprintf('Running local optimization with fmincon...\n');
             end
             
             % Setup fmincon options
             options = optimoptions('fmincon', 'Algorithm', 'interior-point', ...
-                                   'Display', verbose_flag, ...
-                                   'MaxFunctionEvaluations', maxIter*2, ...
-                                   'OptimalityTolerance', 1e-6);
+                               'Display', display_opt, ...
+                               'MaxFunctionEvaluations', maxIter*2, ...
+                               'MaxIterations', maxIter, ...
+                               'OptimalityTolerance', 1e-6);
             
-            % Run fmincon
-            [bestParams, nll] = fmincon(@objectiveNLL, initialGuess, [], [], [], [], lb, ub, [], options);
+            % Run fmincon with strict bounds enforcement via our wrapper
+            [bestParams, nll] = fminconWrapper(@objectiveNLL, initialGuess, [], [], [], [], lb, ub, [], options);
+            
+            % Ensure parameters are within bounds
+            bestParams = enforceParameterBounds(bestParams);
+            
             fitInfo.finalNLL = nll;
-            %{
-            % Run bounded fminsearch
-            [bestParams, nll] = fminsearchbnd(@objectiveNLL, initialGuess, lb, ub, options);
-            fitInfo.finalNLL = nll;
-            %}
+            
         case 'GlobalThenLocal'
             % First run grid search for a good starting point
             if verbose
@@ -243,6 +280,9 @@ function [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, 
                         testParams(6) = n_values(n_idx);    % n
                         testParams(8) = e_values(e_idx);    % e
                         
+                        % Ensure test parameters are within bounds
+                        testParams = enforceParameterBounds(testParams);
+                        
                         % Calculate NLL
                         nll = objectiveNLL(testParams);
                         
@@ -263,42 +303,39 @@ function [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, 
             fitInfo.gridSearchNLL = bestNLL;
             fitInfo.gridSearchParams = bestGridParams;
             
-            % Run local optimization with fminsearchbnd
+            % Run local optimization with fmincon
             if verbose
                 fprintf('\nRunning local optimization from grid search result...\n');
             end
             
-            % Setup fminsearch options
-            options = optimset('fminsearch');
-            options = optimset(options, 'MaxIter', maxIter);
-            options = optimset(options, 'MaxFunEvals', maxIter * 2);
-            options = optimset(options, 'TolX', 1e-6);
-            options = optimset(options, 'TolFun', 1e-6);
+            % Setup fmincon options
+            options = optimoptions('fmincon', 'Algorithm', 'interior-point', ...
+                               'Display', display_opt, ...
+                               'MaxFunctionEvaluations', maxIter*2, ...
+                               'MaxIterations', maxIter, ...
+                               'OptimalityTolerance', 1e-6);
             
-            if verbose
-                options = optimset(options, 'Display', 'iter');
-            else
-                options = optimset(options, 'Display', 'off');
-            end
+            % Run fmincon with strict bounds enforcement via our wrapper
+            [bestParams, nll] = fminconWrapper(@objectiveNLL, initialGuess, [], [], [], [], lb, ub, [], options);
             
-            % Run fmincon
-            [bestParams, nll] = fmincon(@objectiveNLL, initialGuess, [], [], [], [], lb, ub, [], options);
+            % Ensure parameters are within bounds
+            bestParams = enforceParameterBounds(bestParams);
+            
             fitInfo.finalNLL = nll;
 
-            % Run bounded fminsearch
-            %{
-            [bestParams, nll] = fminsearchbnd(@objectiveNLL, initialGuess, lb, ub, options);
-            fitInfo.finalNLL = nll;
-            %}
         otherwise
             error('Unknown optimization method: %s', optimMethod);
     end
+    
+    % Final verification that parameters are within bounds
+    bestParams = enforceParameterBounds(bestParams);
     
     % Calculate model statistics
     totalTrials = sum(sumBaselineTrials) + sum(sumOptoTrials);
     numParams = length(bestParams);
     
     % Calculate AIC and BIC
+    fitInfo.finalNLL = objectiveNLL(bestParams); % Recalculate with enforced bounds
     aic = 2 * numParams + 2 * fitInfo.finalNLL;
     if totalTrials > numParams + 1
         aicc = aic + (2 * numParams * (numParams + 1)) / (totalTrials - numParams - 1);
@@ -339,6 +376,14 @@ function [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, 
         fprintf('AIC: %.2f, AICc: %.2f, BIC: %.2f\n', aic, aicc, bic);
         fprintf('R-squared (baseline): %.4f, R-squared (opto): %.4f\n', ...
             rSquared_baseline, rSquared_opto);
+        
+        % Additional diagnostics for bounds
+        for i = 1:length(bestParams)
+            if bestParams(i) <= lb(i)*1.01 || bestParams(i) >= ub(i)*0.99
+                fprintf('Warning: Parameter %d (%.4f) is near boundary [%.4f, %.4f]\n', ...
+                    i, bestParams(i), lb(i), ub(i));
+            end
+        end
     end
 end
 
