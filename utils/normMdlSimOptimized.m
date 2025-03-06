@@ -454,8 +454,8 @@ function [c_count, ihv_count, ivh_count, b_count, ...
         currentBatchSize = endIdx - startIdx + 1;
         
         % Generate random stimulus conditions for this batch
-        visualOrt = randi([0 1], currentBatchSize, 1);  % 0=0Â°, 1=90Â°
-        optoOrt = randi([0 1], currentBatchSize, 1);    % 0=0Â°, 1=90Â°
+        visualOrt = randi([0 1], currentBatchSize, 1);  % 0=0°, 1=90°
+        optoOrt = randi([0 1], currentBatchSize, 1);    % 0=0°, 1=90°
         
         % Generate random Gaussian noise
         noiseH = randn(currentBatchSize, 1);
@@ -466,28 +466,28 @@ function [c_count, ihv_count, ivh_count, b_count, ...
         respV = zeros(currentBatchSize, 1);
         
         % Compute responses using boolean masks (vectorized)
-        % Visual=0Â° (V), Opto=0Â° (V)
+        % Visual=0° (V), Opto=0° (V)
         mask = (visualOrt == 0) & (optoOrt == 0);
         if any(mask)
             respH(mask) = noiseH(mask) + resp_cH_vV_oV_i;
             respV(mask) = noiseV(mask) + resp_cV_vV_oV_i;
         end
         
-        % Visual=0Â° (V), Opto=1Â° (H)
+        % Visual=0° (V), Opto=1° (H)
         mask = (visualOrt == 0) & (optoOrt == 1);
         if any(mask)
             respH(mask) = noiseH(mask) + resp_cH_vV_oH_i;
             respV(mask) = noiseV(mask) + resp_cV_vV_oH_i;
         end
         
-        % Visual=1Â° (H), Opto=0Â° (V)
+        % Visual=1° (H), Opto=0° (V)
         mask = (visualOrt == 1) & (optoOrt == 0);
         if any(mask)
             respH(mask) = noiseH(mask) + resp_cH_vH_oV_i;
             respV(mask) = noiseV(mask) + resp_cV_vH_oV_i;
         end
         
-        % Visual=1Â° (H), Opto=1Â° (H)
+        % Visual=1° (H), Opto=1° (H)
         mask = (visualOrt == 1) & (optoOrt == 1);
         if any(mask)
             respH(mask) = noiseH(mask) + resp_cH_vH_oH_i;

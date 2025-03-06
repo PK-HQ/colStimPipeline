@@ -1,7 +1,7 @@
 function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysisBlockID,...
     mdl, fitParams, x, monkeyName, clusterBlocks, plotAverageFlag,...
     saveFlag, cluster, modelTypeStr, savefilename)
-    endIdx=size(mdl.headers,2)-3;
+    endIdx=size(mdl.headers,2);
     % Number of blocks and conditions
     [nConditions, ~, nBlocks] = size(behavioralData.gaborContrasts(:, :, clusterBlocks));
     if plotAverageFlag==1
