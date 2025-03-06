@@ -60,8 +60,8 @@ function [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, 
     function nll = objectiveNLL(params)
         % Get model predictions
         try
-            predBaseline = normMdlSimOptimized(xDataBaseline, params, 'baseline', modelOptions);
-            predOpto = normMdlSimOptimized(xDataOpto, params, 'opto', modelOptions);
+            predBaseline = normMdlSimClaude(xDataBaseline, params, 'baseline', modelOptions);
+            predOpto = normMdlSimClaude(xDataOpto, params, 'opto', modelOptions);
             
             % Ensure predictions are within valid range for probability
             predBaseline = max(0.001, min(0.999, predBaseline/100));
@@ -293,8 +293,8 @@ function [bestParams, fitInfo] = fitBayesianModel(xDataBaseline, yDataBaseline, 
     bic = log(totalTrials) * numParams + 2 * fitInfo.finalNLL;
     
     % Calculate final predictions
-    predBaseline = normMdlSimOptimized(xDataBaseline, bestParams, 'baseline', modelOptions);
-    predOpto = normMdlSimOptimized(xDataOpto, bestParams, 'opto', modelOptions);
+    predBaseline = normMdlSimClaude(xDataBaseline, bestParams, 'baseline', modelOptions);
+    predOpto = normMdlSimClaude(xDataOpto, bestParams, 'opto', modelOptions);
     
     % Calculate R-squared
     ssTotal_baseline = sum((yDataBaseline - mean(yDataBaseline)).^2);

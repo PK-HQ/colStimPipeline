@@ -71,8 +71,8 @@ function [mdl, mdlAvg] = fitBayesianModelMLE(xBlocks, yBlocks, modelType)
         padded_yOpto(1:len_yOpto) = yOpto(1:len_yOpto);
 
         % Store mdl
-        mdlBaseline = @(x, params) max(minBound, min(maxBound, normMdlSimOptimized(x, params, 'baseline'))); % zero opto input
-        mdlOpto = @(x, params) max(minBound, min(maxBound, normMdlSimOptimized(x, params, 'opto'))); % nonzero opto input
+        mdlBaseline = @(x, params) max(minBound, min(maxBound, normMdlSimClaude(x, params, 'baseline'))); % zero opto input
+        mdlOpto = @(x, params) max(minBound, min(maxBound, normMdlSimClaude(x, params, 'opto'))); % nonzero opto input
         
         mdl.mdlBaseline = mdlBaseline;
         mdl.mdlOpto = mdlOpto;
@@ -513,8 +513,8 @@ function mdl = calculateTotalError(mdl, params, xBaseline, yBaseline, xOpto, yOp
             % GPU/ParPool options
             options = struct('useGPU', true, 'useParallel', false, 'nTrials', 1000, 'verbose', false);
             
-            mdlBaseline = @(x, params) max(minBound, min(maxBound, normMdlSimOptimized(x, params, 'baseline'))); % zero opto input
-            mdlOpto = @(x, params) max(minBound, min(maxBound, normMdlSimOptimized(x, params, 'opto'))); % nonzero opto input
+            mdlBaseline = @(x, params) max(minBound, min(maxBound, normMdlSimClaude(x, params, 'baseline'))); % zero opto input
+            mdlOpto = @(x, params) max(minBound, min(maxBound, normMdlSimClaude(x, params, 'opto'))); % nonzero opto input
             
             % Define NLL objective function
             objectiveFunction = @(params) ...
