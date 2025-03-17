@@ -7,7 +7,7 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
     if plotAverageFlag==1
         nBlocks=1;
     end
-    for block = 1%:3%round(nBlocks/2)
+    for block = nBlocks
         % Init figure
         dat=[];
         make_it_tight = true;
@@ -21,7 +21,7 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
         hold on;
         yline(50,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
         %xline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on
-        for cond = 1:nConditions
+        for cond = 1:nConditions+1
             % Extract fitted parameters for current condition and block
             beta = fitParams(block, 1);
             n = fitParams(block, 2);
@@ -188,9 +188,11 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                                {'Color', lineColor, 'LineStyle', 'none', 'LineWidth', 3, 'Marker', markerType, ...
                                 'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize}); hold on;
                 % Average
-                plot(100, nanmean(mdl.yBlock(cond,:,block)),'Color', lineColor, 'LineStyle', 'none', 'LineWidth', 2.5, 'Marker', markerType, ...
-                                'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize+6); hold on;
-
+                barLength=45:50;
+                plot(barLength, repmat(nanmean(mdl.yBlock(cond,:,block)),1,numel(barLength)), '-', 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'off')
+                %plot(100, nanmean(mdl.yBlock(cond,:,block)),'Color', lineColor, 'LineStyle', 'none', 'LineWidth', 2.5, 'Marker', markerType, ...
+                %                'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize+6); hold on;
+            
 
                 % Add datapoints's count annotation
                 zeroConstrastPoint=xBlock==0;
@@ -235,18 +237,20 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                             ['Energy: ' num2str(bitmapSPDhv(1),2) ' & ' num2str(bitmapSPDhv(2),2) ' mW (' num2str(bitmapSPDmean,2) ' \pm ' num2str(bitmapSPDstd,1) ' mW)',...
                             ', Columns: ' num2str(bitmapColumnhv(1),2) ' & ' num2str(bitmapColumnhv(2),2)]});
                     else
+                        %{
                         title({[datastruct(analysisBlockID(clusterBlocks(block))).date 'R' datastruct(analysisBlockID(block)).run ' (' combinedBLStr ')'],...
                             ['Energy: ' num2str(bitmapSPDhv(1),2) ' & ' num2str(bitmapSPDhv(2),2) ' mW, ',...
                             'Columns: ' num2str(bitmapColumnhv(1),2) ' & ' num2str(bitmapColumnhv(2),2)]});
+                        %}
                     end
                     % Labels etc
                     %axis square
-                    xlim([0 100]); ylim([0 100]); xticks(0:12.5:100); addSkippedTicks(0,100,12.5,'x'); addSkippedTicks(0,100,10,'y'); axis square
+                    xlim([0 50]); ylim([0 100]); xticks(0:12.5:100);addSkippedTicks(0,50,5,'x'); addSkippedTicks(0,100,10,'y'); axis square
                     % Adding legend after plotting to ensure it covers all conditions
                     moveLines()
                     h2 = get(gca,'Children');
                     legend
-                    legend(h2([end-2:end]), {'Baseline', 'Con-Opto', 'Incon-Opto'}, 'Location', 'east',...
+                    legend(h2([end-2:end]), {'Baseline', 'Con-Opto', 'Incon-Opto','Con-Incon O'}, 'Location', 'east',...
                        'NumColumns',1,'FontSize',32);
                     upFontSize(32, 0.01)
             
@@ -256,11 +260,11 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                     yOffset=.05;
                     %text('Units', 'Normalized', 'Position', [1 1]-[xOffset yOffset], 'string', 'More biasing', 'color', 'k','FontWeight','bold', 'Fontsize',14)
                     ax = gca;
-                    ylabel('Correct %'); set(gca,'ycolor','k') 
+                    ylabel('Correct (%)'); set(gca,'ycolor','k') 
                     xlabel('Gabor contrast (%)');
                 end
             elseif cond==4
-                subplot(1,2,2)
+                %subplot(1,2,2)
                 % Plot line fit
                 plot(mdl.xFitted(cond,:,block), mdl.yFitted(cond,:,block), 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'on'); hold on;
                 upFontSize(32, 0.01); legend; axis square
@@ -284,7 +288,7 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                                 'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize}); hold on;
                 % Average
                 plot(100, nanmean(mdl.yBlock(cond,:,block)),'Color', lineColor, 'LineStyle', 'none', 'LineWidth', 2.5, 'Marker', markerType, ...
-                                'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize+6); hold on;
+                                'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize+6, 'HandleVisibility', 'off'); hold on;
 
                 % Add datapoints's count annotation
                 zeroConstrastPoint=xBlock==0;
@@ -304,28 +308,6 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                      nTrials=[nBlocks*ones(1,numel(~zeroConstrastPoint))];
                 end
                 %annotateDataPoints(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), nTrials, markerFaceColor); hold on;
-
-                ylabel('\DeltaCorrect %');
-    
-                yline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on
-                
-                % Set limits if necessary (optional)
-                box off
-                xlim([0 100]);
-                ylim([-80 80]);
-                addSkippedTicks(0,100,12.5,'x')
-                addSkippedTicks(-80, 80,10,'y')
-                set(gca,'FontSize', 10); % Smaller font size for inset        
-                set(gca,'linewidth',2)
-                upFontSize(32, 0.01)
-                % Add text for biasing
-                xOffset=.6;
-                yOffset=.05;
-                % Add text for biasing
-                axis square
-                legend({'Con-Incon Fit', 'Con-Incon Data'}, 'Location', 'southeast',...
-                       'NumColumns',1,'FontSize',20);
-                upFontSize(32, 0.01)
             end
         end
         
@@ -336,7 +318,7 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
 
         % Call the function to create the table
         subplot(1, 2, 1); ax1=gca;
-        createCustomTable2(ax1, modelTypeStr, mdl.headers, mdl.fittedParams(block,:), startPos, xSpacing, ySpacing);
+        %createCustomTable2(ax1, modelTypeStr, mdl.headers, mdl.fittedParams(block,:), startPos, xSpacing, ySpacing);
         
         if plotAverageFlag==1
             [nConditions, ~, nBlocks] = size(behavioralData.gaborContrasts(:, :, clusterBlocks));

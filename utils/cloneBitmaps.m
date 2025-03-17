@@ -1,11 +1,15 @@
 function bmp=cloneBitmaps(currentBlockStruct, cloneLoadFlag)
-%COPYUNIQUEBMPFILES Loads a file, extracts unique BMP filenames, and copies them.
-%   sourceFilePath: Path to the file containing the TS variable.
-%   directoryPath: Directory where the BMP files are located.
-%   sessionPath: Destination directory for the copied BMP files.
-bmp=nan(1080,1920,2);
-bmpPath=currentBlockStruct.mainPath;
-savePath=currentBlockStruct.ROITC;
+% Check if TS file exists first
+if ~isfile(currentBlockStruct.TS)
+    % If TS file doesn't exist, return NaN matrix
+    bmp = nan(1080, 1920, 2);
+    return;
+end
+
+% Rest of the original function...
+bmp = nan(1080, 1920, 2);
+bmpPath = currentBlockStruct.mainPath;
+savePath = currentBlockStruct.ROITC;
 
 % Load the file containing the TS variable
 loadedData = load(currentBlockStruct.TS);

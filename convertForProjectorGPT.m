@@ -42,7 +42,8 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 bitmapData.columnarbitmapTFcamspace(:,:,bitmapNo,blockID)=bitmapCamspacePostMask;
                 bitmapData.nColumns(bitmapNo,blockID)=numel(columnAreas);
                 bitmapData.medianColumnAreas(bitmapNo,blockID)=median(columnAreas);
-                
+                bitmapData.areaPixelsON(bitmapNo,blockID)=sum(columnAreas)*(imagingData.pixelsizemm(blockID)^2);
+
                 %% Save columnar optostim BMP
                 if ispc & saveFlagBMP==1
                     bmpPath=sprintf('T:/PK/ColSeries/%s/',datestr(now,'yyyymmdd'));
@@ -62,9 +63,14 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 %% Power density calculations
                 chamberID='L';
                 LEDpercent=30;
+                %{
                 [bitmapData.adjustedSPD_uW(1,bitmapNo,blockID), bitmapData.ledpower_mW(1,bitmapNo,blockID)] = calculateSPD(behavioralData, imagingData, bitmapData,...
                     bitmapNo, chamberID,LEDpercent,blockID,0);
-
+                %}
+                [bitmapData.energy(1,bitmapNo,blockID), bitmapData.powerdensity(1,bitmapNo,blockID),...
+                    bitmapData.timeONPercent(1,bitmapNo,blockID)] = calculateSPD(behavioralData, imagingData,...
+                    bitmapData, currentBlockStruct, bitmapNo,blockID,0);
+                
                 %% Save the figures
                  [~,h]=suplabel(['Converting bitmap for projector dimensions (' num2str(ort) '\circ)'],'t',[.08 .08 .84 .88]);
                  set(h,'FontSize',16)
@@ -341,11 +347,12 @@ switch conversionType
     
         % Ensure bitmap size is equal to projector (check for odd pixel)
         if mod(size(imageProjSpace_postBB, 2), 2) ~= 0
-            imageProjSpace_postBB_rmpix = imageProjSpace_postBB(:, 1:end-1); % Ensure the image width matches the projector space width
+            imageProjSpace_postBB = imageProjSpace_postBB(:, 1:end-1); % Ensure the image width matches the projector space width
+            
         end
     
         % Optionally, adjust the bitmap for projector orientation
-        imageProjSpace_postBB_flipud = flipud(imageProjSpace_postBB_rmpix);
+        imageProjSpace_postBB_flipud = flipud(imageProjSpace_postBB);
         image=imageProjSpace_postBB_flipud;
 
     case {'proj2cam'} % recovers camera space image

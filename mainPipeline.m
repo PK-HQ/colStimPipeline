@@ -1,24 +1,34 @@
 %% Define analysis and current session to be analysed
-pipelineMode='';% beta
-analysisMode='psycluster'; %summary/psycluster/beta/neurometrics/psyphi/stability/neurometricsfix
-referenceSessID=80;%for ort map
-currentSessID=81;%for biasing expt
+% === Select analysis to run ===
+% Main modes:
+% 1. expt = generate bitmaps for experiments
+% 2. summary = generate expt + psychometric + neurometric fits from experiment
+% 3. psycluster = fit psychometric curves only, 
+% 4. neurometrics = fit neurometric curves only
+% 5. psyphidist/psyphiscatter = plot psycluster data as histogram/scatter (requires psycluster to be run first)
+% 6. stability = quantifies stability of vasculature image across sessions
+% 7. neurometricsfix = neurometrics for columnar optostim, fixation-state
+
+analysisMode='psycluster';
+monkeyName=''; % Pepper or blank
+referenceSessID=1;%for ort map
+currentSessID=2;%for biasing expt
 
 % Save, plot flags
-saveFlag=1;
+saveFlag=0;
 saveFlagBMP=0;
 plotFlag=1;
 chambers={'R', 'L'};
 %% Load dataStruct for the desired chamber
-[mainPath, datastruct]=setupEnv('users/PK/colStimPipeline/exptListBiasingFull.m');
+[mainPath, datastruct]=setupEnv(['users/PK/colStimPipeline/exptListBiasingFull' monkeyName '.m']);
 
-for chamberID=2%1:2%:2
+for chamberID=1%1:2%:2
     nColumnsWanted=[]; chamberWanted=chambers{chamberID};
     analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted);
-
-    %% Pipeline: Bitmap generation
-    switch pipelineMode
-        case {'beta'}        
+    
+    %% Run the desired analysis pipeline variant
+    switch analysisMode
+        case {'expt'}        
             %% Fast pipeline (coregisters within session ort map to optostim block green image)
             % Get correction for camera-projector alignment
             % imregtform of orignal and recovered bitmap, apply to correct for
@@ -50,11 +60,61 @@ for chamberID=2%1:2%:2
             HE=1000;
             [projBitmapTRBB,bitmapsCamSpace,nBlobs,medianBlobAreas]=convertForProjector(dsReferenceSess,dsCurrentSess,columnarBitmapCoregistered,orts,...
                 bitmapParams.gridSize,bitmapParams.gammaCorrFactor,bitmapParams.sensitivity,'cam2proj',alignmentTransform,plotFlag,saveFlagBMP,saveFlag, pdfFilename);
-    end
-    
 
-    %% Run the desired analysis pipeline variant
-    switch analysisMode
+        case 'summaryExpt'
+            % Process only right chamber for Pepper
+            for chamberID = 1  % Only process R chamber
+                % Setup for single chamber
+                nColumnsWanted = [];
+                chamberWanted = chambers{chamberID};
+
+                % Initialize empty data structures
+                behavioralData = [];
+                imagingData = [];
+                bitmapData = [];
+
+                % Set current session as the only block to analyze
+                blockID = 1;
+                analysisBlockID = currentSessID;
+
+                % Get current and reference session structs directly from datastruct
+                currentBlockStruct = datastruct(currentSessID);
+                referenceBlockStruct = datastruct(referenceSessID);
+
+                % Load single block data
+                [currentBlockStruct, referenceBlockStruct,...
+                    behavioralData, imagingData, bitmapData, successFlag] = loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID, analysisMode);
+
+                if ~successFlag
+                    error('Failed to load block data');
+                end
+
+                % Set PDF filename for saving
+                pdfFilename = currentBlockStruct.psychneuroPDF;
+
+                % Get orientation map from reference session
+                bitmapData = getColumnarBitmapV4(currentBlockStruct, imagingData, bitmapData, blockID,...
+                    pdfFilename, plotFlag, saveFlag);
+
+                % Transform columnar positions to current cortical view
+                bitmapData = coregisterBitmap2GreenImgV2(currentBlockStruct, referenceBlockStruct,...
+                    imagingData, bitmapData, blockID,...
+                    pdfFilename, plotFlag, saveFlag);
+
+                % Generate bitmap, correct for projector properties and camera-projector alignment
+                [bitmapData] = convertForProjectorGPT(behavioralData, imagingData, bitmapData,...
+                    currentBlockStruct, 'cam2proj', blockID,...
+                    pdfFilename, plotFlag, saveFlagBMP, saveFlag);
+
+                % Clear temporary data
+                imagingData.optoIntg = [];
+                imagingData.baselineIntg = [];
+                if isfield(imagingData, 'gaussfit')
+                    imagingData.gaussfit(:,:,blockID) = [];
+                end
+                CF; % close figures
+            end
+            
         case {'summary'}
             if ~exist('behavioralData','var')
                 behavioralData=[];
@@ -71,7 +131,7 @@ for chamberID=2%1:2%:2
                 end
                 % === Load block data ===
                  [currentBlockStruct,referenceBlockStruct,...
-                    behavioralData, imagingData, bitmapData, successFlag]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID);
+                    behavioralData, imagingData, bitmapData, successFlag]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID, analysisMode);
                  if ~successFlag
                      continue
                  end
@@ -112,8 +172,8 @@ for chamberID=2%1:2%:2
 
         case {'psycluster'}
             %% Psychometrics: Cluster blocks by binning mean energy per block
-            %clc; CF
-            for c=2:-1:1%numel(chambers):-1:1
+            filterTag=true;
+            for c=2%2:-1:1%numel(chambers):-1:1
                 chamberWanted=chambers{c};
                 % Load only if its not loaded
                 if ~exist('dataTag')
@@ -123,8 +183,18 @@ for chamberID=2%1:2%:2
                         load([mainPath 'Chip/Meta/summary/statistics' chamberWanted 'tag.mat']);
                     end
                 end
-                [bins, binEdges, clusterIdx] = clusterEnergy(squeeze(bitmapData.energy), 'bin', 2);
-                savePDF(['psychometrics/' chamberWanted '-chamber/' num2str(numel(bins)) 'clusters'], 'Chip', 1, 1, 1)
+                if filterTag==true & c==1
+                    analysisParams.cluster=[1]; % mean
+                    analysisParams.columnMean=20; % mean
+                    analysisParams.columnRange=4; % stdev    
+                elseif filterTag==true & c==2
+                    analysisParams.cluster=[3 4]; % mean
+                    analysisParams.columnMean=20; % mean
+                    analysisParams.columnRange=4; % stdev
+                end
+                analysisParams=[];
+                [bins, binEdges, clusterIdx, validBlocks] = clusterEnergy(squeeze(bitmapData.energy), squeeze(bitmapData.nColumns), 'bin', 2, analysisParams);
+                %savePDF(['psychometrics/' chamberWanted '-chamber/' num2str(numel(bins)) 'clusters'], 'Chip', 1, 1, 1)
                 monkeyName=datastruct(analysisBlockID(1)).monkey;
                 %save([mainPath '/Chip/Meta/psychometrics/fittingParams' chamberWanted '-' modelTypes{2} modelTypes{3}  '-C' num2str(cluster) '.mat'], 'mdlStruct', 'bitmapEnergy', 'AICCdeltax', 'AICCbeta');
                 
@@ -300,10 +370,14 @@ for chamberID=2%1:2%:2
             chamberIDs=2; saveFlag=0; filterColumns=0;
             plotPsyRaw(datastruct, mainPath, chambers, chamberIDs, filterColumns, saveFlag)
 
-        case {'psyphi'}
-                chamberIDs=2; saveFlag=0; filterColumns=0;
+        case {'psyphiscatter'}
+                chamberIDs=2; saveFlag=0; filterColumns=20;
                 plotPsyPhiCorrelation(datastruct, mainPath, chambers, chamberIDs, filterColumns, saveFlag)
             
+        case {'psyphidist'}
+                chamberIDs=1:2; saveFlag=0; filterColumns=20;
+                plotPsyPhiDist(datastruct, mainPath, chambers, chamberIDs, filterColumns, saveFlag)
+
         case {'TS'}
             if ~exist('behavioralData','var')
                 behavioralData=[];
@@ -320,7 +394,7 @@ for chamberID=2%1:2%:2
                 end
                 % === Load block data ===
                  [currentBlockStruct,referenceBlockStruct,...
-                    behavioralData, imagingData, bitmapData, successFlag]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID);
+                    behavioralData, imagingData, bitmapData, successFlag]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID, analysisMode);
 
                 % Save for table
                 optoTrialsIdx=behavioralData.optoTS(blockID).Header.Conditions.TypeCond>0;

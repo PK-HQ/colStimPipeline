@@ -20,7 +20,7 @@ yOptoAverage=rmnan(reshape(yOptoAll,1,numel(yOptoAll)));
 options = optimoptions('fmincon', 'Algorithm', 'interior-point', 'Display', 'off', 'TolFun', 1e-14, 'TolX', 1e-14);
 %options = optimoptions('fmincon', 'Algorithm', 'sqp', 'Display', 'off', 'TolFun', 1e-14, 'TolX', 1e-14);
 fprintf('Fitting model, independent parameters per session...')
-for block = 1%:3%round(nBlocks/2)
+for block = nBlocks
     xBaseline=rmnan(xBaselineAll(block,:));
     yBaseline=rmnan(yBaselineAll(block,:));
     
@@ -65,7 +65,7 @@ mdlAvg = calculateTotalError(mdlAvg, initialParams, xBaselineAverage, yBaselineA
     options, modelType, baselineModelFlag, 1);
 %}
 fprintf('Done!\n\n')
-displayTable(mdl.fittedParams(:,:,1), mdl.headers(1:end))%mdl.headers(1:end-4))
+%displayTable(mdl.fittedParams(:,:,1), mdl.headers(1:end))%mdl.headers(1:end-4))
 %displayTable(mdlAvg.fittedParams(:,:,1), mdl.headers(1:end))%mdlAvg.headers(1:end-4))
 fprintf('\n=========\n\n')
 
