@@ -1,5 +1,5 @@
 function [movingImgMaskCoregistered,coregStats,transformParams,ImgReference,ImgTarget]=coregisterGreenImages(...
-  currentBlockStruct,referenceBlockStruct,Mask)
+  currentBlockStruct,referenceBlockStruct,Mask, analysisMode)
 %% [README] Loads green images of reference and current session, and 
 %%% coregister with auto (same session) or manual mode (diff session or override)
 
@@ -75,10 +75,10 @@ switch method
     case {'auto'}
         switch autoStages
             case {2}
-                if isfile(referenceBlockStruct.transformParams)
+                if isfile(currentBlockStruct.transformParams) && strcmp(analysisMode, 'summary')
                     titleStr='Superimposed (similarity + affine)';
                     % load transformaiton file if exist
-                    load(referenceBlockStruct.transformParams);
+                    load(currentBlockStruct.transformParams);
                 else 
                     titleStr='Superimposed (similarity + affine)';
 
@@ -89,7 +89,7 @@ switch method
                     [optimizer,metric] = imregconfig('multimodal');
 
                     % Stage 1 = fast rigid (rotate translate)
-                    %optimizer.MaximumIterations = 500;
+                    %optimizer.MaximumIterations = 1000;
                     optimizer.InitialRadius = 6.25*10^-4;
                     optimizer.GrowthFactor = 1.05;
                     transformType='rigid';
@@ -98,55 +98,15 @@ switch method
                     movingImgMaskCoarse = imwarp(movingImgMask,transformCoarse,'OutputView',imref2d(size(ImgTarget)));
 
                     % Stage 2 = slow affine (rotate translate scale skew)
-                    %optimizer.MaximumIterations = 1000;
+                    optimizer.MaximumIterations = 2000;
                     regParams.PyramidLevels=3;       
-                    optimizer.InitialRadius = 6.25*10^-3;
-                    optimizer.GrowthFactor = 1.05;       
+                    optimizer.InitialRadius = 6.25*10^-5;
+                    optimizer.GrowthFactor = 1.01;       
                     transformType='affine';
                     transformParams = imregtform(movingImgMask,ImgTarget,transformType,optimizer,metric,'DisplayOptimization',false,...
                     'PyramidLevels',regParams.PyramidLevels,'InitialTransformation',transformCoarse);
 
-                    % Previous function used
-                    %[tformCoarse,movingImgMaskDemons]=imregdemons(movingImgMask,ImgTarget,'PyramidLevels',5,'AccumulatedFieldSmoothing',3);
-
-                    % save transformation file
-                    %save(referenceBlockStruct.transformParams,'transformParams')
-
-                    %{
-                    if isfile(filenameStructSession.transformParams)
-                        % load transformaiton file if exist
-                        load(filenameStructSession.transformParams);
-                    else
-                        regParams.PyramidLevels=3;
-
-                        %optimizer
-                        [optimizer,metric] = imregconfig('multimodal');
-
-                        % Stage 1 = fast rigid (rotate translate)
-                        %optimizer.MaximumIterations = 500;
-                        optimizer.InitialRadius = 6.25*10^-4;
-                        optimizer.GrowthFactor = 1.05;
-                        transformType='rigid';
-                        transformCoarse = imregtform(movingImgMask,ImgTarget,transformType,optimizer,metric,'DisplayOptimization',false,...
-                        'PyramidLevels',regParams.PyramidLevels);
-                        movingImgMaskCoarse = imwarp(movingImgMask,transformCoarse,'OutputView',imref2d(size(ImgTarget)));
-
-                        % Stage 2 = slow affine (rotate translate scale skew)
-                        %optimizer.MaximumIterations = 1000;
-                        regParams.PyramidLevels=3;       
-                        optimizer.InitialRadius = 6.25*10^-3;
-                        optimizer.GrowthFactor = 1.05;       
-                        transformType='affine';
-                        transformParams = imregtform(movingImgMask,ImgTarget,transformType,optimizer,metric,'DisplayOptimization',false,...
-                        'PyramidLevels',regParams.PyramidLevels,'InitialTransformation',transformCoarse);
-
-                        % Previous function used
-                        %[tformCoarse,movingImgMaskDemons]=imregdemons(movingImgMask,ImgTarget,'PyramidLevels',5,'AccumulatedFieldSmoothing',3);
-
-                        % save transformation file
-                        save(filenameStructSession.transformParams,'transformParams')
-                    end
-                      %}
+                     save(currentBlockStruct.transformParams,'transformParams')
                      upFontSize(14,.015)
                     1;
                 end

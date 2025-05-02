@@ -1,0 +1,20 @@
+Pepper
+Y:\Pepper\Pepper20250423\ (Columns stimulated = ~20)
+Fixation, columnar stim series (run6)
+Fixation, checkerboard series (run1)
+Fixation, duty cycle series (run2)
+
+Y:\Pepper\Pepper20250417\ (Columns stimulated = ~20)
+Fixation, power response series (run4)
+
+Chip
+Y:\Chip\Chip20240112\ (Columns stimulated = 1)
+Fixation, columnar stim series (run5-run9, range of LED time ON*)
+Fixation, checkerboard series (run12)
+Fixation, power response series (run10)
+
+Y:\Chip\Chip20240118\ (Columns stimulated = 20)
+Fixation, columnar stim series (run4-run9, range of LED time ON*)
+Fixation, power response series (run11)
+
+*to calculate % LED time on, calculate 100*TS.Header.Conditions.ProjTTLPulseOn/TS.Header.Conditions.ProjTTLPulseOff

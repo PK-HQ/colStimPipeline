@@ -15,12 +15,12 @@ referenceBMPOrt=0;
 referenceBMPGamma='G050'; %'G050/G120'
 
 % ----- Load original bmp -----t
-bmpOriginalFilename=['X:\PK\ColSeries\' referenceBMPfolder '\O' num2str(referenceBMPOrt,'%05.f') 'HE1000' referenceBMPGamma 'T09900.bmp'];%['X:\PK\ColSeries\' referenceBMPfolder '\O' num2str(referenceBMPOrt*100,'%05.f') 'HE0032' referenceBMPGamma 'S00001.bmp'];
-%['X:\PK\ColSeries\' referenceBMPfolder '\O' num2str(referenceBMPOrt,'%05.f') 'HE1000' referenceBMPGamma 'T09900.bmp'];
+bmpOriginalFilename=['V:\PK\ColSeries\' referenceBMPfolder '\O' num2str(referenceBMPOrt,'%05.f') 'HE1000' referenceBMPGamma 'T09900.bmp'];%['V:\PK\ColSeries\' referenceBMPfolder '\O' num2str(referenceBMPOrt*100,'%05.f') 'HE0032' referenceBMPGamma 'S00001.bmp'];
+%['V:\PK\ColSeries\' referenceBMPfolder '\O' num2str(referenceBMPOrt,'%05.f') 'HE1000' referenceBMPGamma 'T09900.bmp'];
 bmpOriginal=double(imread(bmpOriginalFilename));
 
 % ----- Load projected response, threshold it to get estimated bmp -----
-responseOriginalfolder=['F:\OIdata\' currentSession '\'];%['D:\Chip' currentSession '\'];
+responseOriginalfolder=['D:\OIdata\' currentSession '\'];%['D:\Chip' currentSession '\'];
 responseOriginalFilename=[responseOriginalfolder 'calib100_' referenceBMPfolder '.bmp'];% 'calib50.bmp'];
 dataSaveFolder=responseOriginalfolder;
 responseOriginal=double(imread(responseOriginalFilename));

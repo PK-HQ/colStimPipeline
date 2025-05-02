@@ -3,7 +3,7 @@ function [behavioralData,imagingData,successFlag] = loadBehavImagingData(current
 successFlag = true;
 
 switch pipelineMode
-    case 'summaryExpt'  % Load minimal components for bitmap generation
+    case 'expt'  % Load minimal components for bitmap generation
         % 1. Reference map components
         load(referenceEntry.Orientation, 'Mask', 'RespCondPCA', 'Ort', 'MapAmpOrt', 'PCAExpl', 'nPCAComp');
         
@@ -15,10 +15,27 @@ switch pipelineMode
         end
         
         % 3. Reference map to current FOV transform
-        load(currentEntry.transformParams, 'transformParams');
-        imagingData.transformRef2Block(blockID) = transformParams;
+        %load(currentEntry.transformParams, 'transformParams');
+        %imagingData.transformRef2Block(blockID) = transformParams;
         
-        % 4. Compile essential data into structs
+        % 4. Gaussian response for selecting column subsets
+        load(referenceEntry.Orientation, 'Mask', 'RespCondPCA', 'Ort', 'MapAmpOrt', 'PCAExpl','nPCAComp');
+        % Gaussian Fit
+        if isfile(currentEntry.gaussianFit)
+            load(currentEntry.gaussianFit,'ROIMaskgaussian','centerCoords');
+        else
+            ROIMaskgaussian=[];
+            centerCoords=[];
+        end
+
+        if exist(currentEntry.gaussianResponse)==2 && isfile(currentEntry.gaussianResponse)
+            load(currentEntry.gaussianResponse,'FFTCond');
+        else
+            FFTCond=nan(128,128,3);
+        end
+
+        
+        % 5. Compile essential data into structs
         imagingData.ortpca(:,:,:,blockID) = RespCondPCA;
         imagingData.orts(:,:,blockID) = unique(Ort);
         imagingData.mask(:,:,blockID) = double(Mask);
@@ -27,7 +44,12 @@ switch pipelineMode
         imagingData.ortampmap(:,:,:,blockID) = imagingData.mask(:,:,blockID).*MapAmpOrt;
         imagingData.npca(1,blockID) = nPCAComp;
         imagingData.pcaexpl(:,blockID) = PCAExpl(1:12);
-        
+        imagingData.gaussresp(1:128,1:128,1:3,blockID)=padArray(FFTCond, 3, 3, NaN);
+        imagingData.gaussfit(:,:,blockID)=padStruct(ROIMaskgaussian, 200);
+        if isempty(centerCoords)
+            imagingData.centerCoords(1,:,blockID)=[NaN NaN];
+        end
+
         % Camera parameters
         imagingData.pixelsizemm(1,blockID) = 0.016; % Standard pixel size in mm
         imagingData.pixels(1,blockID) = 512;  % Standard image size

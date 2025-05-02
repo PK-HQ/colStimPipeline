@@ -2,18 +2,18 @@
 clear;
 
 %% Inputs
-monkeyStr = {'Chip', 'Chip','Pepper'}; % Example for multiple monkeys
-monkeyIDstr = {'28', '28','32'}; % Example for multiple monkeys
-sessionStr = {'20240112', '20240131', '20250114'}; % Example for multiple sessions
+monkeyStr = {'Chip','Pepper'}; % Example for multiple monkeys
+monkeyIDstr = {'28','32'}; % Example for multiple monkeys
+sessionStr = {'20240131', '20250318'}; %'20250114'}; % Example for multiple sessions
 
 pdfSuffix = 'test';
 
-LumRuns = [10,7,0]; % Corresponding to sessions
-SiteID = [1, 1, 1]; % Corresponding to sessions
+LumRuns = [7, 9]; % 0]; % Corresponding to sessions
+SiteID = [1, 2]; % Corresponding to sessions
 SiteIDStr = sessionStr; % Corresponding to sessions
 
 %% Conditions
-OptoLuminance = [5, 10, 20, 30, 50, 70, 100];
+OptoLuminance = [1e-12, 5, 10, 20, 30, 50, 70, 100];
 OptoMaxPower = 62.6; % mW, RM6, with ND0
 OptolightGuideDi = 9; % mm
 OptoProjectorArea = pi * (OptolightGuideDi / 2)^2; % mm^2
@@ -73,7 +73,7 @@ figure;
 [ha, ~] = tight_subplot(numel(SiteID) + 1, numel(OptoLuminance) + 1, .01, [.05, -.05], [.01, .07]);
 numRow = numel(SiteID) + 1;
 numCol = numel(OptoLuminance) + 1;
-Clim = [min(RespFFT(:)), max(RespFFT(:))];
+Clim = [min(RespFFT(:)), max(RespFFT(:))]*.8;
 
 axes(ha(1));
 axis off;
@@ -135,15 +135,40 @@ for iSession = 1:numSessions
 
         x = RespFFT(:, :, iSession, iLED);
         dataFilteredX = nanconv(x, imageFilter, 'nanout');
+        
+        % Define the central 256x256 region (indices 129 to 384)
+        centerRowStart = 129;
+        centerRowEnd   = 384;
+        centerColStart = 129;
+        centerColEnd   = 384;
+        centerRegion   = dataFilteredX(centerRowStart:centerRowEnd, centerColStart:centerColEnd);
+        
+        % Find the peak within the central region
+        [maxVal, linearIdx] = max(centerRegion(:));
+        [peakRow, peakCol] = ind2sub(size(centerRegion), linearIdx);
+        
+        % Convert the peak location back to the original image coordinates
+        xMax = peakRow + centerRowStart - 1;
+        yMax = peakCol + centerColStart - 1;
+        
+        % Define the ROI based on ROISize
+        ROI.X = xMax - floor(ROISize / 2) + 1 : xMax + ceil(ROISize / 2);
+        ROI.Y = yMax - floor(ROISize / 2) + 1 : yMax + ceil(ROISize / 2);
+
+
+        %{
+        x = RespFFT(:, :, iSession, iLED);
+        dataFilteredX = nanconv(x, imageFilter, 'nanout');
         [xMax, yMax] = find(dataFilteredX == max(max(dataFilteredX)));
         ROI.X = xMax - floor(ROISize / 2) + 1 : xMax + ceil(ROISize / 2);
         ROI.Y = yMax - floor(ROISize / 2) + 1 : yMax + ceil(ROISize / 2);
+        %}
 
         CenterResp(iSession, iLED) = mean(mean(RespFFT(ROI.X, ROI.Y, iSession, iLED), 1), 2) * 100;
     end
     
     subplot(1, numSessions, iSession);
-    imagesc(RespFFT(:, :, iSession, end), [min(RespFFT(:)), max(RespFFT(:))]);
+    imagesc(RespFFT(:, :, iSession, end), Clim);
     colorbar;
     hold on;
     rectangle('Position', [min(ROI.Y), min(ROI.X), ROISize, ROISize], 'EdgeColor', 'k');
@@ -162,10 +187,10 @@ colormap(colormapR);
 
 %% Naka-Rushton Fit
 clc
-Param0 = [0, 0, 1]; % Initial guesses for RMax, C50, and n
-NakaRushton = @(Param, x) Param(1) .* ((x .^ Param(3)) ./ ((x .^ Param(3)) + (Param(2) .^ Param(3))));
-
-FitParam = zeros(numSessions, numel(Param0));
+% Modified Naka-Rushton with a baseline parameter:
+% Param(1): baseline, Param(2): Rmax (amplitude above baseline),
+% Param(3): C50, Param(4): exponent (n)
+NakaRushton = @(Param, x) Param(1) + Param(2) .* ((x.^Param(4)) ./ ((x.^Param(4)) + (Param(3).^Param(4))));
 NormCenterResp = CenterResp;
 
 % Normalize responses
@@ -177,56 +202,63 @@ for iSession = 1:numSessions
 end
 
 % Define preferred colormap
-preferredColormap = slanCM('guppy',3); % Choose a colormap (e.g., jet, parula, hot, cool)
-Col = preferredColormap(round(linspace(1, size(preferredColormap, 1), numSessions)), :); % Assign colors based on sessions
+preferredColormap = slanCM('plasma',numSessions); % Choose a colormap (e.g., jet, parula, hot, cool)
+Col = preferredColormap;%(round(linspace(1, size(preferredColormap, 1), numSessions)), :); % Assign colors based on sessions
 
 figure;
 hold on;
 
-fitParams = zeros(numSessions, 5);
-
+fitParams = zeros(numSessions, 6);
 for iSession = 1:numSessions
     tLED = OptoLightPD;
-
-    % Fit the Naka-Rushton function
-    FitParam = lsqcurvefit(NakaRushton, Param0, tLED, CenterResp(iSession, :));
+    % Define initial guesses:
+    % - baseline_guess: minimum response (nonzero if measured)
+    % - amplitude_guess: range of response (max - min)
+    % - C50: initial guess (e.g., 1)
+    % - exponent: initial guess (e.g., 5)
+    baseline_guess = min(CenterResp(iSession, :));
+    amplitude_guess = max(CenterResp(iSession, :)) - baseline_guess;
+    Param0 = [baseline_guess, amplitude_guess, 1, 3]; % Baseline, amplitude, C50, Exponent
     
-    % Calculate P_{50} and P_{max}
-    P_50 = NakaRushton(FitParam, 0.5); % Response at 50% power
-    P_max = NakaRushton(FitParam, 1); % Response at 100% power
-
-    % Collect parameters for display
-    fitParams(iSession, :) = [FitParam(1), FitParam(2), FitParam(3), P_50, P_max];
-
-    % Plot the fit
+    % Optionally add bounds to ensure physical realism:
+    lb = [-Inf, 0, eps, 0];
+    ub = [Inf, Inf, Inf, Inf];
+    
+    % Fit the model
+    FitParam = lsqcurvefit(NakaRushton, Param0, tLED, CenterResp(iSession, :), lb, ub);
+    
+    % Calculate metrics like P50 relative to the baseline
+    P_50 = NakaRushton(FitParam, 0.5);
+    P_max = NakaRushton(FitParam, 1);
+    
+    fitParams(iSession, :) = [FitParam(1), FitParam(2), FitParam(3), FitParam(4), P_50, P_max];
+    
+    % Plot the fitted curve
     x = linspace(0, max(tLED), 100);
-    plot(x, NakaRushton(FitParam, x), ...
-        'Color', Col(iSession, :), 'LineStyle', '-', 'LineWidth', 2); % Use colormap for line color
-
-    % Scatter the data points
-    scatter(tLED, CenterResp(iSession, :), 75, Col(iSession, :), 'filled', 'MarkerEdgeColor', 'k','HandleVisibility','off'); % Use colormap for scatter color
-
-
+    plot(x, NakaRushton(FitParam, x), 'Color', Col(iSession, :), 'LineWidth', 2);
+    scatter(tLED, CenterResp(iSession, :), 75, Col(iSession, :), 'filled', 'MarkerEdgeColor', 'k');
+    addSkippedTicks(0,1,.1,'x');
 end
+
 % Axis customization
 axis square;
-xlabel('Stimulation power density (mW/mm^2)');
-ylabel('Average ROI response amplitude (\DeltaF/F%)');
-title('Power-response function (Naka-Rushton fit)');
+xlabel('Power density (mW/mm^2)');
+ylabel('ROI amplitude (\DeltaF/F%)');
+title('Power-response function');
 legend([monkeyStr], 'Location', 'northwest');
 set(gcf, 'color', 'w');
-upFontSize
+upFontSize(24, .015);
+startPos = [0.5, 3];
 for iSession=1:numSessions
     % Add custom table with parameters
     if iSession == 1
         % Customize the starting position and spacing
-        headers = {'R_{max}', 'C_{50}', 'n', 'P_{50}', 'P_{max}'};
-        startPos = [0.5, 3]; % Starting position in data coordinates
-        xSpacing = 0.1; % Horizontal spacing between columns
-        ySpacing = .5; % Vertical spacing between rows
+        headers = {'Base', 'R_{max}', 'C_{50}', 'n', 'P_{50}', 'P_{max}'};
+        xSpacing = 0.11; % Horizontal spacing between columns
+        ySpacing = 1; % Vertical spacing between rows
     else
-        headers = {'', '', '', '', ''}; % Blank headers for subsequent sessions
-        startPos = [0.5, 3.5] - [0, iSession / 2]; % Adjust starting position for subsequent sessions
+        headers = {'', '', '', '', '', ''}; % Blank headers for subsequent sessions
+        startPos = startPos - [0, iSession*.5]; % Adjust starting position for subsequent sessions
     end
     createCustomTable2(gca, '', headers, round(fitParams(iSession, :), 1, 'decimal'), startPos, xSpacing, ySpacing);
 end

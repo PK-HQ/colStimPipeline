@@ -43,6 +43,9 @@ function bitmapData = loadBitmapData(datastruct, currentBlockStruct, currentBloc
     bitmapData.projectorx=1920;
     bitmapData.projectory=1080;
     bitmapData.pixelsizemm=.0054;
+    bitmapData.ProjTTLPulseOn(blockID)=datastruct(currentBlockID).powercycle*50;
+    bitmapData.ProjTTLPulseOff(blockID)=50-(datastruct(currentBlockID).powercycle*50);
+
     
     % copy original bitmaps to run folder
     cloneLoadFlag='load';

@@ -63,6 +63,12 @@ function dataTable = scrapeTS(dataFolder, monkeyName, dateStart, dateEnd)
 % based on each valid file found.
 
 %% Function
+    % set monkey id
+    if strcmp(monkeyName,'Chip')
+        monkeyID=28;
+    elseif strcmp(monkeyName,'Pepper')
+        monkeyID=32;
+    end
     % Initialize an empty array to store the results
     results = [];
     
@@ -76,7 +82,7 @@ function dataTable = scrapeTS(dataFolder, monkeyName, dateStart, dateEnd)
         dateStr = datestr(currentDate, 'yyyymmdd');
         
         % Construct the date folder path
-        dateFolderPath = fullfile(dataFolder, monkeyName, ['Chip' dateStr]);
+        dateFolderPath = fullfile(dataFolder, monkeyName, [monkeyName dateStr]);
         
         % Check if the date folder exists
         if isfolder(dateFolderPath)
@@ -92,7 +98,7 @@ function dataTable = scrapeTS(dataFolder, monkeyName, dateStart, dateEnd)
                 % Construct the file path for the TS file in the run folder
                 %filePath = fullfile(dateFolderPath, runFolderName, ['M28D' dateStr 'R' num2str(runNum) 'TS.mat']);
                 % Define the file pattern using wildcards
-                filePattern = fullfile(dateFolderPath, runFolderName, ['M28D*R*TS.mat']);
+                filePattern = fullfile(dateFolderPath, runFolderName, ['M' num2str(monkeyID) 'D*R*TS.mat']);
 
                 % Find files matching the pattern
                 matchingFiles = dir(filePattern);
@@ -118,6 +124,10 @@ function dataTable = scrapeTS(dataFolder, monkeyName, dateStart, dateEnd)
                         optoOnly = 0;
                         blOnly = 0;
                         bloptoCombined = 0;
+                        fixColstim=0;
+                        fixPRF=0;
+                        fixSIRF=0;
+                        fixDC=0;
                         intgMat = 0;
                         binned = 0;
 
@@ -144,18 +154,41 @@ function dataTable = scrapeTS(dataFolder, monkeyName, dateStart, dateEnd)
                                 % Check for ProjImg and categorize opto conditions
                                 if isfield(loadedData.TS.Header.Conditions, 'ProjImg')
                                     projImages = loadedData.TS.Header.Conditions.ProjImg;
-                                    containsDot = any(contains(projImages, 'Dot'));
+                                    blockType = loadedData.TS.Header.Conditions.TypeCond;
+
+                                    % Identify if its an active task (orientation discrimination) or passive fix
+                                    taskCode=3;
+                                    taskFlag=any(blockType==taskCode);
+                                    % Identify projector stimulation type
+                                    %containsDot = any(contains(projImages, 'Dot'));
                                     containsO000 = any(contains(projImages, 'O000'));
                                     containsO090 = any(contains(projImages, 'O090'));
+                                    containsCB = any(contains(projImages, 'SFseries\CBS'));
+                                    containsDC = any(contains(projImages, 'DCseries\CBS'));
+                                    containsLum = any(contains(projImages, 'LumSeries\Dot'));
 
                                     % Set the mutually exclusive columns
-                                    if containsO000 && containsO090 && ~containsDot
-                                        optoOnly = 1;
-                                    elseif containsDot && ~containsO000 && ~containsO090
-                                        blOnly = 1;
-                                    elseif containsDot && containsO000 && containsO090
-                                        bloptoCombined = 1;
+                                    if taskFlag % Task block
+                                        if containsO000 && containsO090 && ~containsLum % biasing only
+                                            optoOnly = 1;
+                                        elseif containsLum && ~containsO000 && ~containsO090 % baseline only
+                                            blOnly = 1;
+                                        elseif containsLum && containsO000 && containsO090 % biasing and baseline, combined
+                                            bloptoCombined = 1;
+                                        end
+                                    elseif ~taskFlag % Fixation block
+                                        if containsO000 && containsO090 % biasing only
+                                            fixColstim = 1;
+                                        elseif containsCB
+                                            fixSIRF = 1;
+                                        elseif containsDC
+                                            fixDC=1;
+                                        elseif containsLum
+                                            fixPRF=1;
+                                        end
                                     end
+
+
                                 end
                             else
                                 % If TS is missing, specify the absence
@@ -179,7 +212,10 @@ function dataTable = scrapeTS(dataFolder, monkeyName, dateStart, dateEnd)
                         end
 
                         % Append the data to results array
-                        results = [results; {dateStr, runNum, protocolName, gaborContrasts, gaborOrientation, optoOnly, blOnly, bloptoCombined, intgMat, binned}];
+                        results = [results; {dateStr, runNum, protocolName, gaborContrasts, gaborOrientation, ...
+                            optoOnly, blOnly, bloptoCombined,...
+                            fixColstim, fixPRF, fixSIRF, fixDC,...
+                            intgMat, binned}];
                     end
                 end
             end
@@ -187,7 +223,10 @@ function dataTable = scrapeTS(dataFolder, monkeyName, dateStart, dateEnd)
     end
     
     % Convert results to table format
-    dataTable = cell2table(results, 'VariableNames', {'Date', 'RunNumber', 'ProtocolName', 'GaborContrasts', 'GaborOrientation', 'OptoOnly', 'BlOnly', 'BlOptoCombined', 'IntgMat', 'Binned'});
+    dataTable = cell2table(results, 'VariableNames', {'Date', 'RunNumber', 'ProtocolName', 'GaborContrasts', 'GaborOrientation',...
+        'OptoOnly', 'BlOnly', 'BlOptoCombined',...
+        'fixColstim','fixPRF','fixSIRF','fixDC',...
+        'IntgMat', 'Binned'});
     
     % Sort the table by Date and RunNumber in ascending order
     dataTable = sortrows(dataTable, {'Date', 'RunNumber'});

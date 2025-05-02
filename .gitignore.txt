@@ -5,10 +5,18 @@ ColSeries/
 store/
 autoRunDA/
 GEVI/
+firstPaper/
+figures/
+others/
+testcode/
 
 # Common files to ignore
 *.mat
 *.asv
+
+# Image and data files
+*.svg
+*.png
 *.m~
 
 # OS generated files

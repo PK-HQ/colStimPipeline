@@ -19,6 +19,9 @@ PCAsuffix='P2';%70%
 %% Set dir, folder paths
 filenameStruct.monkey=dataStruct.monkey;
 filenameStruct.monkeyNo=dataStruct.monkeyNo;
+if isfield(dataStruct,'chamber')
+    filenameStruct.chamber=dataStruct.chamber;
+end
 filenameStruct.date=dataStruct.date;
 filenameStruct.run=dataStruct.run;
 filenameStruct.modality=dataStruct.modality;

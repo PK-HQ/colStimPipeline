@@ -28,7 +28,7 @@ end
 switch cloneLoadFlag
     case {'clone'}
         resultArray = cellfun(@(x) extractAfter(x, 'PK'), bmpFilenamesRaw, 'UniformOutput', false);
-        bmpFilenames = findMatchingFiles([bmpPath 'users/PK/colStimPipeline'],resultArray);
+        bmpFilenames = findMatchingFiles([bmpPath 'users/PK/colStimPipeline'],resultArray,currentBlockStruct.date);
         % Look for these filenames in directoryPath and copy them to sessionPath
         for i = 1:length(bmpFilenames)
             srcFile = bmpFilenames{i};
@@ -50,12 +50,12 @@ switch cloneLoadFlag
             fileNames{i}=[filename fileext];
         end
         
-        bmpFilenames = findMatchingFiles(currentBlockStruct.ROITC,fileNames);
+        bmpFilenames = findMatchingFiles(currentBlockStruct.ROITC,fileNames, currentBlockStruct.date);
 
         % Look for these filenames in directoryPath and copy them to sessionPath
         for i = 1:length(bmpFilenames)
             [~, name, ext] = fileparts(bmpFilenames{i});
-            destFile = fullfile(savePath, [name ext]);
+            destFile = bmpFilenames{i}; % fullfile(savePath, [name ext])
             if exist(destFile, 'file')
                 bmp(:,:,i)=double(imread(destFile));
                 %fprintf('Loading... Loaded %s\n', destFile);
@@ -67,7 +67,7 @@ switch cloneLoadFlag
 end
 end
 
-function matchingFiles = findMatchingFiles(bmpPath, filePaths)
+function matchingFiles = findMatchingFiles(bmpPath, filePaths, currentDate)
     % Initialize output
     matchingFiles = {};
 
@@ -80,12 +80,12 @@ function matchingFiles = findMatchingFiles(bmpPath, filePaths)
         foundMatch = false;
 
         % Define the directories to search
-        searchDirs = {fileDirData,['T:\PK\' extractAfter(fileDirData,'e\')]}; % Search in either the server Y:\ or local experiment computer T:\
+        searchDirs = {fileDirData,['V:/PK/ColSeries/' currentDate]}; % Search in either the server Y:\ or local experiment computer T:\
 
         % Iterate over search directories
         for k = 1:length(searchDirs)
             % Create a pattern to match the filename without the potential Cxx suffix
-            filePattern = [fileName(1:end-4), '*', fileExt];  % e.g., O09000HE0032G040S00001*
+            filePattern = [fileName(1:end-8), '*', fileExt];  % e.g., O09000HE0032G040S00001*
 
             % Get list of matching files in the current directory
             files = dir(fullfile(searchDirs{k}, filePattern));

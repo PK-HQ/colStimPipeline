@@ -1,5 +1,5 @@
 function [bitmapData]=convertForProjectorGPT(behavioralData, imagingData, bitmapData,...
-    currentBlockStruct, conversionType, blockID, ...
+    currentBlockStruct, conversionType, blockID,...
     pdfFilename, plotFlag,saveFlagBMP,saveFlag)
 disp('Generating bitmap...')
 
@@ -11,7 +11,7 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
     bitmapCamspace=bitmapData.columnarbitmapCoreg(:,:,bitmapNo,blockID); % grab input image wanted
     contourMaskLevel=bitmapData.gaussianContourLevel(1,bitmapNo,blockID); % grab contour mask desired to extract n-columns
     
-    [imagingData, ort, bitmapCamspace, contourMaskLevel]=getColumnSelectionMask(bitmapData, imagingData, blockID, bitmapNo, plotFlag, saveFlag, pdfFilename);
+    [imagingData, ort, bitmapCamspace, contourMaskLevel]=getColumnSelectionMask(bitmapData, imagingData, currentBlockStruct, blockID, bitmapNo, plotFlag, saveFlag, pdfFilename);
 
     if ort==0 || ort ==90 % Process only 0 or 90 deg orientations (for speed)
         switch conversionType
@@ -28,6 +28,9 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 %% Apply camera-projector transformation
                 bitmapProjSpaceAligned=applyCamProjAlignment(imagingData, blockID, bitmapProjSpaceBB, conversionType);
 
+                %% Ensure binary only
+                bitmapProjSpaceAligned(bitmapProjSpaceAligned>0)=1;
+
                 %% Save to bitmapData
                 % Calculate bitmap stats for columns within the contour (total pixels on, % pixel on, spatial duty cycle)
                 nanContour=double(gaussianMask);
@@ -43,12 +46,11 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 bitmapData.nColumns(bitmapNo,blockID)=numel(columnAreas);
                 bitmapData.medianColumnAreas(bitmapNo,blockID)=median(columnAreas);
                 bitmapData.areaPixelsON(bitmapNo,blockID)=sum(columnAreas)*(imagingData.pixelsizemm(blockID)^2);
-
                 %% Save columnar optostim BMP
-                if ispc & saveFlagBMP==1
-                    bmpPath=sprintf('T:/PK/ColSeries/%s/',datestr(now,'yyyymmdd'));
+                if saveFlagBMP==1
+                    bmpPath=sprintf('V:/PK/ColSeries/%s/',datestr(now,'yyyymmdd'));
                     bmpFilename = sprintf('O%05gHE%04gG%03gS%05gC%02g.bmp',...
-                        ort*100,bitmapData.gridSize,bitmapData.gammaCorrFactor,bitmapData.sensitivity*10000,bitmapData.gaussianContourLevel(bitmapNo));
+                        ort*100,bitmapData.gridSize,bitmapData.gammaCorrFactor(bitmapNo),bitmapData.sensitivity*10000,bitmapData.gaussianContourLevel(bitmapNo));
 
                     if ~exist(bmpPath, 'dir')
                          mkdir(bmpPath)
@@ -89,13 +91,13 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 imgsc(bitmapCamspace);hold on; plot(yContour(bound),xContour(bound),'color','r','linewidth',.5);
                 title({'Columns with contour overlay','(cam-space)'})
                 % Plot targeted columns
-                subplot(2,5,2); imgsc(bitmapCamspacePostMask);title({'Targeted columns','(cam-space)'})
+                subplot(2,5,2); imgsc(bitmapCamspacePostMask);colormap('gray');title({'Targeted columns','(cam-space)'})
                 % plot resized
-                subplot(2,5,3); imgsc(bitmapProjSpaceResized);title({'Imresize','(proj-space)'});  axis square; 
+                subplot(2,5,3); imgsc(bitmapProjSpaceResized);colormap('gray');title({'Imresize','(proj-space)'});  axis square; 
                 % plot black-bars
-                subplot(2,5,4); imgsc(bitmapProjSpaceBB);title({'Crop, black bars & flipud','(proj-space)'})
+                subplot(2,5,4); imgsc(bitmapProjSpaceBB);colormap('gray');title({'Crop, black bars & flipud','(proj-space)'})
                 % Plot post projector-camera alignment
-                subplot(2,5,5); imgsc(bitmapProjSpaceAligned);title({'Camera-projector alignment','(proj-space)'})
+                subplot(2,5,5); imgsc(bitmapProjSpaceAligned);colormap('gray');title({'Camera-projector alignment','(proj-space)'})
                 % Plot bitmap column area sizes
                 subplot(2,5,6:10); 
                 lenDC10=15;
@@ -198,10 +200,11 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                     ylim([0 roundup(max(columnAreas),1000)])
                 end
                 upFontSize(18,.0025)
+        end
     end
 end
 end
-end
+
 
 
 
@@ -217,7 +220,7 @@ end
 
 %% === SUBFUNCTIONS ===
 %% Get masks based on gaussian-shaped responses to a visual gaussian. Contains n-contours that can be used to mask the original columnar map to isolate columns
-function [imagingData, ort, bitmapCamspace, contourMaskLevel]=getColumnSelectionMask(bitmapData, imagingData, blockID, bitmapNo, plotFlag, saveFlag, pdfFilename)
+function [imagingData, ort, bitmapCamspace, contourMaskLevel]=getColumnSelectionMask(bitmapData, imagingData, currentBlockStruct, blockID, bitmapNo, plotFlag, saveFlag, pdfFilename)
     % Generate bitmap here
 
     % Extract necessary data from input structures
@@ -226,17 +229,27 @@ function [imagingData, ort, bitmapCamspace, contourMaskLevel]=getColumnSelection
     contourMaskLevel = bitmapData.gaussianContourLevel(1, bitmapNo, blockID); % Contour mask level
 
     % Fit a 2D Gaussian to create masks
-    [imagingData] = fitGaussianResponseMask(bitmapData, imagingData, bitmapCamspace, blockID, bitmapNo, plotFlag);
+    [imagingData] = fitGaussianResponseMask(bitmapData, imagingData, currentBlockStruct, bitmapCamspace, blockID, bitmapNo, plotFlag);
 
     % Append to PDF if required
     appendToPDF(saveFlag, pdfFilename);
 end
 
-function [imagingData] = fitGaussianResponseMask(bitmapData, imagingData, bitmapCamspace, blockID, bitmapNo, plotFlag)
+function [imagingData] = fitGaussianResponseMask(bitmapData, imagingData, currentBlockStruct, bitmapCamspace, blockID, bitmapNo, plotFlag)
+    if isfield(currentBlockStruct, 'chamber')
+        if strcmp(currentBlockStruct.chamber,'R')
+            priorGaussAngle=-5;
+        end
+    end
+
     if ~isnan(bitmapData.gaussianCond(blockID))
         gaussianResponse = abs(imagingData.gaussresp(:, :, bitmapData.gaussianCond(blockID), blockID));
         desiredResp = imresize(gaussianResponse, [imagingData.pixels(blockID), imagingData.pixels(blockID)], 'bilinear');
-        [ROIMaskGaussian, centerCoords] = fit2Dgaussian(bitmapData.gaussianContourLevelMax(bitmapNo, blockID), desiredResp, bitmapCamspace, imagingData.nanmask(:, :, blockID), plotFlag);
+        if strcmp(currentBlockStruct.monkey,'Pepper')
+            desiredResp=double(imwarp(desiredResp,bitmapData.transformParams(blockID),'OutputView',imref2d(size(desiredResp))));
+        end
+        [ROIMaskGaussian, centerCoords] = fit2Dgaussian(bitmapData.gaussianContourLevelMax(bitmapNo, blockID), desiredResp, ...
+            bitmapCamspace, imagingData.nanmask(:, :, blockID), priorGaussAngle, plotFlag);
 
         % Store fitted Gaussian mask and center coordinates
         imagingData.gaussfit(1, :, blockID) = padStruct(ROIMaskGaussian, 200);
@@ -272,7 +285,7 @@ function [gaussianMask, bitmapCamspacePostMask] = isolateColumns(bitmapData, ima
                 disp('Loop 1');
                 gaussianMask, bitmapCamspacePostMask = processSingleColumnSpecial(bitmapCamspace, imagingData.centerCoords(:, :, blockID));
             % Single or multiple columns, general case
-            elseif (nColumnsWanted == 1 && contourMaskLevel < 200) || nColumnsWanted > 1
+            elseif nColumnsWanted > 1 || (nColumnsWanted == 1 && contourMaskLevel < 200)
                 disp('Loop 2');
                 gaussianMask = imagingData.gaussfit(1, contourMaskLevel, blockID).area;
                 bitmapCamspacePostMask = gaussianMask .* bitmapCamspace;
@@ -378,7 +391,11 @@ end
 function bitmapProjSpaceAligned=applyCamProjAlignment(imagingData, blockID, bitmapProjSpaceBB, conversionType)
 switch conversionType
     case {'cam2proj'}
+        if isfield(imagingData,'transformmatrix')
             bitmapProjSpaceAligned = imwarp(bitmapProjSpaceBB,imagingData.transformmatrix(:,blockID),'OutputView',imref2d(size(bitmapProjSpaceBB)));
+        else
+            bitmapProjSpaceAligned=bitmapProjSpaceBB;
+        end
     case {'proj2cam'}
             bitmapProjSpaceAligned = imwarp(bitmapProjSpaceBB,invert(imagingData.transformmatrix(:,blockID)),'OutputView',imref2d(size(bitmapProjSpaceBB)));        
 end

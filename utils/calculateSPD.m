@@ -41,8 +41,13 @@ switch method
         pixelsOnArea= bitmapData.areaPixelsON(imageNo,blockID); %mm2
         power = powerdensity * pixelsOnArea; %mW
         
-        timeON_ms = unique(behavioralData.optoTS(blockID).Header.Conditions.ProjTTLPulseOn);
-        timeOFF_ms = unique(behavioralData.optoTS(blockID).Header.Conditions.ProjTTLPulseOff);
+        if ~isempty(behavioralData)
+            timeON_ms = unique(behavioralData.optoTS(blockID).Header.Conditions.ProjTTLPulseOn);
+            timeOFF_ms = unique(behavioralData.optoTS(blockID).Header.Conditions.ProjTTLPulseOff);
+        else
+            timeON_ms = bitmapData.ProjTTLPulseOn(blockID);
+            timeOFF_ms = bitmapData.ProjTTLPulseOff(blockID);
+        end
         timeONPercent = timeON_ms/(timeON_ms+timeOFF_ms);
         
         energy = power * timeONPercent;

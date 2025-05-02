@@ -1,5 +1,5 @@
 function bitmapData=coregisterBitmap2GreenImgV2(currentBlockStruct,referenceBlockStruct,imagingData,bitmapData,blockID,...
-    pdfFilename, plotFlag,saveFlag)
+    analysisMode, pdfFilename, plotFlag,saveFlag)
 disp('Getting transformation matrix to map reference map to current green image...')
 %% Plotting
 if plotFlag==0
@@ -10,7 +10,7 @@ end
 
 %% Get coregistration params for greenImageReference (to be transformed) to greenImageSession (anchor image)
 %transform type: auto, similarity
-[imgReferenceCoreg,coregStats,transformParams,imgReference,imgTarget]=coregisterGreenImages(currentBlockStruct,referenceBlockStruct,imagingData.nanmask);
+[imgReferenceCoreg,coregStats,transformParams,imgReference,imgTarget]=coregisterGreenImages(currentBlockStruct,referenceBlockStruct,imagingData.nanmask, analysisMode);
 [~,h]=suplabel('Identifying transformation matrix from reference to current session','t',[0.08 0.08 .84 .80]);
 set(h,'FontSize',16)
 switch saveFlag
@@ -19,8 +19,9 @@ switch saveFlag
 end
 
 %% Use transform to align bitmap with greenImageSession, and threshold
+bitmapData.transformParams(blockID)=transformParams;
 for i=1:size(bitmapData.columnarbitmap(:,:,:,blockID),3)
-  bitmapData.columnarbitmapCoreg(:,:,i,blockID)=double(imwarp(bitmapData.columnarbitmap(:,:,i,blockID),transformParams,'OutputView',imref2d(size(imgTarget))));
+  bitmapData.columnarbitmapCoreg(:,:,i,blockID)=double(imwarp(bitmapData.columnarbitmap(:,:,i,blockID),bitmapData.transformParams(blockID),'OutputView',imref2d(size(imgTarget))));
 end
 
 %transform and plot aligned images

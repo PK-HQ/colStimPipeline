@@ -1,5 +1,5 @@
 function mdlStruct=analyzePsychometricModels(monkeyName, chamberWanted, modelTypes, mainPath,...
-    behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, saveFlag)
+    behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, saveFlag)
 %% Plot by cluster, and by model type
 nClusters=sort(clusterIdx,'descend');%unique(clusterIdx);
 % Initialize mdlStruct and other structures
@@ -7,7 +7,7 @@ mdlStruct = struct();
 AICCdeltax = struct();
 AICCbeta = struct();
 thresh=[];beta=[];exp=[];c50=[];
-for cluster=3%1:nClusters%1:nClusters
+for cluster=1:3%1:nClusters
     disp(['Cluster ' num2str(cluster)])
     
     % Get columns
@@ -33,7 +33,7 @@ for cluster=3%1:nClusters%1:nClusters
     end
     bitmapDataAvg.energy=[];
     
-    for modelID = 4%8
+    for modelID = 1
         modelTypeStr = modelTypes{modelID};
 
         conds = 1:3;
@@ -43,20 +43,21 @@ for cluster=3%1:nClusters%1:nClusters
         % Fit psychometric data
         switch strcmp(modelTypeStr, 'bill')
             case 1
-                [mdl, mdlAvg] = fitBayesianModelMLE(xBlocks, yBlocks, modelTypeStr);
+                [mdl, mdlAvg] = fitPsyMLE(xBlocks, yBlocks, 'bill', plotLine);
+                %[mdl,mdlAvg] = fitPsyMLE(xBlocks, yBlocks, modelTypeStr);
             case 0
-                [mdl,mdlAvg] = fitNakaRushtonMLE3(xBlocks, yBlocks, modelTypeStr);
+                [mdl,mdlAvg] = fitPsyMLE(xBlocks, yBlocks, modelTypeStr, plotLine);
+                %[mdl,mdlAvg] = fitNakaRushtonMLE3(xBlocks, yBlocks, modelTypeStr);
         end
-        xFit = sort([-nlinspace(0, 100, 100, 'nonlinear'), nlinspace(0, 100, 100, 'nonlinear')]);
+        xFit = sort([nlinspace(0, 100, 100, 'linear')]);
         savefilenameBlock = ['psychometrics/' chamberWanted '-chamber/' modelTypeStr '/' 'psychfit-' chamberWanted '-' modelTypeStr '-C' num2str(cluster)];
-        plotFlag=1;
         switch plotFlag
             case 1
                 if modelID>0
                     % Plot per block
                     plotAverageFlag=0;
                     mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysisBlockID,...
-                        mdl, mdl.fittedParams(:, :, 1), xFit, monkeyName, clusterBlocksIdx, plotAverageFlag,...
+                        mdl, mdl.fittedParams(:, :, 1), xFit, monkeyName, clusterBlocksIdx, plotAverageFlag, plotLine,...
                         saveFlag, cluster, modelTypeStr, savefilenameBlock);
                     
                     % Plot block average
@@ -79,31 +80,6 @@ for cluster=3%1:nClusters%1:nClusters
                     beta=[beta;mdl.fittedParams(:,1)];
                     exp=[exp;mdl.fittedParams(:,2)];
                     c50=[c50;mdl.fittedParams(:,3)];
-                
-                elseif modelID == 0
-                    %{
-                    % Process 'bill' model
-                    plotAverageFlag = 0;
-                    mdl = plotNakaRushtonFit3_Bill(behavioralData, bitmapData, datastruct, analysisBlockID,...
-                        mdl, mdl.fittedParams(:, :, 1), xFit, monkeyName, clusterBlocks, plotAverageFlag,...
-                        saveFlag, cluster, modelTypeStr, savefilenameBlock);
-
-                    % Plot block average for 'bill'
-                    savefilenameAverage = ['psychometrics/' chamberWanted '-chamber/' modelTypeStr '/' 'psychfit-' chamberWanted '-' modelTypeStr '-C' num2str(cluster) '-' num2str(nClusterBlocks + 1)];
-                    plotAverageFlag = 1;
-                    plotNakaRushtonFit3_Bill(behavioralData, bitmapData, datastruct, analysisBlockID,...
-                        mdlAvg, mdlAvg.fittedParams(:, :, 1), xFit, monkeyName, clusterBlocks, plotAverageFlag,...
-                        saveFlag, cluster, modelTypeStr, savefilenameAverage);
-
-                    % Save to PDF
-                    append_pdfs([mainPath monkeyName '/Meta/' savefilenameBlock '.pdf'], ...
-                        [mainPath monkeyName '/Meta/' savefilenameAverage '.pdf'], [mainPath monkeyName '/Meta/' savefilenameBlock '.pdf']);
-                    delete([mainPath monkeyName '/Meta/' savefilenameAverage '.pdf']);
-                    %CF;
-
-                    % Collect fitting parameters for summary plots
-                    thresh = [thresh; mdl.thresholdContrast];
-                    %}
                 end
 
                     
