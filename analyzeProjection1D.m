@@ -22,7 +22,7 @@ for cluster=3%
     neuroStruct.(['C' num2str(cluster)]).analyzeBlockIDs=clusterBlocks;
     %Skip to next cluster if none match
     if ~isempty(clusterBlocks)
-        for blockNo=14%1:numel(clusterBlocks)%[3 5 10 11 14]
+        for blockNo=18%1:numel(clusterBlocks)%[3 5 10 11 14]
             tic
             blockID=clusterBlocks(blockNo);
             imagingData.optoIntg=[];
@@ -30,7 +30,7 @@ for cluster=3%
     
             % Load block data individually as imaging data too large
              [currentBlockStruct,~,...
-                behavioralData, imagingData, ~, ~]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID);
+                behavioralData, imagingData, ~, ~]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID,'');
                 filenameStructCurrent=generateFilenames(currentBlockStruct);
             %{
             if size(imagingData.optoIntg,3)>=blockID
@@ -130,7 +130,7 @@ for cluster=3%
                     condIDs=condIDsOpto;
             end
     
-            [images.averageColumn]=columnarFilter(behavioralData.optoTS(blockID),images.(trialOutcomeType));
+            [images.averageColumn]=columnarFilter(behavioralData.optoTS(blockID),images,trialOutcomeType);
             %% Get reference PCA map for comparison
             % Process make ROI imagingData.mask
             ROImask=double(imagingData.mask(:,:,blockID)); snrMask=ROImask; snrMask(snrMask==0)=NaN;
@@ -145,6 +145,10 @@ for cluster=3%
             [fullROI, optostimROI, recruitROI]=parcellation(condIDs,currentBlockStruct,bitmapData,imagingData,...
                 images,trialOutcomeType,snrMask,gaussMask, bitmapData.columnarbitmapTFcamspace,meanColumns,...
                 optostimMaskType,blockID);
+
+            [fullROI, optostimROI, recruitROI] = parcellation(condIDs, currentBlockStruct, bitmapData, imagingData, ...
+            images, trialOutcomeType, gaussMask, bitmapData.columnarbitmapTFcamspace, meanColumns, ...
+            optostimMaskType, blockID);
             
             % Choose the area analyzed
             switch optostimAreaFlag

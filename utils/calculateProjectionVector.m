@@ -15,6 +15,8 @@ angleAverage=[];
 amplitudeAverage=[];
 switch analysisFlag
     case 'similarity'
+        % This uses the 0 and 90 columns as a map together by creating a difference map
+
         %% Calculate angle and amplitude of image projected into reference image space
         referenceImage=rescale(referenceImage(:,:,2),-1,1)-rescale(referenceImage(:,:,1),-1,1);
         % Initialize the rescaled image ([-1 1])
@@ -68,9 +70,11 @@ switch analysisFlag
         angleAverage=atan(mean(y)/mean(x));
         amplitudeAverage=mean(y)/sin(angleAverage);
     case 'similarityColumn'
+        % This uses the 0 and 90 columns as a map separately, instead of creating a difference map
+
         % Bitmap mask for removing stimulated pixels
-        roiMask=double(~bitmapData.bitmapMask(:,:,blockID));
-        roiMask(roiMask==0)=nan;            
+        %roiMask=double(~bitmapData.bitmapMask(:,:,blockID));
+        %roiMask(roiMask==0)=nan;            
         
         % Create reference map of 0- and 90-tuned columns, with snr mask and bitmap mask
         tileGridSize = [32,32];
@@ -82,8 +86,8 @@ switch analysisFlag
         [~, referenceImageColumn90, ~, ~] = processActivityMap(...
             rescale(imagingData.refmapCoreg(:,:,2,blockID), -1, 1), tileGridSize, gammaVal, sensitivity);
         
-        referenceImageColumn0 = -referenceImageColumn0 .* snrMask .* roiMask;
-        referenceImageColumn90 = referenceImageColumn90 .* snrMask .* roiMask;
+        referenceImageColumn0 = -referenceImageColumn0 .* snrMask;% .* roiMask; % map of 0 columns, remove ± coding
+        referenceImageColumn90 = referenceImageColumn90 .* snrMask;% .* roiMask; % map of 90 columns, remove ± coding
 
         % Initialize result vectors
         numPairs = numel(condIDs.V0O0);  % Assuming condIDs.V0O0 and condIDs.V90O90 have the same length
@@ -92,17 +96,21 @@ switch analysisFlag
         dataO90C0 = nan(numPairs,1);
         dataO90C90 = nan(numPairs,1);
         
+        % rescale images to eliminate raw image -ves to [0 1]
+        images = rescale(double(images), 0, 1);
         % Loop through each contrast, 1st row = 0 column and 2nd row = 90 column
         for contrast=1:nContrasts
             % Define data for current iteration
             resp = images(:,:,contrast) .* snrMask;
-            respROI = resp .* roiMask;
-        
+            respROI = resp;% .* roiMask;
+
             % Compute responses for each image, separately for 0 and 90 columns
-            resp0 = respROI .* referenceImageColumn0 .* roiMask; resp0(resp0==0) = nan;
-            resp90 = respROI .* referenceImageColumn90 .* roiMask; resp90(resp90==0) = nan;
+            resp0 = respROI .* referenceImageColumn0;% .* roiMask; 
+            resp0(resp0==0) = nan;
+            resp90 = respROI .* referenceImageColumn90;% .* roiMask; 
+            resp90(resp90==0) = nan;
         
-        % Save response, 1st-row = 0 columns and 2nd-row = 90 columns
+            % Save response, 1st-row = 0 columns and 2nd-row = 90 columns
             amplitude(1, contrast) = mean(removenan(resp0));
             amplitude(2,contrast)= mean(removenan(resp90));
         end

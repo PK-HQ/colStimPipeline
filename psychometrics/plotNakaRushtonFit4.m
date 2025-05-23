@@ -7,7 +7,7 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
     if plotAverageFlag==1
         nBlocks=1;
     end
-    for block = 1:3%nBlocks
+    for block = nBlocks
         % Init figure
         dat=[];
         make_it_tight = true;

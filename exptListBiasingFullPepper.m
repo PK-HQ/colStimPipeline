@@ -202,7 +202,7 @@ datastruct(entryNo).gaussianCond=2;
 datastruct(entryNo).nColumnsWanted=[20 20];
 datastruct(entryNo).greenImgID=2;
 
-entryNo=12; % B;  Changed to gridsize 16
+entryNo=12; % B without dichroic;  Changed to gridsize 16
 datastruct(entryNo).monkeyNo='32';
 datastruct(entryNo).monkey='Pepper';
 datastruct(entryNo).chamber='R';

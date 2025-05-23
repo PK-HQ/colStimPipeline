@@ -12,20 +12,20 @@
 % 9. SIRF = fit and plot SIRF across sessions
 
 %% Change these for experiment runs
-analysisMode='summary';
-monkeyName='Pepper';%Pepper or blank
-referenceSessID=8;%for ort map
-currentSessID=9;%for biasing expt
+analysisMode='neurometrics';
+monkeyName='Chip';%Pepper or blank
+referenceSessID=10;%for ort map
+currentSessID=13;%for biasing expt
 
 % Saving and plotting flags
-saveFlag=1;
+saveFlag=0;
 saveFlagBMP=0;
 plotFlag=1;
 
 %% Load dataStruct for the desired chamber
 [mainPath, datastruct]=setupEnv(['users/PK/colStimPipeline/exptListBiasingFull' monkeyName '.m']);
 chambers={'R', 'L'};
-for chamberID=1
+for chamberID=2
     nColumnsWanted=[]; chamberWanted=chambers{chamberID};
     analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted);
     
@@ -84,7 +84,7 @@ for chamberID=1
                 bitmapData=[];
             end
             
-            for blockID=1:numel(analysisBlockID)-2
+            for blockID=numel(analysisBlockID)
                 disp(['=== Block ' num2str(blockID)  '/' num2str(numel(analysisBlockID)) '==='])
                 tic
                 if isfield(behavioralData,'auc') && size(behavioralData.auc,3)>=blockID
@@ -278,34 +278,32 @@ for chamberID=1
             %% Neurometrics
         case {'neurometrics'}
             clc; neuroStruct=[];
-            for chamberID=2%numel(chambers):-1:1
-                nColumnsWanted=[]; chamberWanted=chambers{chamberID};
-                
-                if ~exist('dataTag')
-                    load([mainPath 'Chip/Meta/summary/statistics' chamberWanted '.mat'], 'behavioralData', 'bitmapData', 'imagingData');
-                elseif exist('dataTag')
-                    if ~strcmp(dataTag,chamberWanted)
-                        load([mainPath 'Chip/Meta/summary/statistics' chamberWanted '.mat'], 'behavioralData', 'bitmapData', 'imagingData');
-                    end
+            nColumnsWanted=[]; chamberWanted=chambers{chamberID};
+            
+            if ~exist('dataTag')
+                load([mainPath 'Chip/Meta/summary/statistics' chamberWanted 'tag.mat'], 'behavioralData', 'bitmapData', 'imagingData','dataTag');
+            elseif exist('dataTag')
+                if ~strcmp(dataTag,chamberWanted)
+                    load([mainPath 'Chip/Meta/summary/statistics' chamberWanted 'tag.mat'], 'behavioralData', 'bitmapData', 'imagingData','dataTag');
                 end
-                                
-                analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted); %RESET
+            end
+                            
+            analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted); %RESET
 
-                %[bins, clusterIdx] = clusterEnergy(squeeze(bitmapData.energy), 'bin', 2);          
-                [bins, binEdges, clusterIdx] = clusterEnergy(squeeze(bitmapData.energy), 'bin', 2);
+            %[bins, clusterIdx] = clusterEnergy(squeeze(bitmapData.energy), 'bin', 2);          
+            analysisParams=[];
+            [bins, binEdges, clusterIdx] =  clusterEnergy(squeeze(bitmapData.energy), squeeze(bitmapData.nColumns), 'bin', 5, analysisParams);
 
-                monkeyName='Chip';
-                saveFlag=1;
-                trialOutcomeType='averageColumn';  % 'average' or 'averageColumn'
-                optostimMaskType='gaussian'; filterColumns=0; 
-                ROIs={'full'};
-                for roiID=1:numel(ROIs)
-                    %neuroStruct=analyzeProjection1D(mainPath, datastruct, behavioralData, imagingData, bitmapData, analysisBlockID, trialOutcomeType, ...
-                    %    gcf, 1, ROIs{roiID}, clusterIdx, filterColumns, optostimMaskType, saveFlag);
-                    neuroStruct=analyzeProjection1DRefactored(mainPath, datastruct, behavioralData, imagingData, bitmapData, analysisBlockID, trialOutcomeType, ...
-                        gcf, 1, ROIs{roiID}, clusterIdx, filterColumns, optostimMaskType, saveFlag);
-                    %save([mainPath 'Chip/Meta/neurometric/neuroStruct' chamberWanted ROIs{roiID} optostimMaskType '.mat'], 'neuroStruct');
-                end
+            monkeyName='Chip';
+            trialOutcomeType='average';  % 'average' or 'averageColumn'
+            optostimMaskType='gaussian'; filterColumns=0; 
+            ROIs={'nonstim'};
+            for roiID=1:numel(ROIs)
+                %neuroStruct=analyzeProjection1D(mainPath, datastruct, behavioralData, imagingData, bitmapData, analysisBlockID, trialOutcomeType, ...
+                %    gcf, 1, ROIs{roiID}, clusterIdx, filterColumns, optostimMaskType, saveFlag);
+                neuroStruct=analyzeProjection1DRefactored(mainPath, datastruct, behavioralData, imagingData, bitmapData, analysisBlockID, trialOutcomeType, ...
+                    gcf, 1, ROIs{roiID}, clusterIdx, filterColumns, optostimMaskType, saveFlag);
+                %save([mainPath 'Chip/Meta/neurometric/neuroStruct' chamberWanted ROIs{roiID} optostimMaskType '.mat'], 'neuroStruct');
             end
         1;
        %% Load data if needed

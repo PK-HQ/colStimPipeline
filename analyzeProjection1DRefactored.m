@@ -22,7 +22,7 @@ for cluster=3%
     neuroStruct.(['C' num2str(cluster)]).analyzeBlockIDs=clusterBlocks;
     %Skip to next cluster if none match
     if ~isempty(clusterBlocks)
-        for blockNo=16%14%1:numel(clusterBlocks)%[3 5 10 11 14]
+        for blockNo=19%14%1:numel(clusterBlocks)%[3 5 10 11 14]
             tic
             blockID=clusterBlocks(blockNo);
             imagingData.optoIntg=[];
@@ -30,7 +30,8 @@ for cluster=3%
     
             % Load block data individually as imaging data too large
              [currentBlockStruct,~,...
-                behavioralData, imagingData, ~, ~]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID);
+                behavioralData, imagingData, ~, ~]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID, '');
+
                 filenameStructCurrent=generateFilenames(currentBlockStruct);
 
             monkey=datastruct(analysisBlockID(blockID)).monkey;
@@ -62,11 +63,11 @@ for cluster=3%
             % Coregister reference map (pca90-0) to activity
              plotFlag=0;
              [imagingData] = coregisterRefMap2Responses(...
-                images, imagingData, blockColumns, condIDs, blockID, plotFlag);
+                images, imagingData, blockColumns, condIDs, blockID, trialOutcomeType, plotFlag);
             % Coregister bitmap (pca90-0) to activity
             plotFlag=0;
              [bitmapData] = coregisterBitmap2Responses(...
-                images, imagingData, bitmapData, blockColumns, condIDs, blockID, plotFlag);
+                images, imagingData, bitmapData, blockColumns, condIDs, blockID, trialOutcomeType, plotFlag);
             
            %% STAGE 3. Split the image into optostim and recruitment ROI
             columnarResp = splitImageIntoROIs(blockColumns, condIDs, currentBlockStruct, bitmapData, imagingData, ...
@@ -74,7 +75,7 @@ for cluster=3%
             
            %% STAGE 4. Plot processed images for ROI
             %plotProcessedImages(imagingData, columnarResp, condIDs, blockID);
-            plotTypeFlag=1;
+            plotTypeFlag=2;
             plotNeurometricData(bitmapData, imagingData, cluster, blockNo, columnarResp,  blockID, condIDs,...
                 TSbaseline, TSopto,...
                 blockColumns, neuroStruct, colorCon, colorIncon, optostimAreaFlag,...
@@ -385,52 +386,45 @@ function plotNeurometricData(bitmapData, imagingData, cluster, blockNo, columnar
         elseif plotID == 2
             % Assumes opto dominant
             axes(hAx(plotID))
-            mapName = '{Iso-tuned columns wrt. visual}';
-            yLabelStr = 'Column activity (a.u.)';
+            mapName = '{Iso-tuned columns wrt. opto}';
+            yLabelStr = '';
 
-            % Recruitment
-            similarityValues=[amplitudeColumn(1,condIDs.V0),amplitudeColumn(1,condIDs.V90),...
-                amplitudeColumn(1,condIDs.V0O0),amplitudeColumn(1,condIDs.V0O90),...
-                amplitudeColumn(1,condIDs.V90O0),amplitudeColumn(1,condIDs.V90O90)];
-            %{
+            % Recruitment            
             similarityValues=[amplitudeColumn(1,condIDs.V0),amplitudeColumn(2,condIDs.V90),...
-                amplitudeColumn(1,condIDs.V0O0),amplitudeColumn(1,condIDs.V0O90),...
-                amplitudeColumn(2,condIDs.V90O0),amplitudeColumn(2,condIDs.V90O90)];
-            %}
+                amplitudeColumn(1,condIDs.V0O0),amplitudeColumn(2,condIDs.V0O90),...
+                amplitudeColumn(1,condIDs.V90O0),amplitudeColumn(2,condIDs.V90O90)];
+            
             % Generate sorting indices based on condIDs fields
             sortedIndices = [condIDs.V0, condIDs.V90, condIDs.V0O0, condIDs.V0O90, condIDs.V90O0, condIDs.V90O90];
             % Sort similarityValues to preserve the order in amplitude/images
             [~, sortOrder] = sort(sortedIndices);  % Get sorting order
             similarityValues = similarityValues(sortOrder);
+            
             % Plot axis limits
-            yLimit = [-100 100]./25000;
-            yTicks = [-100:25:100]./25000;
+            yLimit = [-1 1];
+            yTicks = [-1:.2:1];
             xLimit = [0 100];
             xTicks = 0:12.5:100;
             modifier=[-1;1];
         elseif plotID == 3
             % Assumes opto dominant
             axes(hAx(plotID))
-            mapName = '{Ortho-tuned columns wrt. visual}';
-            yLabelStr = 'Column activity (a.u.)';
+            mapName = '{Ortho-tuned columns wrt. opto}';
+            yLabelStr = '';
 
             % Suppression
-            similarityValues=[amplitudeColumn(2,condIDs.V0),amplitudeColumn(2,condIDs.V90),...
-                amplitudeColumn(2,condIDs.V0O0),amplitudeColumn(2,condIDs.V0O90),...
-                amplitudeColumn(2,condIDs.V90O0),amplitudeColumn(2,condIDs.V90O90)];
-            %{
             similarityValues=[amplitudeColumn(2,condIDs.V0),amplitudeColumn(1,condIDs.V90),...
-                amplitudeColumn(2,condIDs.V0O0),amplitudeColumn(2,condIDs.V0O90),...
-                amplitudeColumn(1,condIDs.V90O0),amplitudeColumn(1,condIDs.V90O90)];
-            %}
+                amplitudeColumn(2,condIDs.V0O0),amplitudeColumn(1,condIDs.V0O90),...
+                amplitudeColumn(2,condIDs.V90O0),amplitudeColumn(1,condIDs.V90O90)];
+           
             % Generate sorting indices based on condIDs fields
             sortedIndices = [condIDs.V0, condIDs.V90, condIDs.V0O0, condIDs.V0O90, condIDs.V90O0, condIDs.V90O90];
             % Sort similarityValues to preserve the order in amplitude/images
             [~, sortOrder] = sort(sortedIndices);  % Get sorting order
             similarityValues = similarityValues(sortOrder);
             % Plot axis limits
-            yLimit = [-100 100]./25000;
-            yTicks = [-100:25:100]./25000;
+            yLimit = [-1 1];
+            yTicks = [-1:.2:1];
             xLimit = [0 100];
             xTicks = 0:12.5:100;
             modifier=[-1;1];
@@ -632,7 +626,7 @@ function plotNeurometricData(bitmapData, imagingData, cluster, blockNo, columnar
         xticks(xTicks);
         
         if plotType == 2
-            addSkippedTicks(-100,100,25, 'y');
+            %addSkippedTicks(-100,100,25, 'y');
             addSkippedTicks(0, 100, 12.5, 'x');
         elseif plotType == 1
             addSkippedTicks(-100, 100,25, 'x');
@@ -644,13 +638,13 @@ function plotNeurometricData(bitmapData, imagingData, cluster, blockNo, columnar
 
         %% Add inset of subtracted image
         % Choose the area analyzed
-        %{
-        if plotType == 2
+        
+        if plotType == 2 && plotID==1
             gcf;
             if plotID == 1
-                axInset = axes('Position', [.29 + .043 .257 .18 .18]);
+                axInset = axes('Position', [.1 + .043 .257 .18 .18]);
             elseif plotID == 2
-                axInset = axes('Position', [.56 + .043 .257 .18 .18]);
+                axInset = axes('Position', [.35 + .043 .257 .18 .18]);
             end
             imgsc(columnarResp(:,:,condIDs.V90O90(1)).*snrMask - columnarResp(:,:,condIDs.V0O0(1)).*snrMask);
             hold on;
@@ -668,7 +662,8 @@ function plotNeurometricData(bitmapData, imagingData, cluster, blockNo, columnar
             box off;
             set(axInset, 'XTick', [], 'YTick', [], 'Box', 'off', 'XColor', 'none', 'YColor', 'none', 'Color', 'none'); % No ticks, no box
         end
-        %}
+        
+        
     end
 
     % Colorbar struff

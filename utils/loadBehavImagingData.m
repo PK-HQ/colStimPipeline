@@ -126,7 +126,7 @@ switch pipelineMode
                 imagingData.optoIntg(:,:,:,blockID)= DataTrial;
             end
         else
-            disp(['=== IntgOpto missing:' currentEntry.OptoTS])
+            disp(['=== IntgOpto missing'])
         end
 
         if ~isempty(currentEntry.baselineIntg)
@@ -137,9 +137,17 @@ switch pipelineMode
             else
                 disp(['IntgBL file loaded:' currentEntry.baselineIntg])
                 imagingData.baselineIntg(:,:,:,blockID)= DataTrial;
+              %% Check if opto intg loaded 
+                if size(imagingData.optoIntg,3)>=blockID
+                    if isempty(imagingData.optoIntg(:,:,:,blockID))
+                        disp(['Check INTG: Block ' num2str(blockID)])
+                    end
+                elseif size(imagingData.optoIntg,3)<blockID
+                    disp(['Check INTG: Block ' num2str(blockID)])
+                end
             end
         else
-            disp(['=== IntgBL missing:' currentEntry.baselineTS])
+            disp(['=== IntgBL missing'])
         end
 
         % Compile into struct
@@ -169,14 +177,5 @@ switch pipelineMode
         
         % Cam-proj transformation
         imagingData.transformmatrix(:,blockID)=alignmentTransform;
-
-        %% Check if opto intg loaded 
-        if size(imagingData.optoIntg,3)>=blockID
-            if isempty(imagingData.optoIntg(:,:,:,blockID))
-                disp(['Check INTG: Block ' num2str(blockID)])
-            end
-        elseif size(imagingData.optoIntg,3)<blockID
-            disp(['Check INTG: Block ' num2str(blockID)])
-        end
 end
 end

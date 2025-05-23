@@ -7,7 +7,7 @@ mdlStruct = struct();
 AICCdeltax = struct();
 AICCbeta = struct();
 thresh=[];beta=[];exp=[];c50=[];
-for cluster=1:3%1:nClusters
+for cluster=nClusters%1:nClusters
     disp(['Cluster ' num2str(cluster)])
     
     % Get columns
