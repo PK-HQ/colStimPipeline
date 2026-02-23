@@ -1,4 +1,5 @@
 function [initialParams, lb, ub] = getWeibullFreeAllInitParams()
+%{
     initialParams = [.1 .5 15 3,...
         .1 .5 15 3,...
         .1 nan 15 3];
@@ -8,4 +9,21 @@ function [initialParams, lb, ub] = getWeibullFreeAllInitParams()
     ub = [.2 .5 50 8,...
         .2 .8 50 8,...
         .2 nan 50 8];
+%}
+
+%----- baseline (A  B  alpha  beta)
+initialParams = [ .10  .50  15  3 , ...   % baseline
+                  .10  .50  15  3 , ...   % ? - congruent
+                  .10  .50  15  3 ];      % ? - incongruent  <-- was NaN
+
+% lower bounds
+lb = [ 0    0.50 10 1 , ...
+       0    0.20 10 1 , ...
+       0    0.20 10 1 ];
+
+% upper bounds
+ub = [ 0.20 0.50 50 8 , ...
+       0.20 0.80 50 8 , ...
+       0.20 0.80 50 8 ];
+
 end

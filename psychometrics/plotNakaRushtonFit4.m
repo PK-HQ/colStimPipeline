@@ -7,7 +7,7 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
     if plotAverageFlag==1
         nBlocks=1;
     end
-    for block = nBlocks
+    for block = 1:nBlocks
         % Init figure
         dat=[];
         make_it_tight = true;
@@ -40,11 +40,7 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
             switch cond
                 case 1 % Baseline
                     xPlot = x;
-                    if strcmp(modelTypeStr,'bill')
-                        predictedCurve = mdl.mdlBaseline(xPlot, fitParams(block, 1:end-1)).pcntrl; 
-                    else
-                        predictedCurve = mdl.mdlBaseline(xPlot, fitParams(block, 1:end-1)); 
-                    end
+                    predictedCurve = mdl.mdlBaseline(xPlot, fitParams(block, 1:end-1)).pcntrl; 
                     lineColor = [0 0 0]; % Black for baseline
                     markerFaceColor = [1 1 1]; 
                     edgeColor = 'k';
@@ -68,15 +64,10 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
 
                     %mdl.fittedParams(block,endIdx) = trapz(contr, curve) / (max(contr) - min(contr));
                 case 2 % Con-Opto
-                    if strcmp(modelTypeStr,'bill')
-                        xPlot = x; % Positive contrasts for congruent condition
-                        predictedCurve = mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)).pc; 
-                        xPlot = x(x >= 0); % Positive contrasts for congruent condition
-                        predictedCurve=predictedCurve(x >= 0);
-                    else
-                        xPlot = x; % Positive contrasts for congruent condition
-                        predictedCurve = mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)); 
-                    end
+                    xPlot = x; % Positive contrasts for congruent condition
+                    predictedCurve = mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)).pc; 
+                    xPlot = x(x >= 0); % Positive contrasts for congruent condition
+                    predictedCurve=predictedCurve(x >= 0);
                     lineColor = [0.9294, 0.1098, 0.1373] * 1.05; % Red for con-opto
                     markerFaceColor = lineColor;
                     edgeColor = 'k';
@@ -99,14 +90,9 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
 
                     %mdl.fittedParams(block,endIdx+1) = trapz(contr, curve) / (max(contr) - min(contr));
                 case 3 % Incon-Opto
-                    if strcmp(modelTypeStr,'bill')
-                        xPlot = x; % Positive contrasts for congruent condition
-                        predictedCurve = mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)).pic; 
-                    else
-                        xPlot = x;
-                        predictedCurve = 100-mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)); 
-                        xPlot = -1.* xPlot; % Neg contrasts for congruent condition
-                    end
+                    xPlot = x; % Positive contrasts for congruent condition
+                    predictedCurve = mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)).pic; 
+
                     lineColor = [0, 0.0941, 0.6627] * 1.25; % Blue for incon-opto
                     markerFaceColor = lineColor;
                     edgeColor = 'k';
@@ -245,9 +231,12 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                     % Adding legend after plotting to ensure it covers all conditions
                     moveLines()
                     h2 = get(gca,'Children');
-                    legend
-                    legend(h2([end-2:end]), {'Baseline', 'Con-Opto', 'Incon-Opto','Con-Incon O'}, 'Location', 'east',...
+                    legend({'Baseline', 'Con-Opto', 'Incon-Opto'}, 'Location', 'southeast',...
                        'NumColumns',1,'FontSize',32);
+                    %{
+                    legend(h2([end-2:end]), {'Baseline', 'Con-Opto', 'Incon-Opto'}, 'Location', 'east',...
+                       'NumColumns',1,'FontSize',32);
+                    %}                    
                     upFontSize(32, 0.01)
             
                     
@@ -258,9 +247,12 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                     ax = gca;
                     ylabel('Correct (%)'); set(gca,'ycolor','k') 
                     xlabel('Gabor contrast (%)');
+                    energy=squeeze(bitmapData.energy);
+                    title([datastruct(analysisBlockID(clusterBlocks(block))).date 'R' datastruct(analysisBlockID(clusterBlocks(block))).run ' (' ...
+                        num2str(mean(energy(:,clusterBlocks(block))),2) ' mW mm^{-2})'])
                 end
             elseif cond==4
-                %subplot(1,2,2)
+                subplot(1,2,2)
                 % Plot line fit
                 if plotLine==1
                     plot(mdl.xFitted(cond,:,block), mdl.yFitted(cond,:,block), 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'on'); hold on;
@@ -278,7 +270,7 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                 end
 
                 % Add data points and shaded error bar
-                markerSize = 16;
+                markerSize = 20;
                 patchSaturationVal=1;
                 % Data points
                 shadedErrorBar(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), semY', 'patchSaturation', patchSaturationVal, 'lineprops', ...
@@ -304,7 +296,16 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                 elseif sum(zeroConstrastPoint)==0 && plotAverageFlag==1
                      nTrials=[nBlocks*ones(1,numel(~zeroConstrastPoint))];
                 end
+                upFontSize(32, 0.01);
                 %annotateDataPoints(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), nTrials, markerFaceColor); hold on;
+                xlim([0 50])
+                ylim([-50 50])
+                addSkippedTicks(-40, 40, 10,'y')
+                yline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
+                ylabel('\DeltaCorrect_{con-incon} (%)')
+                legend('Con-Incon', 'Location', 'southeast',...
+                'NumColumns',1,'FontSize',32);
+                axis square
             end
         end
         
@@ -315,7 +316,7 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
 
         % Call the function to create the table
         subplot(1, 2, 1); ax1=gca;
-        createCustomTable2(ax1, modelTypeStr, mdl.headers, mdl.fittedParams(block,:), startPos, xSpacing, ySpacing);
+        %createCustomTable2(ax1, modelTypeStr, mdl.headers, mdl.fittedParams(block,:), startPos, xSpacing, ySpacing);
         
         if plotAverageFlag==1
             [nConditions, ~, nBlocks] = size(behavioralData.gaborContrasts(:, :, clusterBlocks));
@@ -324,22 +325,27 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
         end
         upFontSize(21, .01);
         %Saving
-        %savePDF(savefilename, monkeyName, 1, block, nBlocks)
-        % Png/SVG
-        monkey=datastruct(analysisBlockID(clusterBlocks(block))).monkey;
-        date= datastruct(analysisBlockID(clusterBlocks(block))).date;
-        run=datastruct(analysisBlockID(clusterBlocks(block))).run;
-        if ispc
-          mainPath='Y:/';
-        elseif contains(getenv('HOSTNAME'),'psy.utexas.edu')
-          mainPath='/eslab/data/';
+        if saveFlag
+            savePDF(savefilename, monkeyName, 1, block, nBlocks)
+            % Png/SVG
+            %{
+            monkey=datastruct(analysisBlockID(clusterBlocks(block))).monkey;
+            date= datastruct(analysisBlockID(clusterBlocks(block))).date;
+            run=datastruct(analysisBlockID(clusterBlocks(block))).run;
+            if ispc
+              mainPath='Y:/';
+            elseif contains(getenv('HOSTNAME'),'psy.utexas.edu')
+              mainPath='/eslab/data/';
+            end
+            figPath=[mainPath monkey '\Meta\psychometrics\' datastruct(analysisBlockID(clusterBlocks(block))).chamber '-chamber\' modelTypeStr];
+            figName=['\C' num2str(cluster) 'M' datastruct(analysisBlockID(clusterBlocks(block))).monkeyNo 'D' date 'R' run];
+            set(findall(gcf, '-property', 'FontName'), 'FontName', 'SansSerif');                
+            set(gcf, 'Renderer', 'painters'); % Use painters for vector graphics
+            %print(gcf, [figPath '\png' figName '.png'], '-dpng', '-r600'); % High-res PNG
+            %savefig(gcf, [figPath '\fig' figName '.fig']);           % FIG
+            %print(gcf, [figPath '\svg' figName '.svg'], '-dsvg');        % SVG
+            %}
         end
-        figFilename=[mainPath monkey '\Meta\psychometrics\' datastruct(analysisBlockID(clusterBlocks(block))).chamber '-chamber\' modelTypeStr '\C' num2str(cluster) 'M28D' date 'R' run];
-        set(findall(gcf, '-property', 'FontName'), 'FontName', 'SansSerif');                
-        set(gcf, 'Renderer', 'painters'); % Use painters for vector graphics
-        print(gcf, [figFilename '.png'], '-dpng', '-r600'); % High-res PNG
-        savefig(gcf, [figFilename '.fig']);           % FIG
-        print(gcf, [figFilename '.svg'], '-dsvg');        % SVG
     end
 end
 
@@ -360,7 +366,7 @@ for idx = 1:length(h)
 end
 
 % Extract the elements you want to move
-elementsToMove = h(fliplr(indicesToMove));
+elementsToMove = h(indicesToMove);%fliplr(indicesToMove));
 
 % Remove these elements from the original array
 h(indicesToMove) = [];

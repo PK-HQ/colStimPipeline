@@ -2,7 +2,8 @@ function interactiveFittingGUI()
     %% Parameter bounds and initial guess
     lb = [0,   0,   0,   0,   0.1, 0.5,   1,   0.0,   0 ];
     ub = [1,   1,   1,   1,   300,   4,   600, 1.0, 50];
-    p0 = [0.45, 0.56, 0.04, 0.59,  172, 1.9, 400, 0.39,  18];
+    p0 = [ 0.1321    0.1073    0.0000    0.2658   58.0891    2.6990   99.9944    0.5500   28.5762]%[.43 .56 .33 .27 178.0 2.36 565 .72 30];
+    %[0.45, 0.56, 0.04, 0.59,  172, 1.9, 400, 0.39,  18];
     paramNames = {'a','b','l','w','G0','n','rmx','e','o'};
     
     % Data points (example)
@@ -29,12 +30,16 @@ function interactiveFittingGUI()
     hold(ax, 'on');
     % Colors for data: red, blue, black (matching your compareMdls)
     lineCol = [1 1 1; 0.9759 0.1153 0.1442; 0 0.1176 0.8284];
-    
+    lineCol2 = [0 0 0; 0.9759 0.1153 0.1442; 0 0.1176 0.8284];
+
+    mkr={'o','^','v'};
     % Plot data points for each condition
     for cond = 1:3
         scatter(ax, data.xBlock(cond,:), data.yBlock(cond,:), 200, ...
-            'LineWidth', 2.5, 'Marker', 'o', 'MarkerFaceColor', lineCol(cond,:), ...
+            'LineWidth', 2.5, 'Marker', mkr{cond}, 'MarkerFaceColor', lineCol(cond,:), ...
             'MarkerEdgeColor', 'k');
+        plot(91:100, repmat(mean(data.yBlock(cond,:)),1,10), ...
+            'LineWidth', 2.5,'Color', lineCol2(cond,:)); hold on
     end
     
     % Compute initial curves using columnarBayesMdl with p0
@@ -43,9 +48,9 @@ function interactiveFittingGUI()
     h_con      = plot(ax, x, curves.pc, 'r', 'LineWidth', 2);
     h_incon    = plot(ax, x, curves.pic, 'b', 'LineWidth', 2);
     
-    xlabel(ax, 'Gabor Contrast (%)');
+    xlabel(ax, 'Gabor contrast (%)');
     ylabel(ax, 'Correct (%)');
-    title(ax, 'Interactive Fitting (columnarBayesMdl)');
+    title(ax, 'Interactive Fitting (Bayesian decoder)');
     axis(ax, 'square'); ylim(ax, [0 100]);
     %upFontSize(16,.01)
     %% Create slider panel for bottom row (simulate subplot(4,3,10:12))
@@ -99,5 +104,5 @@ function interactiveFittingGUI()
         set(h_incon, 'YData', newCurves.pic);
         drawnow;
     end
-    %upFontSize(16,.01)
+    upFontSize(16,.01)
 end

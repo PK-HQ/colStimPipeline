@@ -1,26 +1,42 @@
-function estimatedpower=estimatePowerFromLED(currentBlockStruct, plotflag)% given data
-% function to estimate power measurement based on led percent
-% Convert the string dates to datetime objects for comparison
-currentDate = datetime(currentBlockStruct.date, 'InputFormat', 'yyyyMMdd');
-referenceDate = datetime('20230209', 'InputFormat', 'yyyyMMdd');
+function estimatedpower=estimatePowerFromLED(currentBlockStruct, bitmapData, plotflag)% given data
+%% Function to estimate power measurement based on led percent
 
-% Check if currentDate is after referenceDate
-if currentDate > referenceDate
-    % Perform action X if currentDate is after referenceDate
-    chamberid='L';
-    led_percent = [5 10 15 20 25 30 40 50 60 70 75 80 90 100];
-    powers = [25.3 32.7 40.2 47.7 54.8 62.6 77.6 92.2 106.0 120.3 127.0 133.5 146.3 159.0];
-    area = 1080 * 1920 * .0054^2; % x y pixSize
-    powerDensities = powers ./ area;
-    ledpercenttoestimate=30; % 30OD16?
+% Check whether the field `orangeLED` exists in the struct `bitmapData`
+% *and* that it contains a non-empty value.  
+% If both are true, use that value; otherwise, default to 100.
+if isfield(bitmapData, 'orangeLED') && ~isempty(bitmapData.orangeLED)
+    ledpercenttoestimate = bitmapData.orangeLED;
 else
-    % Perform action Y otherwise
-    chamberid='R';
-    led_percent = [5 10 15 20 25 30 40 50 60 70 75 80 90 100];
-    powers = [25.3 32.7 40.2 47.7 54.8 62.6 77.6 92.2 106.0 120.3 127.0 133.5 146.3 159.0];
-    area = 1080 * 1920 * .0054^2; % x y pixSize
-    powerDensities = powers ./ area;
-    ledpercenttoestimate=100; % 100OD10?
+    ledpercenttoestimate = 100;
+end
+
+
+% Get monkey, chamber
+monkeyID=str2double(currentBlockStruct.monkeyNo);
+chamberL=strcmp(currentBlockStruct.chamber,'L');
+
+% All measurements are with 580nm ND0
+switch monkeyID
+    case 28
+        if chamberL
+            % Chip L, 20240625
+            led_percent = [5 10 15 20 25 30 40 50 60 70 75 80 90 100];
+            powers = [25.3 32.7 40.2 47.7 54.8 62.6 77.6 92.2 106.0 120.3 127.0 133.5 146.3 159.0];
+            area = 1080 * 1920 * .0054^2; % x y pixSize
+            powerDensities = powers ./ area;
+        else
+            % Chip R, 20230208
+            led_percent = [5 10 15 20 25 30 40 50 60 70 75 80 90 100];
+            powers = [23.8 30.7 38 44.8 51.6 59 73.2 86.1 99.6 112.5 118 125 137.5 149];
+            area = 1080 * 1920 * .0054^2; % x y pixSize
+            powerDensities = powers ./ area;
+        end
+    case 32
+        % Pepper R, 20251028
+        led_percent = [5 10 15 20 25 30 40 50 60 70 75 80 90 100];
+        powers = [26.5 34.2 41.8 49.4 57.1 65.0 80.1 95.0 110.2 124.8 131.0 138.0 152.0 165.5];
+        area = 1080 * 1920 * .0054^2; % x y pixSize
+        powerDensities = powers ./ area;
 end
 
 % initialize variables for storing the best fit

@@ -1,8 +1,14 @@
 function alignmentTransform = getAlignmentTransform(dataStruct)
     % Let user pick the known (original) BMP file
-    cd('V:\PK\ColSeries\')
+    %cd('V:\PK\ColSeries\')
+    cd('Y:\Pepper\Meta\ColSeries\')
+    %{
     [bmpFile, bmpPath] = uigetfile({'*.bmp', 'BMP Files (*.bmp)'}, ...
         'Select the known/original BMP file');
+    %}
+    bmpFile = 'O00000HE0016G044S00100C01.bmp';
+    bmpPath = 'Y:\Pepper\Meta\ColSeries\20250319\';
+    
     if bmpFile == 0
         error('No BMP file selected');
     end
@@ -10,17 +16,21 @@ function alignmentTransform = getAlignmentTransform(dataStruct)
     
     % Let user pick the empirical (measured) response file
     cd('E:\')
-    [responseFile, responsePath] = uigetfile({'*.bmp', 'BMP Files (*.bmp)'}, ...
+        [responseFile, responsePath] = uigetfile({'*.TIF', 'BMP Files (*.TIF)'}, ...
         'Select the empirical/measured response file');
+    %{
+    [responseFile, responsePath] = uigetfile({'*.tif', 'Tif Files (*.tif)'}, ...
+        'Select the empirical/measured response file');
+        %}
     if responseFile == 0
         error('No response file selected');
     end
     responseOriginal = double(imread(fullfile(responsePath, responseFile)));
-    
+
     % Process response image
-    thresholdBmpEst = 98;
+    thresholdBmpEst = 94;
     responseOriginalHE = adapthisteq(rescale(responseOriginal,0,1), ...
-        'NumTiles', size(responseOriginal)./16, 'Range', 'full');
+        'NumTiles', size(responseOriginal)./8, 'Range', 'full');
     responseOriginalFilt = double(responseOriginalHE >= ...
         prctile(responseOriginalHE(:), thresholdBmpEst));
     figure();imagesc(responseOriginalFilt)
@@ -62,8 +72,8 @@ function alignmentTransform = getAlignmentTransform(dataStruct)
     regParams.PyramidLevels=3;
 
     scale=.67;
-    transX=285;
-    transY=195;
+    transX=285-75;
+    transY=195+37;
     shear=0;
     rotate=0;
     % Create initial transformation with your parameters

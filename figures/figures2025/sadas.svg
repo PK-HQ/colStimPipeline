@@ -1,0 +1,104 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="685.96" height="600.39" viewBox="0 0 685.96 600.39">
+<g transform="translate(-28.99,-20.81)">
+<g id="group1">
+<rect x="40.5" y="31.5" width="150" height="40" fill="#d3d3d3"/>
+<text x="45.63" y="46.8" fill="#000000" font-family="Arial" font-size="12px">Photostimulation</text>
+<text x="47.33" y="58.6" fill="#000000" font-family="Arial" font-size="12px">laser</text>
+<text x="77.93" y="70.4" fill="#000000" font-family="Arial" font-size="12px">λ=1035nm</text>
+<rect x="40.5" y="103.5" width="150" height="40" fill="#d3d3d3"/>
+<text x="45.63" y="118.8" fill="#000000" font-family="Arial" font-size="12px">Imaging laser</text>
+<text x="64.33" y="130.6" fill="#000000" font-family="Arial" font-size="12px">λ=920nm</text>
+<rect x="40.5" y="357.5" width="250" height="70" fill="#ffffff" stroke="#000000" stroke-width="1"/>
+<text x="50.63" y="379.8" fill="#000000" font-family="Arial" font-size="14px">Custom</text>
+<text x="51.53" y="396.6" fill="#000000" font-family="Arial" font-size="14px">Spatial Light</text>
+<text x="53.13" y="413.4" fill="#000000" font-family="Arial" font-size="14px">Modulator</text>
+<text x="85.83" y="430.2" fill="#000000" font-family="Arial" font-size="14px">(SLM1 &amp; 2)</text>
+<rect x="140.5" y="465.5" width="140" height="120" fill="#d3d3d3" stroke="#000000"/>
+<rect x="150.8" y="475.8" width="119.4" height="100.4" fill="#a0d1a0"/>
+<line x1="280.5" y1="485.5" x2="311.2" y2="485.5" stroke="#000000" stroke-width="1"/>
+<text x="316.3" y="488.3" fill="#000000" font-family="Arial" font-size="12px">30.7mm</text>
+<line x1="279.5" y1="535.7" x2="279.5" y2="515" stroke="#000000" stroke-width="1"/>
+<line x1="279.5" y1="535.7" x2="310.2" y2="535.7" stroke="#000000" stroke-width="1"/>
+<text x="315.3" y="538.5" fill="#000000" font-family="Arial" font-size="12px">1536 pixels</text>
+<text x="175.5" y="530.2" fill="#000000" font-family="Arial" font-size="12px">Active</text>
+<text x="180.5" y="542" fill="#000000" font-family="Arial" font-size="12px">area</text>
+<line x1="215.5" y1="475.5" x2="215.5" y2="455" stroke="#000000" stroke-width="1"/>
+<line x1="215.5" y1="455" x2="184.8" y2="455" stroke="#000000" stroke-width="1"/>
+<text x="110.3" y="87.7" fill="#000000" font-family="Arial" font-size="12px">OS</text>
+<polygon points="206.5,49.5 246.5,49.5 236.5,69.5 196.5,69.5" fill="#d3d3d3"/>
+<text x="212.3" y="63.7" fill="#000000" font-family="Arial" font-size="12px">BE2</text>
+<polygon points="206.5,80.5 246.5,80.5 236.5,100.5 196.5,100.5" fill="#d3d3d3"/>
+<text x="212.3" y="94.7" fill="#000000" font-family="Arial" font-size="12px">BE1</text>
+<polygon points="301.5,70.5 341.5,70.5 331.5,90.5 291.5,90.5" fill="#a020f0"/>
+<text x="307.6" y="84.7" fill="#ffffff" font-family="Arial" font-size="12px">SLM1</text>
+<polygon points="365.5,40.5 405.5,40.5 395.5,60.5 355.5,60.5" fill="#a020f0"/>
+<text x="371.7" y="54.7" fill="#ffffff" font-family="Arial" font-size="12px">TP1</text>
+<rect x="250.5" y="70.5" width="40" height="20" fill="#ffdab9"/>
+<text x="256.7" y="84.7" fill="#000000" font-family="Arial" font-size="12px">HWP</text>
+<rect x="345.5" y="70.5" width="40" height="20" fill="#ffdab9"/>
+<text x="351.7" y="84.7" fill="#000000" font-family="Arial" font-size="12px">HWP</text>
+<polygon points="206.5,152.5 246.5,152.5 236.5,172.5 196.5,172.5" fill="#a020f0"/>
+<text x="212.6" y="166.7" fill="#ffffff" font-family="Arial" font-size="12px">SLM2</text>
+<polygon points="258.5,142.5 298.5,142.5 288.5,162.5 248.5,162.5" fill="#a020f0"/>
+<text x="264.7" y="156.7" fill="#ffffff" font-family="Arial" font-size="12px">TP2</text>
+<polygon points="301.5,132.5 341.5,132.5 331.5,152.5 291.5,152.5" fill="#4682b4"/>
+<text x="307.9" y="146.7" fill="#ffffff" font-family="Arial" font-size="12px">PBS</text>
+<rect x="206.5" y="132.5" width="40" height="20" fill="#d3d3d3"/>
+<text x="213.7" y="146.7" fill="#000000" font-family="Arial" font-size="12px">PC</text>
+<polygon points="385.5,122.5 425.5,122.5 415.5,142.5 375.5,142.5" fill="#a020f0"/>
+<text x="391.7" y="136.7" fill="#ffffff" font-family="Arial" font-size="12px">RL1</text>
+<polygon points="455.5,122.5 495.5,122.5 485.5,142.5 445.5,142.5" fill="#d3d3d3"/>
+<text x="461.7" y="136.7" fill="#000000" font-family="Arial" font-size="12px">BB</text>
+<polygon points="515.5,122.5 555.5,122.5 545.5,142.5 505.5,142.5" fill="#a020f0"/>
+<text x="521.7" y="136.7" fill="#ffffff" font-family="Arial" font-size="12px">RL2</text>
+<polygon points="585.5,122.5 625.5,122.5 615.5,142.5 575.5,142.5" fill="#d3d3d3"/>
+<text x="591.7" y="136.7" fill="#000000" font-family="Arial" font-size="12px">DC</text>
+<polygon points="585.5,172.5 625.5,172.5 615.5,192.5 575.5,192.5" fill="#d3d3d3"/>
+<text x="591.7" y="186.7" fill="#000000" font-family="Arial" font-size="12px">SL</text>
+<rect x="570.5" y="195.5" width="130" height="25" fill="#ffffff" stroke="#000000"/>
+<text x="576.3" y="212.7" fill="#000000" font-family="Arial" font-size="12px">Optogenetics</text>
+<text x="595.3" y="224.7" fill="#000000" font-family="Arial" font-size="12px">Galvo Set</text>
+<polygon points="585.5,230.5 625.5,230.5 615.5,250.5 575.5,250.5" fill="#a020f0"/>
+<text x="591.7" y="244.7" fill="#ffffff" font-family="Arial" font-size="12px">Imaging</text>
+<text x="593.6" y="256.7" fill="#ffffff" font-family="Arial" font-size="12px">Resonant GS</text>
+<rect x="480.5" y="270.5" width="170" height="100" fill="#ffffff" stroke="#000000" stroke-dasharray="5,5"/>
+<text x="510.3" y="292.7" fill="#000000" font-family="Arial" font-size="12px">Light</text>
+<text x="505.3" y="304.7" fill="#000000" font-family="Arial" font-size="12px">Collection</text>
+<text x="525.3" y="316.7" fill="#000000" font-family="Arial" font-size="12px">Optics</text>
+<polygon points="585.5,330.5 625.5,330.5 615.5,350.5 575.5,350.5" fill="#a020f0"/>
+<text x="591.7" y="344.7" fill="#ffffff" font-family="Arial" font-size="12px">PMT1</text>
+<polygon points="485.5,330.5 525.5,330.5 515.5,350.5 475.5,350.5" fill="#000000"/>
+<polygon points="535.5,360.5 575.5,360.5 565.5,380.5 525.5,380.5" fill="#a020f0"/>
+<text x="541.7" y="374.7" fill="#ffffff" font-family="Arial" font-size="12px">PMT2</text>
+<polygon points="585.5,390.5 625.5,390.5 615.5,410.5 575.5,410.5" fill="#a020f0"/>
+<text x="591.7" y="404.7" fill="#ffffff" font-family="Arial" font-size="12px">TL</text>
+<polygon points="585.5,420.5 625.5,420.5 615.5,440.5 575.5,440.5" fill="#a020f0"/>
+<text x="591.7" y="434.7" fill="#ffffff" font-family="Arial" font-size="12px">FLTR_EM</text>
+<polygon points="585.5,450.5 625.5,450.5 615.5,470.5 575.5,470.5" fill="#a020f0"/>
+<text x="591.7" y="464.7" fill="#ffffff" font-family="Arial" font-size="12px">PIEZO</text>
+<polygon points="585.5,480.5 625.5,480.5 615.5,500.5 575.5,500.5" fill="#a020f0"/>
+<text x="591.7" y="494.7" fill="#ffffff" font-family="Arial" font-size="12px">OBJ</text>
+<ellipse cx="600.5" cy="540.5" rx="50" ry="20" fill="#dda0dd"/>
+<path d="M 110.5,70.5 L 196.5,70.5" stroke="#8b0000" stroke-width="2"/>
+<path d="M 246.5,70.5 L 291.5,70.5" stroke="#8b0000" stroke-width="2"/>
+<path d="M 341.5,70.5 L 355.5,70.5" stroke="#8b0000" stroke-width="2"/>
+<path d="M 405.5,50.5 L 505.5,132.5" stroke="#8b0000" stroke-width="2"/>
+<path d="M 331.5,80.5 L 345.5,80.5" stroke="#8b0000" stroke-width="2"/>
+<path d="M 385.5,50.5 L 341.5,80.5" stroke="#8b0000" stroke-width="2"/>
+<path d="M 110.5,132.5 L 196.5,162.5" stroke="#008000" stroke-width="2"/>
+<path d="M 246.5,152.5 L 248.5,152.5" stroke="#008000" stroke-width="2"/>
+<path d="M 298.5,152.5 L 291.5,142.5" stroke="#008000" stroke-width="2"/>
+<path d="M 341.5,142.5 L 375.5,132.5" stroke="#008000" stroke-width="2"/>
+<path d="M 425.5,132.5 L 445.5,132.5" stroke="#008000" stroke-width="2"/>
+<path d="M 495.5,132.5 L 505.5,132.5" stroke="#008000" stroke-width="2"/>
+<path d="M 555.5,132.5 L 575.5,132.5" stroke="#008000" stroke-width="2"/>
+<path d="M 625.5,132.5 L 615.5,172.5" stroke="#008000" stroke-width="2"/>
+<path d="M 615.5,192.5 L 615.5,230.5" stroke="#008000" stroke-width="2"/>
+<path d="M 615.5,250.5 L 615.5,330.5" stroke="#008000" stroke-width="2"/>
+<path d="M 615.5,350.5 L 615.5,390.5" stroke="#008000" stroke-width="2"/>
+<path d="M 615.5,410.5 L 615.5,450.5" stroke="#008000" stroke-width="2"/>
+<path d="M 615.5,470.5 L 615.5,490.5" stroke="#008000" stroke-width="2"/>
+</g>
+<text x="35.5" y="37.8" fill="#000000" font-family="Arial" font-size="16px" font-weight="bold">A</text>
+</g>
+</svg>

@@ -1,4 +1,4 @@
-function [behavioralData,imagingData,successFlag] = loadBehavImagingData(currentEntry, referenceEntry, alignmentEntry, behavioralData, imagingData, blockID, pipelineMode)
+function [behavioralData,imagingData,successFlag] = loadBehavImagingData(currentEntry, referenceEntry, alignmentEntry, behavioralData, imagingData, blockID, pipelineMode, skipImaging)
 
 successFlag = true;
 
@@ -113,56 +113,65 @@ switch pipelineMode
         end
 
         % refmap FOV to current FOV
-        load(currentEntry.transformParams, 'transformParams');
-        imagingData.transformRef2Block(blockID)=transformParams;
-
-        if ~isempty(currentEntry.Intg)
-            load(currentEntry.Intg, 'DataTrial');      
-            if isempty(DataTrial)
-                DataTrial=[];
-                imagingData.optoIntg(:,:,:,blockID)= DataTrial;
-            else
-                disp(['IntgOpto file loaded:' currentEntry.Intg])
-                imagingData.optoIntg(:,:,:,blockID)= DataTrial;
-            end
+        if isfile(currentEntry.transformParams)
+            load(currentEntry.transformParams, 'transformParams');
         else
-            disp(['=== IntgOpto missing'])
+            transformParams=[];
         end
+        %imagingData.transformRef2Block(blockID)=transformParams;
 
-        if ~isempty(currentEntry.baselineIntg)
-            load(currentEntry.baselineIntg, 'DataTrial');
-            if isempty(DataTrial)
-                DataTrial=[];
-                imagingData.baselineIntg(:,:,:,blockID)= DataTrial;
-            else
-                disp(['IntgBL file loaded:' currentEntry.baselineIntg])
-                imagingData.baselineIntg(:,:,:,blockID)= DataTrial;
-              %% Check if opto intg loaded 
-                if size(imagingData.optoIntg,3)>=blockID
-                    if isempty(imagingData.optoIntg(:,:,:,blockID))
-                        disp(['Check INTG: Block ' num2str(blockID)])
+            switch skipImaging
+                case 0
+                    if ~isempty(currentEntry.Intg)
+                        load(currentEntry.Intg, 'DataTrial');      
+                        if isempty(DataTrial)
+                            DataTrial=[];
+                            imagingData.optoIntg(:,:,:,blockID)= DataTrial;
+                        else
+                            disp(['IntgOpto file loaded:' currentEntry.Intg])
+                            imagingData.optoIntg(:,:,:,blockID)= padArray(DataTrial, 400, 3, NaN);
+                        end
+                    else
+                        disp(['=== IntgOpto missing'])
                     end
-                elseif size(imagingData.optoIntg,3)<blockID
-                    disp(['Check INTG: Block ' num2str(blockID)])
-                end
+            
+                    if ~isempty(currentEntry.baselineIntg)
+                        load(currentEntry.baselineIntg, 'DataTrial');
+                        if isempty(DataTrial)
+                            DataTrial=[];
+                            imagingData.baselineIntg(:,:,:,blockID)= DataTrial;
+                        else
+                            disp(['IntgBL file loaded:' currentEntry.baselineIntg])
+                            imagingData.baselineIntg(:,:,:,blockID)= padArray(DataTrial, 130, 3, NaN);
+                          %% Check if opto intg loaded 
+                            if size(imagingData.optoIntg,3)>=blockID
+                                if isempty(imagingData.optoIntg(:,:,:,blockID))
+                                    disp(['Check INTG: Block ' num2str(blockID)])
+                                end
+                            elseif size(imagingData.optoIntg,3)<blockID
+                                disp(['Check INTG: Block ' num2str(blockID)])
+                            end
+                        end
+                    else
+                        disp(['=== IntgBL missing'])
+                    end
+                case 1
+                    
             end
-        else
-            disp(['=== IntgBL missing'])
-        end
 
         % Compile into struct
         validRefConds=behavioralData.referenceTS(blockID).Header.Conditions.TypeCond(behavioralData.referenceTS(blockID).Header.Conditions.TypeCond>0);
         validRefConds=validRefConds==2;
 
         % Ort map
-        imagingData.ortpca(:,:,:,blockID)=RespCondPCA(:,:,validRefConds);
-        imagingData.orts(:,:,blockID)=unique(Ort);
+        imagingData.ortpca(:,:,:,blockID)=padArray(RespCondPCA(:,:,validRefConds), 12, 3, NaN);
+        imagingData.orts(:,:,blockID)=padArray(unique(Ort), 12, 2, NaN);
         imagingData.mask(:,:,blockID)=double(Mask);
         imagingData.nanmask(:,:,blockID)=imagingData.mask(:,:,blockID); 
         imagingData.nanmask(imagingData.nanmask==0)=NaN;
         imagingData.ortampmap(:,:,:,blockID)=imagingData.mask(:,:,blockID).*MapAmpOrt;
         imagingData.npca(1,blockID)=nPCAComp;
-        imagingData.pcaexpl(:,blockID)=PCAExpl(1:12);
+        imagingData.pcaexpl(:,blockID)=padArray(PCAExpl, 12, 1, NaN);
 
         % Gaussian fitting
         imagingData.gaussresp(1:128,1:128,1:3,blockID)=padArray(FFTCond, 3, 3, NaN);

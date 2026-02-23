@@ -1,4 +1,4 @@
-function [movingImgMaskCoregistered,coregStats,transformParams,ImgReference,ImgTarget]=coregisterGreenImages(...
+function [movingImgMaskCoregistered,ssimPost,transformParams,ImgReference,ImgTarget]=coregisterGreenImages(...
   currentBlockStruct,referenceBlockStruct,Mask, analysisMode)
 %% [README] Loads green images of reference and current session, and 
 %%% coregister with auto (same session) or manual mode (diff session or override)
@@ -75,10 +75,11 @@ switch method
     case {'auto'}
         switch autoStages
             case {2}
-                if isfile(currentBlockStruct.transformParams) && strcmp(analysisMode, 'summary')
+                if isfile(currentBlockStruct.transformParams) 
                     titleStr='Superimposed (similarity + affine)';
                     % load transformaiton file if exist
                     load(currentBlockStruct.transformParams);
+                    disp('Loaded transformParams')
                 else 
                     titleStr='Superimposed (similarity + affine)';
 
@@ -90,15 +91,29 @@ switch method
 
                     % Stage 1 = fast rigid (rotate translate)
                     %optimizer.MaximumIterations = 1000;
+                    %{
+                    scale=1;
+                    transX=100;
+                    transY=20;
+                    shear=0;
+                    rotate=0;
+                    % Create initial transformation with your parameters
+                    transformInit = affine2d([
+                        scale   shear         0;    % Scale & rotation
+                        rotate    scale         0;    % Scale & rotation
+                        transX  transY    1.0000   % Translation
+                    ]);
+                    %}
                     optimizer.InitialRadius = 6.25*10^-4;
                     optimizer.GrowthFactor = 1.05;
                     transformType='rigid';
                     transformCoarse = imregtform(movingImgMask,ImgTarget,transformType,optimizer,metric,'DisplayOptimization',false,...
-                    'PyramidLevels',regParams.PyramidLevels);
+                    'PyramidLevels',regParams.PyramidLevels);%, 'InitialTransformation',transformInit);
                     movingImgMaskCoarse = imwarp(movingImgMask,transformCoarse,'OutputView',imref2d(size(ImgTarget)));
-
+                    
+                    
                     % Stage 2 = slow affine (rotate translate scale skew)
-                    optimizer.MaximumIterations = 2000;
+                    %optimizer.MaximumIterations = 2000;
                     regParams.PyramidLevels=3;       
                     optimizer.InitialRadius = 6.25*10^-5;
                     optimizer.GrowthFactor = 1.01;       
@@ -109,6 +124,7 @@ switch method
                      save(currentBlockStruct.transformParams,'transformParams')
                      upFontSize(14,.015)
                     1;
+                    disp('Ran transformParams')
                 end
             case {1}
                 titleStr='Superimposed (affine)';
@@ -139,13 +155,18 @@ axes(hA(4))
 imagesc(imfuse(ImgTarget,movingImgMaskCoregistered,'ColorChannels','red-cyan')); axis square; title(titleStr); upFontSize(14,.015)
 
 %calc correlation, translate, rotate, scale
+ssimPre = registrationQuality(ImgTarget, movingImg);
+ssimPost = registrationQuality(ImgTarget, movingImgMaskCoregistered);
+title(['SSIM: ' num2str(ssimPost,2) '(?: ' num2str(ssimPost-ssimPre,2) ')'])
+%{
 transformCorrPrecoreg = corrcoef(double(ImgTarget),double(movingImg));
 transformCorrPrecoregMasked = corrcoef(ImgTarget,movingImgMask);
 transformCorrPostCoreg = corrcoef(ImgTarget,movingImgMaskCoregistered);
 coregStats.SimilarityPrecoreg = transformCorrPrecoreg(1,2);
 coregStats.SimilarityPrecoregMasked = transformCorrPrecoregMasked(1,2);
-
 coregStats.Similarity = transformCorrPostCoreg(1,2);
+%}
+
 %coregStats.Translate = transformParams.T(3,[1,2]);
 %coregStats.Rotation = atan2(transformParams.T(2,1),transformParams.T(1,1))*180/pi;
 %coregStats.Scale = abs(transformParams.T(2,1)+1i*transformParams.T(1,1));

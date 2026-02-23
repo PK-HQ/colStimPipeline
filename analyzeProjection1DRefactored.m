@@ -1,12 +1,13 @@
-function neuroStruct=analyzeProjection1D(mainPath, datastruct, behavioralData, imagingData, bitmapData, analysisBlockID, trialOutcomeType, ...
+function neuroStruct=analyzeProjection1DRefactored(mainPath, datastruct, behavioralData, imagingData, bitmapData, analysisBlockID, trialOutcomeType, ...
     hAx, hAxPanel, optostimAreaFlag, clusterIdx, filterColumns,optostimMaskType, saveFlag)
 % EXEMPLAR: #81: cluster=4 block=5
 
 % Colors
-colorCon = [0, 225, 80] / 255;colorIncon = [156, 14, 254] / 255;
 errorIntgBlocks={};
 nClusters=numel(unique(clusterIdx));
-for cluster=3%
+colorCon = [0, 225, 80] / 255;colorIncon = [156, 14, 254] / 255;
+
+for cluster=1
     clusterBlocksAll=find(clusterIdx==cluster);
 
     % filter for n columns or not
@@ -22,7 +23,7 @@ for cluster=3%
     neuroStruct.(['C' num2str(cluster)]).analyzeBlockIDs=clusterBlocks;
     %Skip to next cluster if none match
     if ~isempty(clusterBlocks)
-        for blockNo=19%14%1:numel(clusterBlocks)%[3 5 10 11 14]
+        for blockNo=1:numel(clusterBlocks)%[3 5 10 11 14]
             tic
             blockID=clusterBlocks(blockNo);
             imagingData.optoIntg=[];
@@ -32,7 +33,7 @@ for cluster=3%
              [currentBlockStruct,~,...
                 behavioralData, imagingData, ~, ~]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID, '');
 
-                filenameStructCurrent=generateFilenames(currentBlockStruct);
+            filenameStructCurrent=generateFilenames(currentBlockStruct);
 
             monkey=datastruct(analysisBlockID(blockID)).monkey;
             date=datastruct(analysisBlockID(blockID)).date;
@@ -57,6 +58,7 @@ for cluster=3%
             % Define gaussianMask
             gaussMask=imagingData.gaussfit(:,:,blockID); %rename
             % Option for bandpass spatial filtering for columns
+            imagesc(rescale(mean(pcaData,3),0,1).*snrMask); axis square; colormap('inferno');colorbar
             images=columnarFilter(behavioralData.optoTS(blockID),images,trialOutcomeType);
 
            %% Coregister all images to block responses
@@ -376,24 +378,33 @@ function plotNeurometricData(bitmapData, imagingData, cluster, blockNo, columnar
             axes(hAx(plotID))
             mapName = '{Reference map}';
             similarityValues=amplitude;
-            yLabelStr = 'Similarity (%)';
+            yLabelStr = 'Similarity to visual evoked (%)';
             % Plot axis limits
             yLimit = [-100 100];
             yTicks = -100:25:100;
             xLimit = [-100 100];
             xTicks = -100:12.5:100;
             modifier=[-1;1];
+            colorCon=[0, 225, 80] / 255; colorIncon = [156, 14, 254] / 255;
+
         elseif plotID == 2
             % Assumes opto dominant
             axes(hAx(plotID))
-            mapName = '{Iso-tuned columns wrt. opto}';
-            yLabelStr = '';
+            mapName = '{Visual + con-opto}';
+            yLabelStr = 'Mean proj. activity in columns';
 
             % Recruitment            
+            %{ 
+            sorted to have con-incon
             similarityValues=[amplitudeColumn(1,condIDs.V0),amplitudeColumn(2,condIDs.V90),...
                 amplitudeColumn(1,condIDs.V0O0),amplitudeColumn(2,condIDs.V0O90),...
                 amplitudeColumn(1,condIDs.V90O0),amplitudeColumn(2,condIDs.V90O90)];
-            
+            %}
+
+            similarityValues=[amplitudeColumn(1,condIDs.V0),amplitudeColumn(2,condIDs.V90),...
+                amplitudeColumn(1,condIDs.V0O0),amplitudeColumn(2,condIDs.V0O0),...
+                amplitudeColumn(1,condIDs.V90O90),amplitudeColumn(2,condIDs.V90O90)];
+
             % Generate sorting indices based on condIDs fields
             sortedIndices = [condIDs.V0, condIDs.V90, condIDs.V0O0, condIDs.V0O90, condIDs.V90O0, condIDs.V90O90];
             % Sort similarityValues to preserve the order in amplitude/images
@@ -406,17 +417,24 @@ function plotNeurometricData(bitmapData, imagingData, cluster, blockNo, columnar
             xLimit = [0 100];
             xTicks = 0:12.5:100;
             modifier=[-1;1];
+            colorCon=[169, 254, 0]/255; colorIncon=[169, 254, 0]/255;
         elseif plotID == 3
             % Assumes opto dominant
             axes(hAx(plotID))
-            mapName = '{Ortho-tuned columns wrt. opto}';
+            mapName = '{Visual + incon-opto}';
             yLabelStr = '';
 
             % Suppression
+            %{
+            sorted to have con-incon
             similarityValues=[amplitudeColumn(2,condIDs.V0),amplitudeColumn(1,condIDs.V90),...
                 amplitudeColumn(2,condIDs.V0O0),amplitudeColumn(1,condIDs.V0O90),...
                 amplitudeColumn(2,condIDs.V90O0),amplitudeColumn(1,condIDs.V90O90)];
-           
+            %}
+            similarityValues=[amplitudeColumn(1,condIDs.V0),amplitudeColumn(2,condIDs.V90),...
+                amplitudeColumn(1,condIDs.V0O90),amplitudeColumn(2,condIDs.V0O90),...
+                amplitudeColumn(1,condIDs.V90O0),amplitudeColumn(2,condIDs.V90O0)];
+
             % Generate sorting indices based on condIDs fields
             sortedIndices = [condIDs.V0, condIDs.V90, condIDs.V0O0, condIDs.V0O90, condIDs.V90O0, condIDs.V90O90];
             % Sort similarityValues to preserve the order in amplitude/images
@@ -428,6 +446,7 @@ function plotNeurometricData(bitmapData, imagingData, cluster, blockNo, columnar
             xLimit = [0 100];
             xTicks = 0:12.5:100;
             modifier=[-1;1];
+            colorCon=[253,31,203]/255; colorIncon=[253,31,203]/255;
         end
 
         % Store y-values for x=0 by marker type
@@ -473,11 +492,21 @@ function plotNeurometricData(bitmapData, imagingData, cluster, blockNo, columnar
                     if plotType == 1
                         conds = [condIDs.V0O0; condIDs.V90O0];
                         condMarker = 'v';
-                        colorRow = [156, 14, 254] / 255;
+                        colorRow = colorIncon;
                     elseif plotType == 2
-                        conds = [condIDs.V0O0; condIDs.V90O90];
-                        condMarker = '^';
-                        colorRow = [0, 225, 80] / 255;
+                        if plotID==1
+                            conds = [condIDs.V0O0; condIDs.V90O90];
+                            condMarker = '^';
+                            colorRow = colorCon;
+                        elseif plotID==2
+                            conds = [condIDs.V0O0; condIDs.V90O90];
+                            condMarker = '^';
+                            colorRow = colorCon;
+                        elseif plotID==3
+                            conds = [condIDs.V0O0; condIDs.V90O90];
+                            condMarker = '^';
+                            colorRow = colorCon;
+                        end
                     end
                     condMarkerColor = colorRow;
                     condLineColor = colorRow;
@@ -513,11 +542,21 @@ function plotNeurometricData(bitmapData, imagingData, cluster, blockNo, columnar
                     if plotType == 1
                         conds = [condIDs.V0O90; condIDs.V90O90];
                         condMarker = '^';
-                        colorRow = [0, 225, 80] / 255;
+                        colorRow = colorCon;
                     elseif plotType == 2
-                        conds = [condIDs.V0O90; condIDs.V90O0];
-                        condMarker = 'v';
-                        colorRow = [156, 14, 254] / 255;
+                        if plotID==1
+                            conds = [condIDs.V0O90; condIDs.V90O0];
+                            condMarker = 'v';
+                            colorRow = colorIncon;
+                        elseif plotID==2
+                            conds = [condIDs.V0O90; condIDs.V90O0];
+                            condMarker = 'v';
+                            colorRow = colorIncon;
+                        elseif plotID==3
+                            conds = [condIDs.V0O90; condIDs.V90O0];
+                            condMarker = 'v';
+                            colorRow = colorIncon;
+                        end
                     end
 
                     condMarkerColor = colorRow;
@@ -634,6 +673,8 @@ function plotNeurometricData(bitmapData, imagingData, cluster, blockNo, columnar
         end
         if plotID==1
             legend('location','southeast')
+        elseif plotID>1
+            legend({'','Iso-tuned', 'Ortho-tuned'}, 'Location', 'southeast')'
         end
 
         %% Add inset of subtracted image
@@ -642,7 +683,7 @@ function plotNeurometricData(bitmapData, imagingData, cluster, blockNo, columnar
         if plotType == 2 && plotID==1
             gcf;
             if plotID == 1
-                axInset = axes('Position', [.1 + .043 .257 .18 .18]);
+                axInset = axes('Position', [.22 .52 .18 .18]);
             elseif plotID == 2
                 axInset = axes('Position', [.35 + .043 .257 .18 .18]);
             end
@@ -892,7 +933,7 @@ function plotNeurometricDataSlice(imagingData, bitmapData, cluster, blockNo, blo
         % Combine data
         conData=[dataO0C0; dataO0C90];
         conLabel=[ones(size(dataO0C0));2*ones(size(dataO0C90))];
-        colors = [[0, 225, 80] / 255; [156, 14, 254] / 255];  % Green con, Purple incon\
+        colors = [colorCon; colorIncon];  % Green con, Purple incon\
         plot(conData)
         %{
         h = daboxplot(conData, 'groups', conLabel, 'colors', colors, ...
@@ -905,7 +946,7 @@ function plotNeurometricDataSlice(imagingData, bitmapData, cluster, blockNo, blo
         % Combine data
         inconData=[dataO90C0; dataO90C90];
         inconLabel=[ones(size(dataO90C0));2*ones(size(dataO90C90))];
-        colors = [[156, 14, 254] / 255; [0, 225, 80] / 255];  % Green con, Purple incon
+        colors = [colorIncon; colorCon];  % Green con, Purple incon
         h = daboxplot(inconData, 'groups', inconLabel, 'colors', colors, ...
             'mean' ,1, 'outliers', 0, 'whiskers', 1,'scatter',0, 'jitter',0, 'xtlabels', {'0-col','90-col'});
         title('Distributions (Opto 90)','FontWeight','normal')

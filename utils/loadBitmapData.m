@@ -16,7 +16,12 @@ function bitmapData = loadBitmapData(datastruct, currentBlockStruct, currentBloc
             bitmapData.adaptthresh(blockID)=datastruct(currentBlockID).adaptthresh;
     end
 
-    bitmapData.orts(1,:,blockID) = [0 90];
+    hasOrts = isfield(datastruct(currentBlockID), 'orts');
+    if hasOrts && ~isempty(datastruct(currentBlockID).orts)
+        bitmapData.orts(1,:,blockID) = datastruct(currentBlockID).orts;
+    else
+        bitmapData.orts(1,:,blockID) = [0 90];
+    end
     if ~isempty(datastruct(currentBlockID).gaussianContourLevel) && numel(datastruct(currentBlockID).gaussianContourLevel)<2
         bitmapData.gaussianContourLevel(:,:,blockID)=repmat(datastruct(currentBlockID).gaussianContourLevel,1,2);
     elseif isempty(datastruct(currentBlockID).gaussianContourLevel)
@@ -45,7 +50,8 @@ function bitmapData = loadBitmapData(datastruct, currentBlockStruct, currentBloc
     bitmapData.pixelsizemm=.0054;
     bitmapData.ProjTTLPulseOn(blockID)=datastruct(currentBlockID).powercycle*50;
     bitmapData.ProjTTLPulseOff(blockID)=50-(datastruct(currentBlockID).powercycle*50);
-
+    [bitmapData.blueLED, bitmapData.blueND] = parseLEDstring(datastruct(currentBlockID).blueLED);
+    [bitmapData.orangeLED, bitmapData.orangeND] = parseLEDstring(datastruct(currentBlockID).orangeLED);
     
     % copy original bitmaps to run folder
     cloneLoadFlag='load';

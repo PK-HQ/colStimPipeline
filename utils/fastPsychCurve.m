@@ -1,4 +1,4 @@
-load('Y:\Pepper\Pepper20250403\M32D20250403R3TS.mat')
+load('Y:\Pepper\Pepper20250820\M32D20250820R3TS.mat')
 optoFlag=TS.Header.Conditions.TypeCond==3;
 visualOrt=(TS.Header.Conditions.GaborOrt(optoFlag) == 90) * 1 + (TS.Header.Conditions.GaborOrt(optoFlag) == 0) * -1;
 x=TS.Header.Conditions.StimCon(optoFlag).*visualOrt; %contrasts
@@ -9,7 +9,7 @@ x(zeroConds(1))=mean(x(zeroConds)); x(zeroConds(2))=[];
 
 figure
 scatter(x(x>=0),y(x>=0),200,'ko', 'LineWidth',2, 'markerfacecolor','r'); hold on
-scatter(-x(x<=0),y(x<=0)-1,200,'ko', 'LineWidth',2, 'markerfacecolor','b'); hold on
+scatter(x(x<=0),100-y(x<=0)-1,200,'ko', 'LineWidth',2, 'markerfacecolor','b'); hold on
 xlim([0 50])
 ylim([0 100])
 
@@ -18,6 +18,6 @@ axis square
 addSkippedTicks(0, 50, 12.5,'x')
 addSkippedTicks(0, 100, 12.5,'y')
 upFontSize
-title('Pepper 20250403R3', 'FontWeight','Normal')
+title('Pepper20250820', 'FontWeight','Normal')
 ylabel('% Vertical')
 xlabel('% Correct')

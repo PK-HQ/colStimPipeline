@@ -1,5 +1,5 @@
 function [currentBlockStruct,referenceBlockStruct,...
-    behavioralData, imagingData, bitmapData, successFlag]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID, pipelineMode)    
+    behavioralData, imagingData, bitmapData, successFlag]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID, pipelineMode, skipImaging)    
     disp('Loading behavioral, imaging and bitmap data...')
     %% Define filenames
     % Grab entries for blocks used
@@ -14,7 +14,7 @@ function [currentBlockStruct,referenceBlockStruct,...
     %% Load behavioral, imaging and bitmap data
     % Load behav and imaging data
     [behavioralData, imagingData,successFlag]=loadBehavImagingData(currentBlockStruct, referenceBlockStruct, ...
-        alignmentBlockPath, behavioralData, imagingData, blockID, pipelineMode);
+        alignmentBlockPath, behavioralData, imagingData, blockID, pipelineMode, skipImaging);
     
     % Load bitmap params
     bitmapData = loadBitmapData(datastruct, currentBlockStruct, currentEntryID, bitmapData, blockID);

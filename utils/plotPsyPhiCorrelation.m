@@ -9,17 +9,17 @@ function plotPsyPhiCorrelation(datastruct, mainPath,chambers, chamberIDs, filter
     %   neuroStruct: Neuro data structure containing phi data
     for chamberID = chamberIDs % Change this to loop over chambers if needed
         chamberWanted = chambers{chamberID};
-        
+        monkeyName=datastruct(1).monkey;
         loadFlag=exist('dataTag');
         if ~loadFlag
-            load([mainPath 'Chip/Meta/summary/statistics' chamberWanted '.mat'], 'bitmapData');
-            load([mainPath 'Chip/Meta/psychometrics/' chamberWanted '-chamber/weibullfreeAll/mdlStruct' chamberWanted '.mat'], 'mdlStruct');
-            load([mainPath 'Chip/Meta/neurometric/neuroStruct' chamberWanted '.mat'], 'neuroStruct');
+            load([mainPath monkeyName '/Meta/summary/statistics' chamberWanted '.mat'], 'bitmapData');
+            load([mainPath monkeyName '/Meta/psychometrics/' chamberWanted '-chamber/weibullfreeAll/mdlStruct' chamberWanted '.mat'], 'mdlStruct');
+            %load([mainPath monkeyName '/Meta/neurometric/neuroStruct' chamberWanted '.mat'], 'neuroStruct');
         elseif loadFlag
             if ~strcmp(dataTag,chamberWanted)
-                load([mainPath 'Chip/Meta/summary/statistics' chamberWanted '.mat'], 'bitmapData');
-                load([mainPath 'Chip/Meta/psychometrics/' chamberWanted '-chamber/weibullfreeAll/mdlStruct' chamberWanted '.mat'], 'mdlStruct');
-                load([mainPath 'Chip/Meta/neurometric/neuroStruct' chamberWanted '.mat'], 'neuroStruct');
+                load([mainPath monkeyName '/Meta/summary/statistics' chamberWanted '.mat'], 'bitmapData');
+                load([mainPath monkeyName '/Meta/psychometrics/' chamberWanted '-chamber/weibullfreeAll/mdlStruct' chamberWanted '.mat'], 'mdlStruct');
+                %load([mainPath monkeyName '/Meta/neurometric/neuroStruct' chamberWanted '.mat'], 'neuroStruct');
             end
         end
         
@@ -280,6 +280,10 @@ function plotPsyPhiCorrelation(datastruct, mainPath,chambers, chamberIDs, filter
     % Psy vs Phi
     fprintf('=============== %s ===============\n','Phi')
     figure('Name', 'Phi x Psy');
+    dataPhiCon=data.(chamberWanted).phi(:,1);
+    dataPsyCon=data.(chamberWanted).psy(:,1);
+    dataPhiIncon=data.(chamberWanted).phi(:,2);
+    dataPsyIncon=data.(chamberWanted).psy(:,2);
     scatter(dataPhiCon, dataPsyCon, 250, 'ksq', 'LineWidth', 2.5, 'markerFaceColor', [0.9294, 0.1098, 0.1373] * 1.05,'markerFaceAlpha',.7); hold on;
     scatter(dataPhiIncon, dataPsyIncon, 250, 'ksq', 'LineWidth', 2.5, 'markerFaceColor',[0, 0.0941, 0.6627] * 1.25,'markerFaceAlpha',.7); hold on;
     xlabel('Norm. mean projection (a.u.)');

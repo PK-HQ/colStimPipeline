@@ -1,4 +1,10 @@
 function [bins, binEdges, clusterIdx, validIndices] = clusterEnergy(bitmapEnergies, bitmapColumns, method, nClusters, analysisParams)
+    % Init
+    bins=NaN;
+    binEdges=NaN;
+    clusterIdx=NaN;
+    validIndices=NaN;
+    
     % Validate inputs
     if ~ismatrix(bitmapEnergies) || size(bitmapEnergies, 1) ~= 2
         error('Etotal must be a 2xn array.');

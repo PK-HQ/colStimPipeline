@@ -1,18 +1,30 @@
 # Folders to exclude
-FEXfunctions/
-GeneralDataAnalyses/
-ColSeries/
-store/
 autoRunDA/
-GEVI/
-firstPaper/
+ColSeries/
+DCseries/
+docs/
+FEXfunctions/
 figures/
+GeneralDataAnalyses/
+GEVI/
+LumSeries/
 others/
+store/
 testcode/
+testfigs/
 
 # Common files to ignore
 *.mat
 *.asv
+*.m~
+*.mex*
+*.mat
+*.fig
+*.slxc
+*.autosave
+slprj/
+codegen/
+cache/
 
 # Image and data files
 *.svg

@@ -1,14 +1,14 @@
 % Example parameter set
 clearvars;
-params.a = .5;%nlinspace(0, .2, 5, 'nonlinear'); % Weight of iso-tuned visual input (Varying param 1), lifts curve but flatten, .1
-params.b = .5;%nlinspace(0, 1, 5, 'nonlinear'); % Weight of ortho-tuned visual input (Varying param 2), .4
-params.l = .1; % Weight of iso-tuned visual input norm, S-shape of curve, .4 to 1
-params.w = .1; % Weight of ortho-tuned visual input norm, sharpening incon, any
-params.e = .5; %nlinspace(.4, .6, 5, 'nonlinear'); %nlinspace(0.3, 1, 5, 'linear'); % Relative weight of optostim effects on excitation, S-shape of curve, .4 to .7
-params.g0 = nlinspace(50, 100, 5, 'linear'); % Normalization constant
-params.n = 6;   % Spiking exponent
-params.rmx = nlinspace(0,100,5, 'linear'); % Max response
-params.o = 50;  % Opto-stim effective contrast
+params.a = .43;%nlinspace(0, .2, 5, 'nonlinear'); % Weight of iso-tuned visual input (Varying param 1), lifts curve but flatten, .1
+params.b = .56;%nlinspace(0, 1, 5, 'nonlinear'); % Weight of ortho-tuned visual input (Varying param 2), .4
+params.l = .33; % Weight of iso-tuned visual input norm, S-shape of curve, .4 to 1
+params.w = .27; % Weight of ortho-tuned visual input norm, sharpening incon, any
+params.e = nlinspace(0,1,5, 'linear'); %nlinspace(.4, .6, 5, 'nonlinear'); %nlinspace(0.3, 1, 5, 'linear'); % Relative weight of optostim effects on excitation, S-shape of curve, .4 to .7
+params.g0 = 172; % Normalization constant
+params.n = 2.36;   % Spiking exponent
+params.rmx = 565; % Max response
+params.o = nlinspace(0,50,5, 'linear');  % Opto-stim effective contrast
 params.ntrl = 100000; % Trials per contrast level
 x = [-linspace(0, 100, 10) linspace(0, 100, 10)]; % Contrast levels
 

@@ -41,19 +41,19 @@ switch monkeyName
                         end
 
                     end
-                    excludeBlocks=[44 45 45 50 51 52:55 60 95];
+                    excludeBlocksL=[44 45 45 50 51 52:55 60 95];
                 else
                     % Check for chamberRight criteria
                     if  ~isempty(entry.powercycle)
                         rightIndex = rightIndex + 1;
                         datastructRight(rightIndex) = entryNo;
                     end
-                    excludeBlocks=10;
+                    excludeBlocksR=10;
                 end
             end
         end
     case {'Pepper'}
-        cutoffDate = '20250404';
+        cutoffDate = '20250822'; %glasses
         for entryNo = 1:length(datastruct)
             entry = datastruct(entryNo);
             entryDate = entry.date;
@@ -70,7 +70,7 @@ switch monkeyName
                             datastructRight(rightIndex) = entryNo;
                         end
                     end
-                    excludeBlocks=nan;
+                    excludeBlocksR=nan;
                 end
             end
         end
@@ -83,9 +83,9 @@ datastructRight = datastructRight(1:rightIndex);
 switch chamberWanted
     case 'L'
         datastructChamber=datastructLeft;
-        analysisBlockID=setdiff(datastructChamber,excludeBlocks);
+        analysisBlockID=setdiff(datastructChamber,excludeBlocksL);
     case 'R'
         datastructChamber=datastructRight;
-        analysisBlockID=setdiff(datastructChamber,excludeBlocks);
+        analysisBlockID=setdiff(datastructChamber,excludeBlocksR);
 end
 end

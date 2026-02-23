@@ -13,7 +13,7 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
     
     [imagingData, ort, bitmapCamspace, contourMaskLevel]=getColumnSelectionMask(bitmapData, imagingData, currentBlockStruct, blockID, bitmapNo, plotFlag, saveFlag, pdfFilename);
 
-    if ort==0 || ort ==90 % Process only 0 or 90 deg orientations (for speed)
+    if ort==0 || ort ==90 || ort==45 || ort==135% Process only used orientations (for speed)
         switch conversionType
             case {'cam2proj'} % Convert from camera space (512 x 512px) to projector space (1920 x 1080px)
                %% Plot 1: Select central n-columns with a contour (from 2D gaussian)
@@ -48,23 +48,30 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 bitmapData.areaPixelsON(bitmapNo,blockID)=sum(columnAreas)*(imagingData.pixelsizemm(blockID)^2);
                 %% Save columnar optostim BMP
                 if saveFlagBMP==1
-                    bmpPath=sprintf('V:/PK/ColSeries/%s/',datestr(now,'yyyymmdd'));
+
                     bmpFilename = sprintf('O%05gHE%04gG%03gS%05gC%02g.bmp',...
                         ort*100,bitmapData.gridSize,bitmapData.gammaCorrFactor(bitmapNo),bitmapData.sensitivity*10000,bitmapData.gaussianContourLevel(bitmapNo));
-
-                    if ~exist(bmpPath, 'dir')
-                         mkdir(bmpPath)
+                    
+                    bmpPath=sprintf('V:/PK/ColSeries/%s/',datestr(now,'yyyymmdd'));
+                    if exist('V:/PK','dir')
+                        if ~exist(bmpPath, 'dir')
+                             mkdir(bmpPath)
+                        end
+                        imwrite(bitmapProjSpaceAligned,[bmpPath bmpFilename]);
                     end
 
-                    % Save the bitmapData
+                    bmpPath2=sprintf('Y:/Pepper/Meta/ColSeries/%s/',datestr(now,'yyyymmdd'));
+                    if ~exist(bmpPath2, 'dir')
+                         mkdir(bmpPath2)
+                    end
                     disp(bmpFilename)
-                    imwrite(bitmapProjSpaceAligned,[bmpPath bmpFilename]);
+                    imwrite(bitmapProjSpaceAligned,[bmpPath2 bmpFilename]);
+
+                    
                 end
                 
                 
                 %% Power density calculations
-                chamberID='L';
-                LEDpercent=30;
                 %{
                 [bitmapData.adjustedSPD_uW(1,bitmapNo,blockID), bitmapData.ledpower_mW(1,bitmapNo,blockID)] = calculateSPD(behavioralData, imagingData, bitmapData,...
                     bitmapNo, chamberID,LEDpercent,blockID,0);
@@ -123,7 +130,8 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 upFontSize(18,.0025)
 
            case {'proj2cam'} % Convert from camera space (512 x 512px) to projector space (1920 x 1080px)
-                bitmapProjSpaceAligned=cloneBitmaps(currentBlockStruct,'load');
+                bitmapProjSpaceAligned=cloneBitmaps(currentBlockStruct,'clone');
+               % [bitmapProjSpaceAligned,~] = loadOrCloneBitmaps(currentBlockStruct);
 
                %% Plot 1: Select central n-columns with a contour (from 2D gaussian)
                 [gaussianMask, bitmapCamspacePostMask] = isolateColumns(bitmapData, imagingData, blockID, bitmapNo, bitmapCamspace);
@@ -283,7 +291,20 @@ function [gaussianMask, bitmapCamspacePostMask] = isolateColumns(bitmapData, ima
             % Single column, special case with contour level 200
             if nColumnsWanted == 1 && contourMaskLevel == 200
                 disp('Loop 1');
-                gaussianMask, bitmapCamspacePostMask = processSingleColumnSpecial(bitmapCamspace, imagingData.centerCoords(:, :, blockID));
+                minPixels=300; %11192025
+                %[gaussianMask, bitmapCamspacePostMask] = processSingleColumnSpecial(bitmapCamspace, imagingData.centerCoords(:, :, blockID));
+                [gaussianMask, bitmapCamspacePostMask] = processSingleColumnSpecial(bitmapCamspace, imagingData.centerCoords(:, :, blockID), minPixels);
+
+                
+            % Single column, special case with contour level <200 to get
+            % center column manuallty
+            elseif nColumnsWanted == 1 && contourMaskLevel < 200
+                disp('Loop 1b');
+                gaussianMask = imagingData.gaussfit(1, contourMaskLevel, blockID).area;
+                bitmapCamspacePostMask = gaussianMask .* bitmapCamspace;
+                
+                minPixels=300;
+                bitmapCamspacePostMask      = bwareaopen(bitmapCamspacePostMask, minPixels);   % :contentReference[oaicite:0]{index=0}
             % Single or multiple columns, general case
             elseif nColumnsWanted > 1 || (nColumnsWanted == 1 && contourMaskLevel < 200)
                 disp('Loop 2');
@@ -296,6 +317,7 @@ function [gaussianMask, bitmapCamspacePostMask] = isolateColumns(bitmapData, ima
                 gaussianMask = zeros(imagingData.pixels(1), imagingData.pixels(1));
                 bitmapCamspacePostMask = gaussianMask .* bitmapCamspace;
             else
+                
                 disp('Loop 4');
                 gaussianMask = ones(imagingData.pixels(1), imagingData.pixels(1));
                 bitmapCamspacePostMask = gaussianMask .* bitmapCamspace;
@@ -310,6 +332,47 @@ function [gaussianMask, bitmapCamspacePostMask] = isolateColumns(bitmapData, ima
     end
 end
 
+function [gaussianMask, bitmapCamSpace] = processSingleColumnSpecial(inpict, centerCoords, minPixels)
+%PROCESS SINGLE COLUMN with size threshold
+%   inpict        – logical or binary image
+%   centerCoords  – [row col] pair, image-space reference point
+%   minPixels     – minimum blob area (px).  Optional, default = 0.
+%
+%   gaussianMask      – binary mask of the chosen blob (blur outside)
+%   bitmapCamSpace    – binary mask (unfiltered) of the same blob
+
+    if nargin < 3
+        minPixels = 0;                 % no size filtering if user omits arg
+    end
+
+    %--- remove blobs below area threshold  ------------------------------%
+    % bwareaopen is the quickest way, but you can also keep large areas
+    cleanBW      = bwareaopen(inpict, minPixels);   % :contentReference[oaicite:0]{index=0}
+    L            = bwlabel(cleanBW);                % connected-component labels
+
+    %--- measure remaining blobs ----------------------------------------%
+    S            = regionprops(L, {'Centroid','Area'});   % :contentReference[oaicite:1]{index=1}
+    if isempty(S)
+        gaussianMask    = false(size(inpict));      % nothing big enough
+        bitmapCamSpace  = gaussianMask;
+        return
+    end
+
+    %--- pick blob whose centroid is closest to the desired point --------%
+    C            = vertcat(S.Centroid);             % n-by-2 [x y]
+    c0           = centerCoords;                    % [row col]
+    d2           = (C(:,1)-c0(2)).^2 + (C(:,2)-c0(1)).^2;   % squared dist
+    [~,k]        = min(d2);                         % index of nearest blob
+    chosenLabel  = find(L==k,1,'first');            % map back to label ID
+    bitmapCamSpace = (L == k);                      % binary mask of blob
+
+    %--- (optional) turn it into a Gaussian-blurred mask -----------------%
+    % Uncomment next line if you actually want a smoothed mask
+    % gaussianMask = imgaussfilt(double(bitmapCamSpace), 3); % ?=3 px  :contentReference[oaicite:2]{index=2}
+    gaussianMask = bitmapCamSpace;                  % un-smoothed by default
+end
+
+%{
 function [gaussianMask, bitmapCamSpace] = processSingleColumnSpecial(inpict, centerCoords)
     % Process for a special single-column case with contour level 200
     L = bwlabel(inpict);
@@ -322,7 +385,7 @@ function [gaussianMask, bitmapCamSpace] = processSingleColumnSpecial(inpict, cen
     bitmapCamSpace = double(L == idx);
     gaussianMask = bitmapCamSpace;
 end
-
+%}
 %% Process image: Resize
 function bitmapResized = resizeToSpace(imagingData, bitmapData, blockID, image,conversionType)
     % Resize to projector space

@@ -10,7 +10,7 @@ end
 
 %% Get coregistration params for greenImageReference (to be transformed) to greenImageSession (anchor image)
 %transform type: auto, similarity
-[imgReferenceCoreg,coregStats,transformParams,imgReference,imgTarget]=coregisterGreenImages(currentBlockStruct,referenceBlockStruct,imagingData.nanmask, analysisMode);
+[imgReferenceCoreg,imagingData.similarity(blockID),transformParams,imgReference,imgTarget]=coregisterGreenImages(currentBlockStruct,referenceBlockStruct,imagingData.nanmask, analysisMode);
 [~,h]=suplabel('Identifying transformation matrix from reference to current session','t',[0.08 0.08 .84 .80]);
 set(h,'FontSize',16)
 switch saveFlag
@@ -19,7 +19,15 @@ switch saveFlag
 end
 
 %% Use transform to align bitmap with greenImageSession, and threshold
-bitmapData.transformParams(blockID)=transformParams;
+if isa(transformParams, 'affine2d')
+    % Method 2: extract the 3×3 matrix and convert
+    bitmapData.transformParams(blockID) = transformParams;%affinetform2d(transformParams.T');
+elseif isa(transformParams, 'affinetform2d')
+    bitmapData.transformParams(blockID)=transformParams;
+else
+    error('transformParams must be either affine2d or affineForm2d');
+end
+
 for i=1:size(bitmapData.columnarbitmap(:,:,:,blockID),3)
   bitmapData.columnarbitmapCoreg(:,:,i,blockID)=double(imwarp(bitmapData.columnarbitmap(:,:,i,blockID),bitmapData.transformParams(blockID),'OutputView',imref2d(size(imgTarget))));
 end

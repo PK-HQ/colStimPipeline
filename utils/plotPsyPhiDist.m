@@ -1,4 +1,4 @@
-function plotPsyPhiDist(datastruct, mainPath,chambers, chamberIDs, filterColumns, saveFlag)
+function plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, filterColumns, saveFlag)
     % Function to plot psy-phi correlation for clusters
     %
     % Args:
@@ -27,20 +27,20 @@ function plotPsyPhiDist(datastruct, mainPath,chambers, chamberIDs, filterColumns
     for chamberID = chamberIDs % Change this to loop over chambers if needed
         chamberWanted = chambers{chamberID};
         if strcmp(chamberWanted,'L')
-            clustersDesired=2:4;
+            clustersDesired=1:5;
         elseif strcmp(chamberWanted,'R')
             clustersDesired=1;
         end
         loadFlag=exist('dataTag');
         if ~loadFlag
-            load([mainPath 'Chip/Meta/summary/statistics' chamberWanted '.mat'], 'bitmapData');
-            load([mainPath 'Chip/Meta/psychometrics/' chamberWanted '-chamber/weibullfreeAll/mdlStruct' chamberWanted '.mat'], 'mdlStruct');
+            load([mainPath monkeyName '/Meta/summary/statistics' chamberWanted 'tag.mat'], 'bitmapData');
+            load([mainPath monkeyName '/Meta/psychometrics/' chamberWanted '-chamber/weibullfreeAll/mdlStruct' chamberWanted '.mat'], 'mdlStruct');
             %load([mainPath 'Chip/Meta/neurometric/neuroStruct' chamberWanted '.mat'], 'neuroStruct');
         elseif loadFlag
             if ~strcmp(dataTag,chamberWanted)
-                load([mainPath 'Chip/Meta/summary/statistics' chamberWanted '.mat'], 'bitmapData');
-                load([mainPath 'Chip/Meta/psychometrics/' chamberWanted '-chamber/weibullfreeAll/mdlStruct' chamberWanted '.mat'], 'mdlStruct');
-                load([mainPath 'Chip/Meta/neurometric/neuroStruct' chamberWanted '.mat'], 'neuroStruct');
+                load([mainPath monkeyName '/Meta/summary/statistics' chamberWanted 'tag.mat'], 'bitmapData');
+                load([mainPath monkeyName '/Meta/psychometrics/' chamberWanted '-chamber/weibullfreeAll/mdlStruct' chamberWanted '.mat'], 'mdlStruct');
+                %load([mainPath monkeyName '/Meta/neurometric/neuroStruct' chamberWanted '.mat'], 'neuroStruct');
             end
         end
                
@@ -104,7 +104,7 @@ function plotPsyPhiDist(datastruct, mainPath,chambers, chamberIDs, filterColumns
     end
    
     %% PLOT DELTA OPTO SCATTER
-    %{
+    
     condStrs={'Con-opto','Incon-opto'};
     condSaveStrs={'Con','Incon'};
     nConds=size(data.(chamberWanted).psy,2);
@@ -138,24 +138,24 @@ function plotPsyPhiDist(datastruct, mainPath,chambers, chamberIDs, filterColumns
             savefig(gcf, [mainPath 'Chip/Meta/psychometrics/averagePsyDiff3.fig']);           % FIG
             print(gcf, [mainPath 'Chip/Meta/psychometrics/averagePsyDiff3.svg'], '-dsvg');        % SVG
     end
-    %}
+    
     %% PLOT DELTA OPTO HIST
     % Setup predictors
     figure('Name', 'Psy');
-
+   
     % Define bin edges to center bins at [0, 5, 10, ..., 50]
     binEdges = -2.5:5:52.5;  % This creates edges at [-2.5, 2.5, 7.5, 12.5, ..., 52.5]
     
     % Create the histogram with specified bin edges
-    histogram(data.deltaPsy, binEdges, 'EdgeColor', 'k', 'FaceColor', [156, 14, 254]/255, 'FaceAlpha', 0.8, 'LineWidth',2);
-    
+    histogram(data.deltaPsy, binEdges, 'EdgeColor', 'k', 'FaceColor', [156, 14, 254]/255, 'FaceAlpha', 0.8, 'LineWidth',2); hold on
+    %histogram([11 -1 2 8 7], binEdges, 'EdgeColor', 'k', 'FaceColor',[255, 166, 0]/255, 'FaceAlpha',1, 'LineWidth',2); hold on
     % Add formatting
     xline(0,'--','LineWidth',2,'Color',[.65 .65 .65])
-    xlabel('\DeltaPerformance (%)');
+    xlabel('\DeltaCorrect (%)');
     ylabel('Count');
     title('Distribution of \DeltaCorrect', 'FontSize', 24, 'FontWeight', 'normal');
     % cosmetics
-    addSkippedTicks(-60,60,10,'x'); xlim([-50 50]);
+    addSkippedTicks(-50,50,12.5,'x'); xlim([-50 50]);
     addSkippedTicks(0,8,1,'y'); ylim([0 8]);
     title('Behavior','FontSize',24,'FontWeight','normal')
     upFontSize(24, .01); axis square
@@ -185,9 +185,9 @@ function plotPsyPhiDist(datastruct, mainPath,chambers, chamberIDs, filterColumns
     yLims = ylim;
     
     % Calculate position (5% from left and bottom edges)
-    xPos1 = xLims(1) + 0.06 * (xLims(2) - xLims(1));
+    xPos1 = xLims(1) + 0.045 * (xLims(2) - xLims(1));
     yPos1 = yLims(1) + 0.07 * (yLims(2) - yLims(1));
-    xPos2 = xPos1;
+    xPos2 = xLims(1) + 0.06 * (xLims(2) - xLims(1));
     yPos2 = yLims(1) + 0.12 * (yLims(2) - yLims(1));
     % Add the text
     text(xPos1, yPos1, pvalueStr, 'FontSize', 14, 'Interpreter', 'tex');

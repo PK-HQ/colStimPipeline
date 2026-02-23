@@ -7,7 +7,7 @@ mdlStruct = struct();
 AICCdeltax = struct();
 AICCbeta = struct();
 thresh=[];beta=[];exp=[];c50=[];
-for cluster=nClusters%1:nClusters
+for cluster=3%1:nClusters%1:nClusters
     disp(['Cluster ' num2str(cluster)])
     
     % Get columns
@@ -53,7 +53,7 @@ for cluster=nClusters%1:nClusters
         savefilenameBlock = ['psychometrics/' chamberWanted '-chamber/' modelTypeStr '/' 'psychfit-' chamberWanted '-' modelTypeStr '-C' num2str(cluster)];
         switch plotFlag
             case 1
-                if modelID>0
+                if strcmp(modelTypeStr, 'bill')
                     % Plot per block
                     plotAverageFlag=0;
                     mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysisBlockID,...
@@ -80,6 +80,12 @@ for cluster=nClusters%1:nClusters
                     beta=[beta;mdl.fittedParams(:,1)];
                     exp=[exp;mdl.fittedParams(:,2)];
                     c50=[c50;mdl.fittedParams(:,3)];
+                else
+                    % Plot per block
+                    plotAverageFlag=0;
+                    mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysisBlockID,...
+                        mdl, mdl.fittedParams(:, :, 1), xFit, monkeyName, clusterBlocksIdx, plotAverageFlag, plotLine,...
+                        saveFlag, cluster, modelTypeStr, savefilenameBlock);
                 end
 
                     
@@ -89,7 +95,7 @@ for cluster=nClusters%1:nClusters
     mdlStruct.([chamberWanted, modelTypeStr, 'C' num2str(cluster) 'Avg']) = mdlAvg;
     %% Compare models of given cluster
     % Filter and compare models with non-parametric t-test (per chamber)
-    savefilename = ['psychometrics/' chamberWanted '-chamber/' 'paramdist-' chamberWanted '-' modelTypes{2} modelTypes{3}  '-C' num2str(cluster)];
+    %savefilename = ['psychometrics/' chamberWanted '-chamber/' 'paramdist-' chamberWanted '-' modelTypes{2} modelTypes{3}  '-C' num2str(cluster)];
     %bitmapEnergy.(chamberWanted)=squeeze(bitmapData.energy(:,:,clusterBlocksIdx))';
     %[powerFiltered, powerFilteredMask] = powerFiltering(squeeze(bitmapData.energy)');
 
@@ -107,7 +113,7 @@ for cluster=nClusters%1:nClusters
     %ranksum(mdlStruct.Rdeltax.fittedParams(:, 4), mdlStruct.Ldeltax.fittedParams(:, 4));
     %CF
 end
-save([mainPath '/Chip/Meta/psychometrics/' chamberWanted '-chamber/' modelTypeStr '/mdlStruct' chamberWanted num2str(columnsDesired) '.mat'], 'mdlStruct');
+save([mainPath monkeyName '/Meta/psychometrics/' chamberWanted '-chamber/' modelTypeStr '/mdlStruct' chamberWanted num2str(columnsDesired) '.mat'], 'mdlStruct');
 
 %% Plot param dist
 

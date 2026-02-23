@@ -37,7 +37,7 @@ switch method
     
     case {2}
         % Extract values from input struct
-        powerdensity=estimatePowerFromLED(currentBlockStruct, plotFlag); %mW/mm2, total power (mW) over rectangular area recorded by the Thorlabs square sensor in mW
+        powerdensity=estimatePowerFromLED(currentBlockStruct, bitmapData, plotFlag); %mW/mm2, total power (mW) over rectangular area recorded by the Thorlabs square sensor in mW
         pixelsOnArea= bitmapData.areaPixelsON(imageNo,blockID); %mm2
         power = powerdensity * pixelsOnArea; %mW
         
@@ -48,7 +48,7 @@ switch method
             timeON_ms = bitmapData.ProjTTLPulseOn(blockID);
             timeOFF_ms = bitmapData.ProjTTLPulseOff(blockID);
         end
-        timeONPercent = timeON_ms/(timeON_ms+timeOFF_ms);
+        timeONPercent = timeON_ms/50;
         
         energy = power * timeONPercent;
 end

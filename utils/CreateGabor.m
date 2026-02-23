@@ -18,6 +18,20 @@
 clear all;
 close all;
 
+%% Parameters
+RatioPxlPerDeg = 50;  % pixels/deg, ratio of screen to visul field
+
+refPos=[2 -3.5];
+refSize=2;
+refSF=2;
+currentPos=[-1.1 -2.2]
+[newSize,newSf] = scaleStimByEcc(refPos,refSize,refSF,currentPos,'mean')
+
+% Calculate new spatial frequency using inverse scaling
+GaborSizes=round(newSize,1);
+GaborSFs=round(newSf,1);%round(refSF * (refSize / GaborSizes),3,'significant');
+GaborOrts=[0 90];%[0:10:180,22.5,45,67.5,112.5,135,157.5];
+
 %% Select a directory
 PathName = uigetdir('.','Select a Directory to Save BMP Files');
 drawnow;
@@ -27,14 +41,6 @@ if PathName==false
   return;
 end
 
-%% Parameters
-RatioPxlPerDeg = 50;  % pixels/deg, ratio of screen to visul field
-refSF=2.75;
-refSize=1.5;
-GaborSizes=[1.6];
-% Calculate new spatial frequency using inverse scaling
-GaborSFs=round(refSF * (refSize / GaborSizes),3,'significant');
-GaborOrts=[0 90];%[0:10:180,22.5,45,67.5,112.5,135,157.5];
 %% Create BMP
 for GaborSize = GaborSizes % deg, size (square)
   % Some parameters and arrays
@@ -89,3 +95,41 @@ for GaborSize = GaborSizes % deg, size (square)
 end
 
 
+function [newSize,newSf] = scaleStimByEcc(prevPos,prevSize,prevSf,newPos,cycleMode)
+% SCALESTIMBYECC  Scale Gabor size and sf by eccentricity.
+%
+%   [newSize,newSf] = scaleStimByEcc(prevPos,prevSize,prevSf,newPos)
+%   [newSize,newSf] = scaleStimByEcc(...,cycleMode)
+%
+%   prevPos  :  Nx2 matrix of [x y] in deg for previous stimuli
+%   prevSize :  Nx1 vector of stimulus diameters (deg)
+%   prevSf   :  Nx1 vector of spatial frequencies (cpd)
+%   newPos   :  1x2  desired [x y] (deg)
+%   cycleMode:  'mean' (default) | 'min' | 'max'
+%               how to choose the target cycle-count  (#cycles = size*sf)
+%
+%   newSize  :  size for the new stimulus (deg)
+%   newSf    :  sf   for the new stimulus (cpd)
+
+if nargin < 5, cycleMode = 'mean'; end
+
+% --- 1. eccentricities
+eccPrev = hypot(prevPos(:,1),prevPos(:,2));
+eccNew  = hypot(newPos(1), newPos(2));
+
+% --- 2. size scaling (size/ecc)
+sizePerEcc = prevSize./eccPrev;
+newSize    = max(sizePerEcc) * eccNew;   % *largest* allowed ratio
+
+% --- 3. choose target #cycles inside the patch
+cyclesPrev = prevSize .* prevSf;
+switch lower(cycleMode)
+    case 'min',  tgtCycles = min(cyclesPrev);
+    case 'max',  tgtCycles = max(cyclesPrev);
+    otherwise,   tgtCycles = mean(cyclesPrev);
+end
+
+% --- 4. spatial frequency for new patch
+newSf = tgtCycles / newSize;
+
+end
