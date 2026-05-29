@@ -25,8 +25,9 @@ refPos=[2 -3.5];
 refSize=2;
 refSF=2;
 currentPos=[-1.1 -2.2]
-[newSize,newSf] = scaleStimByEcc(refPos,refSize,refSF,currentPos,'mean')
-
+%[newSize,newSf] = scaleStimByEcc(refPos,refSize,refSF,currentPos,'mean')
+newSize=1.56;
+newSf=3;
 % Calculate new spatial frequency using inverse scaling
 GaborSizes=round(newSize,1);
 GaborSFs=round(newSf,1);%round(refSF * (refSize / GaborSizes),3,'significant');

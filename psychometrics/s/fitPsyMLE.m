@@ -18,7 +18,7 @@ function [mdl, mdlAvg] = fitPsyMLE(xBlocks, yBlocks, modelType, plotLine)
     yOptoAverage = rmnan(reshape(yOptoAll, 1, numel(yOptoAll)));
     
     fprintf('Fitting model, independent parameters per session...')
-    for block = 2:3%nBlocks
+    for block = nBlocks%:-1:1
         % Get block data
         xBaseline = rmnan(xBaselineAll(block,:));
         yBaseline = rmnan(yBaselineAll(block,:));

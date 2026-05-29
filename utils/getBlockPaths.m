@@ -2,11 +2,10 @@ function [alignmentBlockPath] = getBlockPaths(currentEntry, alignmentBlock)
     computerName = getenv('COMPUTERNAME');
     hostname = getenv('HOSTNAME');
     alignmentBlockPath = '';
-    %currentBlockPath = '';
     monkeyName=currentEntry.monkey;
     if ispc
         switch computerName
-            case {'LA-CPSD077020WD', 'LA-CPSA07019WD', 'CVIS-A64882', 'PSYC-A77304'}
+            case {'LA-CPSD077020WD', 'LA-CPSA07019WD', 'CVIS-A64882', 'PSYC-A77304','CVIS-A69224'}
                 alignmentBlockPath = ['Y:/' monkeyName '/' monkeyName alignmentBlock '/'];
                 if ismember(computerName, {'CVIS-A64882', 'PSYC-A77304'})
                     %currentBlockPath = ['Y:/' 'Chip/Chip' currentBlock.date '/'];

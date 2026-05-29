@@ -1,4 +1,4 @@
-function [energy, powerdensity, timeONPercent] = calculateSPD(behavioralData, imagingData, bitmapData, currentBlockStruct, imageNo, blockID, plotFlag)
+function [energydensity_per_trial_mJmm2, powerDensity, timeONPercent] = calculateSPD(behavioralData, imagingData, bitmapData, currentBlockStruct, imageNo, blockID, plotFlag)
 method=2;
 switch method
     case {1}
@@ -13,11 +13,11 @@ switch method
 
     %% Calculate surface power density (accounting for pixels ON over illuminated DMD area)
     % Given power value across entire area
-    powerdensity=estimatePowerFromLED(currentBlockStruct, plotFlag); % total power (mW) over rectangular area recorded by the Thorlabs square sensor in mW
+    powerDensity=estimatePowerFromLED(currentBlockStruct, plotFlag); % total power (mW) over rectangular area recorded by the Thorlabs square sensor in mW
     % Calculate the fraction of the area illuminated
     fractionIlluminated = pixelsON_bitmap / pixelsON_DLP4710;
     % Adjust power delivered to the illuminated pixels
-    powerDelivered_mW = powerdensity * fractionIlluminated;
+    powerDelivered_mW = powerDensity * fractionIlluminated;
     
     % Calculate the area of one pixel
     pixelArea_mm2 = (pixelSize_mm)^2;
@@ -25,7 +25,7 @@ switch method
     illuminatedArea_mm2 = pixelsON_bitmap * pixelArea_mm2;
     
     % Calculate Adjusted Surface Power Density (SPD)
-    energy = powerDelivered_mW / illuminatedArea_mm2; % mW/mm^2
+    energydensity_per_trial_mJmm2 = powerDelivered_mW / illuminatedArea_mm2; % mW/mm^2
       
     %% Calculate surface power density per second (accounting for pixels ON over illuminated DMD area)
     % Calculate Effective ON Time in seconds
@@ -33,13 +33,13 @@ switch method
     offTime_s = (timeOFF_ms * cyclesON) / 1000;
     totalTime_s = onTime_s + offTime_s;
     % Calculate Surface Power Density per Second (SPD_s)
-    adjustedSPD_uW = energy * 1000 * (onTime_s/totalTime_s); % Normalize by effective total stimulation time (ON+OFF)
+    adjustedSPD_uW = energydensity_per_trial_mJmm2 * 1000 * (onTime_s/totalTime_s); % Normalize by effective total stimulation time (ON+OFF)
     
     case {2}
         % Extract values from input struct
-        powerdensity=estimatePowerFromLED(currentBlockStruct, bitmapData, plotFlag); %mW/mm2, total power (mW) over rectangular area recorded by the Thorlabs square sensor in mW
+        powerDensity=estimatePowerFromLED(currentBlockStruct, bitmapData, plotFlag); %mW/mm2, total power (mW) over rectangular area recorded by the Thorlabs square sensor in mW
         pixelsOnArea= bitmapData.areaPixelsON(imageNo,blockID); %mm2
-        power = powerdensity * pixelsOnArea; %mW
+        spatial_power_mW = powerDensity * pixelsOnArea; %mW/mm2
         
         if ~isempty(behavioralData)
             timeON_ms = unique(behavioralData.optoTS(blockID).Header.Conditions.ProjTTLPulseOn);
@@ -50,8 +50,9 @@ switch method
         end
         timeONPercent = timeON_ms/50;
         
-        energy = power * timeONPercent;
+        energydensity_per_trial_mJmm2 = powerDensity * pixelsOnArea  * timeONPercent;
+        
 end
     % Display results
-    fprintf(['Energy delivered: %.2f mW over 300ms\n'], energy);
+    fprintf(['Energy delivered: %.2f mW over 300ms\n'], energydensity_per_trial_mJmm2);
 end

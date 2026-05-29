@@ -1,4 +1,4 @@
-function [bitmapData]=convertForProjectorGPT(behavioralData, imagingData, bitmapData,...
+function [bitmapData]=convertForProjectorGPT2(behavioralData, imagingData, bitmapData,...
     currentBlockStruct, conversionType, blockID,...
     pdfFilename, plotFlag,saveFlagBMP,saveFlag)
 disp('Generating bitmap...')
@@ -46,6 +46,30 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 bitmapData.nColumns(bitmapNo,blockID)=numel(columnAreas);
                 bitmapData.columnAreas{bitmapNo,blockID}=columnAreas;
                 bitmapData.areaPixelsON(bitmapNo,blockID)=sum(columnAreas)*(imagingData.pixelsizemm(blockID)^2);
+
+                % --- Final ROI = valid imaging/SNR mask intersect contour mask ---
+                pixelArea_mm2 = imagingData.pixelsizemm(blockID)^2;
+                
+                finalROIMask = (imagingData.mask(:,:,blockID)==1) & (gaussianMask==1);
+                bitmapOnMask = bitmapCamspacePostMask > 0;
+                onWithinROI = bitmapOnMask & finalROIMask;
+                
+                % Store ROI areas and duty cycle
+                bitmapData.areaOrtMask(bitmapNo,blockID) = ...
+                    sum(imagingData.mask(:,:,blockID)==1, 'all') * pixelArea_mm2;
+                
+                bitmapData.areaGaussMask(bitmapNo,blockID) = ...
+                    sum(gaussianMask==1, 'all') * pixelArea_mm2;
+                
+                bitmapData.areaFinalROI(bitmapNo,blockID) = ...
+                    sum(finalROIMask, 'all') * pixelArea_mm2;
+                
+                bitmapData.areaPixelsONWithinROI(bitmapNo,blockID) = ...
+                    sum(onWithinROI, 'all') * pixelArea_mm2;
+                
+                bitmapData.spatialDutyCycleWithinROI(bitmapNo,blockID) = ...
+                    sum(onWithinROI, 'all') / sum(finalROIMask, 'all');
+
                 %% Save columnar optostim BMP
                 if saveFlagBMP==1
 
@@ -76,9 +100,11 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 [bitmapData.adjustedSPD_uW(1,bitmapNo,blockID), bitmapData.ledpower_mW(1,bitmapNo,blockID)] = calculateSPD(behavioralData, imagingData, bitmapData,...
                     bitmapNo, chamberID,LEDpercent,blockID,0);
                 %}
-                [bitmapData.energydensitypertrial_mJmm2(1,bitmapNo,blockID), bitmapData.powerdensity_mWmm2(1,bitmapNo,blockID),...
-                    bitmapData.timeONPercent(1,bitmapNo,blockID)] = calculateSPD(behavioralData, imagingData,...
-                    bitmapData, currentBlockStruct, bitmapNo,blockID,0);
+                [bitmapData.meanPowerDensityWithinROI_mWmm2(1,bitmapNo,blockID), ...
+                 bitmapData.totalPowerToOnPixelsWithinROI_mW(1,bitmapNo,blockID), ...
+                 bitmapData.projectorPowerDensity_mWmm2(1,bitmapNo,blockID), ...
+                 bitmapData.temporalDutyCycle(1,bitmapNo,blockID)] = calculatePowerDensity(behavioralData, imagingData, ...
+                    bitmapData, currentBlockStruct, bitmapNo, blockID, 0);
                 
                 %% Save the figures
                  [~,h]=suplabel(['Converting bitmap for projector dimensions (' num2str(ort) '\circ)'],'t',[.08 .08 .84 .88]);
@@ -152,11 +178,36 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
 
                 % Save
                 % Mask areas, pixels on count and density
-                bitmapData.areaOrtMask(bitmapNo,blockID)=sum(imagingData.mask(:,:,blockID)==1, 'all')*(imagingData.pixelsizemm(blockID)^2);
-                bitmapData.areaGaussMask(bitmapNo,blockID)=sum(contourROI==1, 'all')*(imagingData.pixelsizemm(blockID)^2);
-                bitmapData.areaPixelsON(bitmapNo,blockID)=sum(bitmapCamspace(:,:,bitmapNo)>0,'all')*(imagingData.pixelsizemm(blockID)^2);%nansum(contourROI(:)==1);
-                bitmapData.pixelsONDensity(bitmapNo,blockID)=bitmapData.areaPixelsON(bitmapNo,blockID)*100 / bitmapData.areaGaussMask(bitmapNo,blockID); %nansum(contourROI(:)>0)*100/nansum(contourROI(:)==0); %prctPixON=((DC/(5/10))^2)/(2/100);
-                bitmapData.pixelsON(bitmapNo,blockID)=sum(bitmapCamspace(:,:,bitmapNo)>0,'all'); %nansum(contourROI(:)==1);
+                pixelArea_mm2 = imagingData.pixelsizemm(blockID)^2;
+                
+                % Final ROI = valid imaging/SNR mask intersect contour mask
+                finalROIMask = (imagingData.mask(:,:,blockID)==1) & (contourROI==1);
+                bitmapOnMask = bitmapCamspace(:,:,bitmapNo) > 0;
+                onWithinROI = bitmapOnMask & finalROIMask;
+                
+                bitmapData.areaOrtMask(bitmapNo,blockID) = ...
+                    sum(imagingData.mask(:,:,blockID)==1, 'all') * pixelArea_mm2;
+                
+                bitmapData.areaGaussMask(bitmapNo,blockID) = ...
+                    sum(contourROI==1, 'all') * pixelArea_mm2;
+                
+                bitmapData.areaFinalROI(bitmapNo,blockID) = ...
+                    sum(finalROIMask, 'all') * pixelArea_mm2;
+                
+                bitmapData.areaPixelsON(bitmapNo,blockID) = ...
+                    sum(bitmapOnMask, 'all') * pixelArea_mm2;
+                
+                bitmapData.areaPixelsONWithinROI(bitmapNo,blockID) = ...
+                    sum(onWithinROI, 'all') * pixelArea_mm2;
+                
+                bitmapData.spatialDutyCycleWithinROI(bitmapNo,blockID) = ...
+                    sum(onWithinROI, 'all') / sum(finalROIMask, 'all');
+                
+                bitmapData.pixelsONDensity(bitmapNo,blockID) = ...
+                    100 * bitmapData.spatialDutyCycleWithinROI(bitmapNo,blockID);
+                
+                bitmapData.pixelsON(bitmapNo,blockID) = ...
+                    sum(bitmapOnMask, 'all');
 
                 bitmapData.columnarbitmapTFprojspace(:,:,bitmapNo,blockID)=bitmapProjSpaceAligned(:,:,bitmapNo); %first bitmap is black bmp
                 bitmapData.columnarbitmapTFcamspace(:,:,bitmapNo,blockID)=bitmapCamspace(:,:,bitmapNo);
@@ -164,9 +215,11 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 bitmapData.columnAreas{bitmapNo,blockID}=columnAreas;
                 
                 %% Power density calculations
-                [bitmapData.energy(1,bitmapNo,blockID), bitmapData.powerdensity(1,bitmapNo,blockID),...
-                    bitmapData.timeONPercent(1,bitmapNo,blockID)] = calculateSPD(behavioralData, imagingData,...
-                    bitmapData, currentBlockStruct, bitmapNo,blockID,0);
+                [bitmapData.meanPowerDensityWithinROI_mWmm2(1,bitmapNo,blockID), ...
+                 bitmapData.totalPowerToOnPixelsWithinROI_mW(1,bitmapNo,blockID), ...
+                 bitmapData.projectorPowerDensity_mWmm2(1,bitmapNo,blockID), ...
+                 bitmapData.temporalDutyCycle(1,bitmapNo,blockID)] = calculatePowerDensity(behavioralData, imagingData, ...
+                    bitmapData, currentBlockStruct, bitmapNo, blockID, 0);
                                 
                 %% Plots
                 figure('name',['Bitmap generation: ' num2str(ort) char(0176)]) 
@@ -336,12 +389,12 @@ end
 
 function [gaussianMask, bitmapCamSpace] = processSingleColumnSpecial(inpict, centerCoords, minPixels)
 %PROCESS SINGLE COLUMN with size threshold
-%   inpict        – logical or binary image
-%   centerCoords  – [row col] pair, image-space reference point
-%   minPixels     – minimum blob area (px).  Optional, default = 0.
+%   inpict        â€“ logical or binary image
+%   centerCoords  â€“ [row col] pair, image-space reference point
+%   minPixels     â€“ minimum blob area (px).  Optional, default = 0.
 %
-%   gaussianMask      – binary mask of the chosen blob (blur outside)
-%   bitmapCamSpace    – binary mask (unfiltered) of the same blob
+%   gaussianMask      â€“ binary mask of the chosen blob (blur outside)
+%   bitmapCamSpace    â€“ binary mask (unfiltered) of the same blob
 
     if nargin < 3
         minPixels = 0;                 % no size filtering if user omits arg

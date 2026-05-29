@@ -35,7 +35,7 @@ function [desiredBlocks,blockColumns,blockEnergy] = selectNColumnBlocks(bitmapDa
     % Compute mean columns and energy
     columns=bitmapData.nColumns';
     columnsMean = mean(columns, 2);
-    bitmapEnergy = squeeze(bitmapData.energy(:,:,:))';
+    bitmapEnergy = squeeze(bitmapData.totalPowerToOnPixelsWithinROI_mW(:,:,:))';
     bitmapEnergyMean = mean(bitmapEnergy, 2);
 
     % Filter blocks based on column and energy criteria

@@ -19,17 +19,22 @@ switch saveFlag
 end
 
 %% Use transform to align bitmap with greenImageSession, and threshold
+bitmapData.transformParams{blockID} = normalizeTF(transformParams);
+bitmapData.transformClass{blockID}  = class(bitmapData.transformParams{blockID});
+%{
 if isa(transformParams, 'affine2d')
     % Method 2: extract the 3×3 matrix and convert
-    bitmapData.transformParams(blockID) = transformParams;%affinetform2d(transformParams.T');
+    bitmapData.transformParams(blockID) =affinetform2d(transformParams.T');
 elseif isa(transformParams, 'affinetform2d')
     bitmapData.transformParams(blockID)=transformParams;
 else
-    error('transformParams must be either affine2d or affineForm2d');
+    bitmapData.transformParams(blockID)=transformParams;
+    %error('transformParams must be either affine2d or affineForm2d');
 end
+%}
 
 for i=1:size(bitmapData.columnarbitmap(:,:,:,blockID),3)
-  bitmapData.columnarbitmapCoreg(:,:,i,blockID)=double(imwarp(bitmapData.columnarbitmap(:,:,i,blockID),bitmapData.transformParams(blockID),'OutputView',imref2d(size(imgTarget))));
+  bitmapData.columnarbitmapCoreg(:,:,i,blockID)=double(imwarp(bitmapData.columnarbitmap(:,:,i,blockID),bitmapData.transformParams{blockID},'OutputView',imref2d(size(imgTarget))));
 end
 
 %transform and plot aligned images

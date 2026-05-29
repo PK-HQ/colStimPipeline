@@ -54,7 +54,9 @@ function bitmapData = loadBitmapData(datastruct, currentBlockStruct, currentBloc
     [bitmapData.orangeLED, bitmapData.orangeND] = parseLEDstring(datastruct(currentBlockID).orangeLED);
     
     % copy original bitmaps to run folder
-    cloneLoadFlag='load';
+    cloneLoadFlag='clone';
     cloneBitmaps(currentBlockStruct, cloneLoadFlag);
+    %cloneLoadFlag='load';
+    %cloneBitmaps(currentBlockStruct, cloneLoadFlag);
 end
 

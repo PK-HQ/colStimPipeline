@@ -1,4 +1,4 @@
-function plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, filterColumns, saveFlag)
+function plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, nBlockStr, filterColumns, saveFlag)
     % Function to plot psy-phi correlation for clusters
     %
     % Args:
@@ -7,12 +7,16 @@ function plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, 
     %   bitmapData: Bitmap data structure
     %   mdlStruct: Model structure containing psy data
     %   neuroStruct: Neuro data structure containing phi data
+    
+    xlims=[-50 50];
 
     % Init predictor struct
     data.deltaPsy=[];
     data.deltaPhi=[];
     data.meanColumns=[];
     data.meanEnergy=[];
+    % colors
+     purple=[156, 14, 254]/255;
 
     % Check if chambers contains only L, only R, or both
     hasL = any(strcmp(chambers, 'L'));
@@ -27,30 +31,41 @@ function plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, 
     for chamberID = chamberIDs % Change this to loop over chambers if needed
         chamberWanted = chambers{chamberID};
         if strcmp(chamberWanted,'L')
-            clustersDesired=1:5;
+            clustersDesired=1;
         elseif strcmp(chamberWanted,'R')
             clustersDesired=1;
         end
         loadFlag=exist('dataTag');
         if ~loadFlag
-            load([mainPath monkeyName '/Meta/summary/statistics' chamberWanted 'tag.mat'], 'bitmapData');
-            load([mainPath monkeyName '/Meta/psychometrics/' chamberWanted '-chamber/weibullfreeAll/mdlStruct' chamberWanted '.mat'], 'mdlStruct');
+            %load([mainPath monkeyName '/Meta/summary/statistics' chamberWanted 'tag.mat'], 'bitmapData');
+            %load([mainPath monkeyName '/Meta/psychometrics/' chamberWanted '-chamber/weibullfreeAll/mdlStruct' chamberWanted '20.mat'], 'mdlStruct');
+            load([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-final' nBlockStr '.mat'],'blockData','bitmapData','behavioralData','analysisBlockID','datastruct','dataTag','mdlStruct')
+
             %load([mainPath 'Chip/Meta/neurometric/neuroStruct' chamberWanted '.mat'], 'neuroStruct');
         elseif loadFlag
             if ~strcmp(dataTag,chamberWanted)
-                load([mainPath monkeyName '/Meta/summary/statistics' chamberWanted 'tag.mat'], 'bitmapData');
-                load([mainPath monkeyName '/Meta/psychometrics/' chamberWanted '-chamber/weibullfreeAll/mdlStruct' chamberWanted '.mat'], 'mdlStruct');
+                %load([mainPath monkeyName '/Meta/summary/statistics' chamberWanted 'tag.mat'], 'bitmapData');
+                %load([mainPath monkeyName '/Meta/psychometrics/' chamberWanted '-chamber/weibullfreeAll/mdlStruct' chamberWanted '20.mat'], 'mdlStruct');
+                load([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-final' nBlockStr '.mat'],'blockData','bitmapData','behavioralData','analysisBlockID','datastruct','dataTag','mdlStruct')
+
                 %load([mainPath monkeyName '/Meta/neurometric/neuroStruct' chamberWanted '.mat'], 'neuroStruct');
             end
         end
-               
+        
+        if strcmp(datastruct(1).monkeyNo,'28')
+            monkeyNo='1';
+        elseif strcmp(datastruct(1).monkeyNo,'32')
+            monkeyNo='2';
+        end
+       chamberStr=chambers{chamberIDs};
+
         % Get datastruct block IDs
         nColumnsWanted = []; %all
         analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted);
 
         % Get cluster information
         analysisParams=[];
-        [~, ~, clusterIdx, ~] = clusterEnergy(squeeze(bitmapData.energy), squeeze(bitmapData.nColumns), 'bin', 2, analysisParams);
+        [~, ~, clusterIdx, ~] = clusterEnergy(squeeze(bitmapData.totalPowerToOnPixelsWithinROI_mW), squeeze(bitmapData.nColumns), 'kmeans', 1, analysisParams);
 
         nClusters = numel(unique(clusterIdx));
 
@@ -104,41 +119,56 @@ function plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, 
     end
    
     %% PLOT DELTA OPTO SCATTER
+    %% 20 column power x biasing
+    figure
+    deltaBiasY = mdlStruct.([chamberWanted, 'weibullfreeAll' , 'C1']).deltaBias;
+    deltaMaskY = mdlStruct.([chamberWanted, 'weibullfreeAll' , 'C1']).deltaMask;
+    bitmapEnergy=mean(squeeze(bitmapData.totalPowerToOnPixelsWithinROI_mW(:,:,:))',2);
+    columns=mean(bitmapData.nColumns(:,:))';
+    blocksActual = find(columns >= columnsDesired-columnSpread &...
+        columns <= columnsDesired+columnSpread &...
+        mean(squeeze(bitmapData.orts)==[0;90])');
     
-    condStrs={'Con-opto','Incon-opto'};
-    condSaveStrs={'Con','Incon'};
-    nConds=size(data.(chamberWanted).psy,2);
-    nBlocks=size(data.(chamberWanted).psy,1);
-    % Setup predictors
-    figure('Name', 'Psy');
-    for cluster=clustersDesired
-        clusterDataIdx=find(clusterData==cluster);
-        blockNo=1:numel(clusterDataIdx);
-        dataPsyCon=data.(chamberWanted).psy(clusterDataIdx,1);
-        dataPsyIncon=data.(chamberWanted).psy(clusterDataIdx,2);
-        dataPhiCon=data.(chamberWanted).phi(clusterDataIdx,1);
-        dataPhiIncon=data.(chamberWanted).phi(clusterDataIdx,2);
-        dataEnergyAvg=mean(data.(chamberWanted).energy(clusterDataIdx,1:2),2);
-        scatter(dataEnergyAvg, dataPsyCon-dataPsyIncon, 250, 'ksq', 'LineWidth', 2.5,'markerFaceColor',[156, 14, 254] / 255,'markerFaceAlpha',.8); hold on;%[0.9294, 0.1098, 0.1373] * 1.05
+    blocksControl = find(columns >= columnsDesired-columnSpread &...
+        columns <= columnsDesired+columnSpread &...
+        mean(squeeze(bitmapData.orts)==[45;135])');
+    
+    yline(0,'LineStyle','--','color',[.5 .5 .5],'LineWidth',1.5,'HandleVisibility','off'); hold on
+    % Plot actual data
+    mdlScatter=fitSaturatingCurve(bitmapEnergy(blocksActual),deltaBiasY(blocksActual),  'k', 1); hold on
+    mdlScatter=fitSaturatingCurve(bitmapEnergy(blocksActual),deltaMaskY(blocksActual),  'k', 1); hold on
+    scatter(bitmapEnergy(blocksActual),deltaBiasY(blocksActual),200,'Marker', 'square', ...
+        'MarkerFaceColor', purple, 'MarkerEdgeColor', 'k', 'LineWidth',2,'DisplayName','Con-Incon (0\circ, 90\circ)'); hold on
+    scatter(bitmapEnergy(blocksActual),deltaMaskY(blocksActual),200,'Marker', 'square', ...
+        'MarkerFaceColor', [.5 .5 .5], 'MarkerEdgeColor', 'k', 'LineWidth',2,'DisplayName','Base-Opto'); hold on
+    % Plot control data
+    if ~isempty(blocksControl)
+        scatter(bitmapEnergy(blocksControl)+rand(1,5)'/10,deltaBiasY(blocksControl),200,'Marker', 'square', ...
+            'MarkerFaceColor', [1 1 1]*1, 'MarkerEdgeColor', 'k', 'LineWidth',2,'DisplayName','Con-Incon (45\circ, 135\circ)'); hold on
     end
-    yline(0,'--','LineWidth',2,'Color',[.65 .65 .65])
-    xlabel('Power (mW mm-2)');
-    ylabel('\DeltaPerformance (%)');
-    xlim([0 .6]); addSkippedTicks(0,.6,.1,'x')
-    ylim([-10 50]); addSkippedTicks(-10,50,5,'y')
-    title('Behavior','FontSize',24,'FontWeight','normal')
-    upFontSize(24, .01); axis square
-    legend({'Con-Incon'},'Location','northeast','FontSize', 18)
+    legend('Location','best')
+    title({['Power x behavior (M' monkeyNo '-' chamberStr ')'], sprintf('%.0f ± %.0f columns',columnsDesired,round(std(columns(blocksActual))))})
     axis square
+
+    addSkippedTicks(0,4.5,.25,'x')
+    addSkippedTicks(-10,50,5,'y')
+    xlim([0 4.5])
+    ylim([-10 50])
+    %[p,h,stats] = ranksum(actualY(actualX>=3.5), [controlY(controlX>=3.5)' 2 -1 -3], 'tail','both')
+    xlabel('Total power delivered (mW)')
+    ylabel('Δ correct %')
+    upFontSize(20,.01)
+    
     % Save
     switch saveFlag
         case 1
+            figureName=[mainPath monkeyName '/Meta/psychometrics/M' monkeyNo '-powercurve-' chamberStr];
             set(gcf, 'Renderer', 'painters'); % Use painters for vector graphics
-            print(gcf, [mainPath 'Chip/Meta/psychometrics/averagePsyDiff3.png'], '-dpng', '-r600'); % High-res PNG
-            savefig(gcf, [mainPath 'Chip/Meta/psychometrics/averagePsyDiff3.fig']);           % FIG
-            print(gcf, [mainPath 'Chip/Meta/psychometrics/averagePsyDiff3.svg'], '-dsvg');        % SVG
+            print(gcf, [figureName '.png'], '-dpng', '-r600'); % High-res PNG
+            savefig(gcf, [figureName '.fig']);           % FIG
+            print(gcf, [figureName '.svg'], '-dsvg');        % SVG
     end
-    
+
     %% PLOT DELTA OPTO HIST
     % Setup predictors
     figure('Name', 'Psy');
@@ -147,7 +177,7 @@ function plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, 
     binEdges = -2.5:5:52.5;  % This creates edges at [-2.5, 2.5, 7.5, 12.5, ..., 52.5]
     
     % Create the histogram with specified bin edges
-    histogram(data.deltaPsy, binEdges, 'EdgeColor', 'k', 'FaceColor', [156, 14, 254]/255, 'FaceAlpha', 0.8, 'LineWidth',2); hold on
+    histogram(data.deltaPsy, binEdges, 'EdgeColor', 'k', 'FaceColor', purple, 'FaceAlpha', 0.8, 'LineWidth',2); hold on
     %histogram([11 -1 2 8 7], binEdges, 'EdgeColor', 'k', 'FaceColor',[255, 166, 0]/255, 'FaceAlpha',1, 'LineWidth',2); hold on
     % Add formatting
     xline(0,'--','LineWidth',2,'Color',[.65 .65 .65])
@@ -155,9 +185,9 @@ function plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, 
     ylabel('Count');
     title('Distribution of \DeltaCorrect', 'FontSize', 24, 'FontWeight', 'normal');
     % cosmetics
-    addSkippedTicks(-50,50,12.5,'x'); xlim([-50 50]);
-    addSkippedTicks(0,8,1,'y'); ylim([0 8]);
-    title('Behavior','FontSize',24,'FontWeight','normal')
+    xlim(xlims);addSkippedTicks(xlims(1),xlims(2),xlims(2)/4,'x');
+    ylim([0 16]); addSkippedTicks(0,16,2,'y'); 
+    title(['Behavior (M' monkeyNo '-' chamberStr ')'],'FontSize',24,'FontWeight','normal')
     upFontSize(24, .01); axis square
     legend({'Con-Incon'},'Location','northwest','FontSize', 18)
     axis square
@@ -196,10 +226,11 @@ function plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, 
     % Save
     switch saveFlag
         case 1
+            figureName=[mainPath monkeyName '/Meta/psychometrics/M' monkeyNo '-histogram-' chamberStr];
             set(gcf, 'Renderer', 'painters'); % Use painters for vector graphics
-            print(gcf, [mainPath 'Chip/Meta/psychometrics/averageDeltaPsy' chamberStr '.png'], '-dpng', '-r600'); % High-res PNG
-            savefig(gcf, [mainPath 'Chip/Meta/psychometrics/averageDeltaPsy' chamberStr '.fig']);           % FIG
-            print(gcf, [mainPath 'Chip/Meta/psychometrics/averageDeltaPsy' chamberStr '.svg'], '-dsvg');        % SVG
+            print(gcf, [figureName '.png'], '-dpng', '-r600'); % High-res PNG
+            savefig(gcf, [figureName '.fig']);           % FIG
+            print(gcf, [figureName '.svg'], '-dsvg');        % SVG
     end
 end
 

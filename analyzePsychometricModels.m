@@ -7,7 +7,8 @@ mdlStruct = struct();
 AICCdeltax = struct();
 AICCbeta = struct();
 thresh=[];beta=[];exp=[];c50=[];
-for cluster=3%1:nClusters%1:nClusters
+nClusters=numel(unique(clusterIdx));
+for cluster=1:nClusters%1:nClusters
     disp(['Cluster ' num2str(cluster)])
     
     % Get columns
@@ -17,7 +18,7 @@ for cluster=3%1:nClusters%1:nClusters
     columns = mean(bitmapData.nColumns', 2)';
 
     % Compute bitmap energy mean
-    bitmapEnergy = mean(squeeze(bitmapData.energy), 1);
+    bitmapEnergy = mean(squeeze(bitmapData.meanPowerDensityWithinROI_mWmm2), 1);
 
     % Find cluster block indices matching criteria
     clusterBlocksIdx = find(clusterIdx == cluster); %find(clusterIdx == cluster & ...
@@ -33,7 +34,7 @@ for cluster=3%1:nClusters%1:nClusters
     end
     bitmapDataAvg.energy=[];
     
-    for modelID = 1
+    for modelID = 2
         modelTypeStr = modelTypes{modelID};
 
         conds = 1:3;
@@ -43,10 +44,10 @@ for cluster=3%1:nClusters%1:nClusters
         % Fit psychometric data
         switch strcmp(modelTypeStr, 'bill')
             case 1
-                [mdl, mdlAvg] = fitPsyMLE(xBlocks, yBlocks, 'bill', plotLine);
+                [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, 'bill', plotLine);
                 %[mdl,mdlAvg] = fitPsyMLE(xBlocks, yBlocks, modelTypeStr);
             case 0
-                [mdl,mdlAvg] = fitPsyMLE(xBlocks, yBlocks, modelTypeStr, plotLine);
+                [mdl,mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelTypeStr, plotLine);
                 %[mdl,mdlAvg] = fitNakaRushtonMLE3(xBlocks, yBlocks, modelTypeStr);
         end
         xFit = sort([nlinspace(0, 100, 100, 'linear')]);
@@ -56,7 +57,7 @@ for cluster=3%1:nClusters%1:nClusters
                 if strcmp(modelTypeStr, 'bill')
                     % Plot per block
                     plotAverageFlag=0;
-                    mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysisBlockID,...
+                    mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysisBlockID,...
                         mdl, mdl.fittedParams(:, :, 1), xFit, monkeyName, clusterBlocksIdx, plotAverageFlag, plotLine,...
                         saveFlag, cluster, modelTypeStr, savefilenameBlock);
                     
@@ -83,7 +84,7 @@ for cluster=3%1:nClusters%1:nClusters
                 else
                     % Plot per block
                     plotAverageFlag=0;
-                    mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysisBlockID,...
+                    mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysisBlockID,...
                         mdl, mdl.fittedParams(:, :, 1), xFit, monkeyName, clusterBlocksIdx, plotAverageFlag, plotLine,...
                         saveFlag, cluster, modelTypeStr, savefilenameBlock);
                 end
@@ -92,7 +93,8 @@ for cluster=3%1:nClusters%1:nClusters
         end
     end
     mdlStruct.([chamberWanted, modelTypeStr, 'C' num2str(cluster)]) = mdl;
-    mdlStruct.([chamberWanted, modelTypeStr, 'C' num2str(cluster) 'Avg']) = mdlAvg;
+
+    %mdlStruct.([chamberWanted, modelTypeStr, 'C' num2str(cluster) 'Avg']) = mdlAvg;
     %% Compare models of given cluster
     % Filter and compare models with non-parametric t-test (per chamber)
     %savefilename = ['psychometrics/' chamberWanted '-chamber/' 'paramdist-' chamberWanted '-' modelTypes{2} modelTypes{3}  '-C' num2str(cluster)];
@@ -113,8 +115,9 @@ for cluster=3%1:nClusters%1:nClusters
     %ranksum(mdlStruct.Rdeltax.fittedParams(:, 4), mdlStruct.Ldeltax.fittedParams(:, 4));
     %CF
 end
+nBlockStr=num2str(numel(analysisBlockID));
+save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-psychometrics' nBlockStr '.mat'],'mdlStruct')
 save([mainPath monkeyName '/Meta/psychometrics/' chamberWanted '-chamber/' modelTypeStr '/mdlStruct' chamberWanted num2str(columnsDesired) '.mat'], 'mdlStruct');
-
 %% Plot param dist
 
 %{

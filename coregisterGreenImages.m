@@ -9,12 +9,12 @@ function [movingImgMaskCoregistered,ssimPost,transformParams,ImgReference,ImgTar
 %% Coreg
 % Get coregistration params for greenImageReference (to be transformed) to greenImageSession (anchor image)
 sameSession=isequal(currentBlockStruct.date,referenceBlockStruct.date);
-sameSession=1; %OVERRIDE
+
 switch sameSession
     case {1}
         method='auto'; %manual/auto
     case {0}
-        method='manual';
+        method='auto';
 end
 
 coregMask=1;

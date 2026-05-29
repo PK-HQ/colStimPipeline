@@ -37,5 +37,5 @@ p          = [c(1), c(2), c(3)*xScale];         % A, B, K in original units
 xx = linspace(min(x), max(x), 200);
 yy = fh([c(1:2).', c(3)], xx./xScale);          % note transpose!
 hold on
-plot(xx, yy, '-', 'Color', linecolor, 'LineWidth', 2);
+plot(xx, yy, '-', 'Color', linecolor, 'LineWidth', 2, 'HandleVisibility', 'off');
 end

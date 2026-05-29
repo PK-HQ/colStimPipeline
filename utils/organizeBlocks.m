@@ -70,7 +70,7 @@ switch monkeyName
                             datastructRight(rightIndex) = entryNo;
                         end
                     end
-                    excludeBlocksR=nan;
+                    excludeBlocksR=[81 82]; %post-seizure #2
                 end
             end
         end

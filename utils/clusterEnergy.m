@@ -14,7 +14,7 @@ function [bins, binEdges, clusterIdx, validIndices] = clusterEnergy(bitmapEnergi
     meanPowers = mean(bitmapEnergies, 1);
     
     % If nClusters is not provided, determine it unsupervised
-    if nargin < 3 || isempty(nClusters)
+    if nargin < 4 || isempty(nClusters)
         maxClusters = 10; % Maximum number of clusters to consider
         if strcmpi(method, 'bin')
             nClusters = 3; % Default for binning if not specified
@@ -56,6 +56,32 @@ function [bins, binEdges, clusterIdx, validIndices] = clusterEnergy(bitmapEnergi
         clusterIdx = discretize(meanPowers, binEdges);
     end
     
+
+    %% Relabel clusters by increasing mean power
+    if ~strcmpi(method, 'bin')
+        oldClusters = unique(clusterIdx(~isnan(clusterIdx)));
+        clusterCenters = nan(size(oldClusters));
+    
+        for c = 1:numel(oldClusters)
+            clusterCenters(c) = median(meanPowers(clusterIdx == oldClusters(c)));
+            % or use mean(...) if you prefer
+        end
+    
+        % Sort clusters from lowest to highest power
+        [~, sortOrder] = sort(clusterCenters, 'ascend');
+        sortedOldClusters = oldClusters(sortOrder);
+    
+        % Remap old cluster labels to 1, 2, 3, ...
+        newClusterIdx = nan(size(clusterIdx));
+    
+        for newLabel = 1:numel(sortedOldClusters)
+            oldLabel = sortedOldClusters(newLabel);
+            newClusterIdx(clusterIdx == oldLabel) = newLabel;
+        end
+    
+        clusterIdx = newClusterIdx;
+    end
+
     % Organize blocks into bins
     uniqueClusters = unique(clusterIdx);
     m = length(uniqueClusters);

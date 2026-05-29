@@ -95,7 +95,7 @@ switch pipelineMode
             behavioralData.referenceTS(blockID)=TS;
         end
 
-        load(referenceEntry.Orientation, 'Mask', 'RespCondPCA', 'Ort', 'MapAmpOrt', 'PCAExpl','nPCAComp');
+        load(referenceEntry.Orientation, 'Mask', 'RespCondPCA', 'Ort', 'MapAmpOrt', 'PCAExpl','nPCAComp','ThsdDP');
         % Gaussian Fit
         if isfile(currentEntry.gaussianFit)
             load(currentEntry.gaussianFit,'ROIMaskgaussian','centerCoords');
@@ -172,6 +172,7 @@ switch pipelineMode
         imagingData.ortampmap(:,:,:,blockID)=imagingData.mask(:,:,blockID).*MapAmpOrt;
         imagingData.npca(1,blockID)=nPCAComp;
         imagingData.pcaexpl(:,blockID)=padArray(PCAExpl, 12, 1, NaN);
+        imagingData.dprime(:,blockID)=ThsdDP;
 
         % Gaussian fitting
         imagingData.gaussresp(1:128,1:128,1:3,blockID)=padArray(FFTCond, 3, 3, NaN);
@@ -186,5 +187,13 @@ switch pipelineMode
         
         % Cam-proj transformation
         imagingData.transformmatrix(:,blockID)=alignmentTransform;
+
+        % Visual
+        behavioralData.visualStim(blockID).gaborCon=behavioralData.optoTS(blockID).Header.ConditionParams.Stimulus.GaborContrast__pc;
+        behavioralData.visualStim(blockID).gaborSize=behavioralData.optoTS(blockID).Header.ConditionParams.Stimulus.GaborSize__deg;
+        behavioralData.visualStim(blockID).gaborSF=behavioralData.optoTS(blockID).Header.ConditionParams.Stimulus.GaborSF_cpd;
+        behavioralData.visualStim(blockID).gaborOrt=behavioralData.optoTS(blockID).Header.ConditionParams.Stimulus.GaborOrt__deg;
+        behavioralData.visualStim(blockID).gaborPos=[behavioralData.optoTS(blockID).Header.ConditionParams.Stimulus_Position.X__deg behavioralData.optoTS(blockID).Header.ConditionParams.Stimulus_Position.Y__deg];
+        
 end
 end

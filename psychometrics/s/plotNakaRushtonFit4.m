@@ -7,7 +7,7 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
     if plotAverageFlag==1
         nBlocks=1;
     end
-    for block = 2:3%:nBlocks
+    for block = nBlocks%:-1:1
         % Init figure
         dat=[];
         make_it_tight = true;
@@ -227,7 +227,8 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                     end
                     % Labels etc
                     %axis square
-                    xlim([0 50]); ylim([0 100]); xticks(0:12.5:100);addSkippedTicks(0,50,5,'x'); addSkippedTicks(0,100,10,'y'); axis square
+                    xlim([0 100]); ylim([0 100]); xticks(0:12.5:100);
+                    addSkippedTicks(0,100,10,'x'); addSkippedTicks(0,100,10,'y'); axis square
                     % Adding legend after plotting to ensure it covers all conditions
                     moveLines()
                     h2 = get(gca,'Children');
@@ -298,9 +299,10 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                 end
                 upFontSize(32, 0.01);
                 %annotateDataPoints(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), nTrials, markerFaceColor); hold on;
-                xlim([0 50])
+                xlim([0 100])%xlim([0 50])
                 ylim([-50 50])
                 addSkippedTicks(-40, 40, 10,'y')
+                addSkippedTicks(0, 100, 10, 'x')
                 yline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
                 ylabel('\DeltaCorrect_{con-incon} (%)')
                 legend('Con-Incon', 'Location', 'southeast',...

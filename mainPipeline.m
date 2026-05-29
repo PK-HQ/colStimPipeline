@@ -1,23 +1,24 @@
-%% Define analysis and current session to be analysed
+    %% Define analysis and current session to be analysed
 % === Select analysis to run ===
 % Main modes:
 % 1. expt = generate bitmaps for experiments
 % 2. summary = generate expt + psychometric + neurometric fits from experiment
-% 3. psycluster = fit psychometric curves only,
+% 3. psycluster = fit psychometric curves only
 % 4. neurometrics = fit neurometric curves only
 % 5. psyphiscatter = plot psycluster data as histogram/scatter (requires psycluster to be run first)
 % 6. stability = quantifies stability of vasculature image across sessions
 % 7. neurometricsfix = neurometrics for columnar optostim, fixation-state
 % 8. PRF = fit and plot PRF for single sessions
 % 9. SIRF = fit and plot SIRF across sessions
+% 10. psyphidist***
 
 %% Change these for experiment runs
-analysisMode='psyphidist';
+analysisMode='psycluster';%psyphidist
 monkeyName='Pepper';%Pepper or Chip
-currentSessID=76;%for biasing expt
+currentSessID=81;%for biasing expt
 
 % Saving and plotting flags
-saveFlag=0;
+saveFlag=1;
 saveFlagBMP=0;
 plotFlag=1;
 skipImaging=1;
@@ -28,12 +29,13 @@ chambers={'R', 'L'};
 for chamberID=1
     nColumnsWanted=[]; chamberWanted=chambers{chamberID};
     analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted);
-    
+    nBlockStr=num2str(numel(analysisBlockID));
     %% Run the desired analysis pipeline variant
     switch analysisMode
         case 'camproj'
             alignmentTransform = getAlignmentTransform(datastruct(currentSessID));
-            %20250319O0, opto30%, exopto as em filter, optodicroic, blackcard
+            %20250319O0, opto10%, optodicroic,
+            %blackcard, 20hz
         case 'expt'
             % Setup for single chamber
             nColumnsWanted = [];
@@ -54,7 +56,7 @@ for chamberID=1
 
             % Load single block data
             [currentBlockStruct, referenceBlockStruct,...
-                behavioralData, imagingData, bitmapData, successFlag] = loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID, analysisMode, skipImaging);
+                behavioralData, imagingData, bitmapData, successFlag] = loadBlockData(datastruct, analysisBlockID, blockData,behavioralData, imagingData, bitmapData, blockID, analysisMode, skipImaging);
 
             if ~successFlag
                 error('Failed to load block data');
@@ -79,13 +81,14 @@ for chamberID=1
             
         case {'summary'}
             if ~exist('imagingData','var')
+                blockData=[];
                 behavioralData=[];
                 imagingData=[];
                 bitmapData=[];
             end
             
             for blockID=1:numel(analysisBlockID)
-                disp(['=== Block ' num2str(blockID)  '/' num2str(numel(analysisBlockID)) ' (entry: ' num2str(analysisBlockID(blockID)) ')==='])
+                disp(['=== Block ' num2str(blockID)  '/' nBlockStr ' (entry: ' num2str(analysisBlockID(blockID)) ')==='])
                 tic
                 if isfield(behavioralData,'auc') && size(behavioralData.auc,3)>=blockID
                      disp('(Skipping completed block)')
@@ -93,7 +96,7 @@ for chamberID=1
                 end
                 % === Load block data ===
                  [currentBlockStruct,referenceBlockStruct,...
-                    behavioralData, imagingData, bitmapData, successFlag]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID, analysisMode, skipImaging);
+                    blockData, behavioralData, imagingData, bitmapData, successFlag]=loadBlockData(datastruct, analysisBlockID, blockData, behavioralData, imagingData, bitmapData, blockID, analysisMode, skipImaging);
                  if ~successFlag
                      continue
                  end
@@ -110,7 +113,7 @@ for chamberID=1
                     analysisMode, pdfFilename, plotFlag,saveFlag);
         
                   % === Generate bitmap, correct for projector properties and camera-projector alignment===
-                   [bitmapData]=convertForProjectorGPT(behavioralData, imagingData, bitmapData,...
+                   [bitmapData]=convertForProjectorGPT2(behavioralData, imagingData, bitmapData,...
                         currentBlockStruct,'proj2cam', blockID, ...
                         pdfFilename, plotFlag,saveFlagBMP,saveFlag); % or proj2cam
         
@@ -128,24 +131,26 @@ for chamberID=1
                     %imagingData.optoIntg=[];imagingData.baselineIntg=[]; ...
                     %behavioralData.optoTS(blockID)=[]; behavioralData.baselineTS(blockID)=[]; behavioralData.referenceTS(blockID)=[]; % imagingData.gaussfit(:,:,blockID)=[];
                     CF; % close fig
-                    behavioralData=clearFields(behavioralData, {'gaborContrasts', 'percentageCorrect'});
+                    behavioralData=clearFields(behavioralData, {'gaborContrasts', 'percentageCorrect','visualStim'});
 
             end
-            behavioralData=clearFields(behavioralData, {'gaborContrasts', 'percentageCorrect'});
+            behavioralData=clearFields(behavioralData, {'gaborContrasts', 'percentageCorrect','visualStim'});
             dataTag=chamberWanted;
             %save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted 'tag.mat'],'-v7.3','bitmapData','behavioralData','analysisBlockID','datastruct')
-            save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-psychometrics.mat'],'bitmapData','behavioralData','imagingData','analysisBlockID','datastruct','dataTag')
+            save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-full' nBlockStr '.mat'],'blockData','bitmapData','behavioralData','imagingData','analysisBlockID','datastruct','dataTag')
 
         case {'psyclusterPre'}
-            %{
+            
             if ~exist('behavioralData','var')
+                
                 behavioralData=[];
                 imagingData=[];
                 bitmapData=[];
+                load([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-full' nBlockStr '.mat']);
             end
-            %}
-            for blockID=1:numel(analysisBlockID)
-                disp(['=== Block ' num2str(blockID)  '/' num2str(numel(analysisBlockID)) '==='])
+            
+            for blockID=numel(analysisBlockID):-1:1
+                disp(['=== Block ' num2str(blockID)  '/' nBlockStr '==='])
                 tic
                 if isfield(behavioralData,'auc') && size(behavioralData.auc,3)>=blockID
                      disp('(Skipping completed block)')
@@ -153,7 +158,7 @@ for chamberID=1
                 end
                 % === Load block data ===
                  [currentBlockStruct,referenceBlockStruct,...
-                    behavioralData, imagingData, bitmapData, successFlag]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID, analysisMode, skipImaging);
+                    blockData, behavioralData, imagingData, bitmapData, successFlag]=loadBlockData(datastruct, analysisBlockID, blockData,behavioralData, imagingData, bitmapData, blockID, analysisMode, skipImaging);
                  if ~successFlag
                      continue
                  end
@@ -169,33 +174,32 @@ for chamberID=1
                 %imagingData.optoIntg=[];imagingData.baselineIntg=[]; imagingData.gaussfit(:,:,blockID)=[]; behavioralData.optoTS(blockID)=[]; behavioralData.baselineTS(blockID)=[]; behavioralData.referenceTS(blockID)=[];
                 CF; % close fig
             end
-            behavioralData=clearFields(behavioralData, {'gaborContrasts', 'percentageCorrect'});
+            behavioralData=clearFields(behavioralData, {'gaborContrasts', 'percentageCorrect','visualStim'});
             dataTag=chamberWanted;
-            save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-psychometrics.mat'],'bitmapData','behavioralData','analysisBlockID','datastruct','dataTag')
+            save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-psychometricsPre' nBlockStr '.mat'],'blockData','bitmapData','behavioralData','analysisBlockID','datastruct','dataTag')
 
         case {'psycluster'}
             %% Psychometrics: Cluster blocks by binning mean energy per block
             filterTag=true;
             % Load only if its not loaded
             if ~exist('dataTag')
-                load([mainPath monkeyName '/Meta/summary/statistics' chamberWanted '-psychometrics.mat']);
+                load([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-psychometricsPre' nBlockStr '.mat']);
             elseif exist('dataTag')
                 if ~strcmp(dataTag,chamberWanted)
-                    load([mainPath monkeyName '/Meta/summary/statistics' chamberWanted '-psychometrics.mat']);
+                    load([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-psychometricsPre' nBlockStr '.mat']);
                 end
             end
-            if filterTag==true & chamberID==1
-                analysisParams.cluster=[1]; % mean
-                analysisParams.columnMean=20; % mean
-                analysisParams.columnRange=4; % stdev    
-            elseif filterTag==true & chamberID==2
-                analysisParams.cluster=[3 4]; % mean
+            if filterTag==true
                 analysisParams.columnMean=20; % mean
                 analysisParams.columnRange=4; % stdev
             end
             analysisParams=[];
             nBlocks=numel(analysisBlockID);
-            [bins, binEdges, clusterIdx, validBlocks] = clusterEnergy(squeeze(bitmapData.energy), squeeze(bitmapData.nColumns), 'kmeans', 5, analysisParams);
+            method='kmeans';
+            [bins, binEdges, clusterIdx, validBlocks] = clusterEnergy(squeeze(bitmapData.meanPowerDensityWithinROI_mWmm2),...
+                squeeze(bitmapData.nColumns), method, 1, analysisParams);
+            %save([mainPath '/' monkeyName '/Meta/psychometrics/powercluster_' method monkeyName chamberWanted '_' analysisParams.columnMean '±' analysisParams.columnRange '.mat'],'bitmapData','behavioralData','analysisBlockID','datastruct','dataTag')
+
             %savePDF(['psychometrics/' chamberWanted '-chamber/' num2str(numel(bins)) 'clusters'], 'Chip', 1, 1, 1)
             monkeyName=datastruct(analysisBlockID(1)).monkey;
             
@@ -204,13 +208,14 @@ for chamberID=1
             fieldName='AICc';
             constrainedParamStr='';
             plotLine=1;
-            % Pepper hardcode
-            %clusterIdx=repmat(1,1,numel(analysisBlockID));
-                        
+                       
             validBlocks=analysisBlockID;
             mdlStruct=analyzePsychometricModels(monkeyName, chamberWanted, modelTypes, mainPath, ...
                 behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, saveFlag);
             
+            save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-final' nBlockStr '.mat'],'blockData','bitmapData','behavioralData','analysisBlockID','datastruct','dataTag','mdlStruct')
+
+            %{
             %% 20 column power x biasing
             figure
             conY = mdlStruct.([chamberWanted, 'weibullfreeAll' , 'C1']).yConOpto;
@@ -332,7 +337,7 @@ for chamberID=1
             cbL=ylabel(cb,'Power (mW)','FontSize',18,'Rotation',90);
             caxis([0 zMax]); % Set color axis range based on zData
             export_fig(['Y:\users\PK\posters\figures\2024\betaSessions' chamberWanted],'-svg','-png','-nocrop','-r600');
-            
+            %}
                                     
             %% Neurometrics
         case {'neurometrics'}
@@ -398,8 +403,8 @@ for chamberID=1
                 plotPsyPhiCorrelation(datastruct, mainPath, chambers, chamberIDs, filterColumns, saveFlag)
             
         case {'psyphidist'}
-                chamberIDs=1; saveFlag=0; filterColumns=0;
-                plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, filterColumns, saveFlag)
+                chamberIDs=chamberID; saveFlag=1; filterColumns=1;
+                plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, nBlockStr, filterColumns, saveFlag)
 
         case {'PRF'}
             fitPRFv2
@@ -413,7 +418,7 @@ for chamberID=1
             end
             
             for blockID=1:numel(analysisBlockID)%1:numel(analysisBlockID)
-                disp(['=== Block ' num2str(blockID)  '/' num2str(numel(analysisBlockID)) '==='])
+                disp(['=== Block ' num2str(blockID)  '/' nBlockStr '==='])
                 tic
                 if isfield(behavioralData,'auc') && size(behavioralData.auc,3)>=blockID
                      disp('(Skipping completed block)')
@@ -421,7 +426,7 @@ for chamberID=1
                 end
                 % === Load block data ===
                  [currentBlockStruct,referenceBlockStruct,...
-                    behavioralData, imagingData, bitmapData, successFlag]=loadBlockData(datastruct, analysisBlockID, behavioralData, imagingData, bitmapData, blockID, analysisMode);
+                    behavioralData, imagingData, bitmapData, successFlag]=loadBlockData(datastruct, analysisBlockID, blockData,behavioralData, imagingData, bitmapData, blockID, analysisMode);
 
                 % Save for table
                 optoTrialsIdx=behavioralData.optoTS(blockID).Header.Conditions.TypeCond>0;

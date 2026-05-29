@@ -28,7 +28,7 @@ function alignmentTransform = getAlignmentTransform(dataStruct)
     responseOriginal = double(imread(fullfile(responsePath, responseFile)));
 
     % Process response image
-    thresholdBmpEst = 94;
+    thresholdBmpEst = 98;
     responseOriginalHE = adapthisteq(rescale(responseOriginal,0,1), ...
         'NumTiles', size(responseOriginal)./8, 'Range', 'full');
     responseOriginalFilt = double(responseOriginalHE >= ...
@@ -72,8 +72,8 @@ function alignmentTransform = getAlignmentTransform(dataStruct)
     regParams.PyramidLevels=3;
 
     scale=.67;
-    transX=285-75;
-    transY=195+37;
+    transX=285-95;
+    transY=195+60;
     shear=0;
     rotate=0;
     % Create initial transformation with your parameters

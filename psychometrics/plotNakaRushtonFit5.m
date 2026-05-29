@@ -1,4 +1,4 @@
-function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysisBlockID,...
+function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysisBlockID,...
     mdl, fitParams, x, monkeyName, clusterBlocks, plotAverageFlag, plotLine,...
     saveFlag, cluster, modelTypeStr, savefilename)
     endIdx=size(mdl.headers,2);
@@ -9,20 +9,31 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
     end
     mdl.cluster=cluster;
     mdl.clusterBlocksIdx=clusterBlocks;
+    
+    % Dynamic x-axis limits for this animal/chamber/cluster set.
+    % These are computed from all currently available mdl rows, so every block
+    % in this plotting call uses the same x-limits and same mean-bar geometry.
+    [xLimPre, xLimMerged, meanBar, tickCfg] = getPsychometricAxisLimits(mdl);
+    
     for block = 1:nBlocks
         % Init figure
         dat=[];
         make_it_tight = true;
-        hmarg=.15;
-        subplot = @(m,n,p) subtightplot (m, n, p, [0.1 0.1], [hmarg hmarg], [0.1 0.1]);
+        hmarg = .18;
+        subplot = @(m,n,p) subtightplot(m, n, p, [0.1 0.1], [hmarg hmarg], [0.1 0.1]);
         if ~make_it_tight,  clear subplot;  end
        
         figure('Name', ['Block #', datastruct(clusterBlocks(block)).date]);
-        subplot(1,2,1)
-
+        
+        % Panel 1: pre-merged raw/split data
+        subplot(1,3,1)
+        mdl = plotPreMergedPanel(mdl, block, xLimPre, meanBar, tickCfg);
+        
+        % Panel 2: merged fitted data
+        subplot(1,3,2)
         hold on;
         yline(50,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
-        %xline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on
+
         for cond = 1:nConditions+2
             % Extract fitted parameters for current condition and block
             beta = fitParams(block, 1);
@@ -219,7 +230,7 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                                {'Color', lineColor, 'LineStyle', 'none', 'LineWidth', 3, 'Marker', markerType, ...
                                 'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize}); hold on;
                 % Average
-                barLength=45:50;
+                barLength = meanBar.rightEdgeRange;
                 plot(barLength, repmat(nanmean(mdl.yBlock(cond,:,block)),1,numel(barLength)), '-', 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'off')
 
                 % Add datapoints's count annotation
@@ -245,12 +256,12 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                 if cond==3
                     [combinedBLStr,mdl.combinedBL(block)]=checkMergedBaseline(datastruct,analysisBlockID,block);
 
-                    if isfield(bitmapData, 'energy') & ~isempty(bitmapData.energy(:,:,clusterBlocks(block)))
+                    if isfield(bitmapData, 'meanPowerDensityWithinROI_mWmm2') & ~isempty(bitmapData.meanPowerDensityWithinROI_mWmm2(:,:,clusterBlocks(block)))
                         if plotAverageFlag % for plotting the average across all blocks
-                            bitmapSPD=squeeze(bitmapData.energy(:,:,clusterBlocks));
+                            bitmapSPD=squeeze(bitmapData.meanPowerDensityWithinROI_mWmm2(:,:,clusterBlocks));
                             bitmapColumns=bitmapData.nColumns(:,clusterBlocks)';
                         else
-                            bitmapSPD=squeeze(bitmapData.energy(:,:,clusterBlocks(block)));
+                            bitmapSPD=squeeze(bitmapData.meanPowerDensityWithinROI_mWmm2(:,:,clusterBlocks(block)));
                             bitmapColumns=bitmapData.nColumns(:,block)';
                         end
                     else
@@ -262,18 +273,22 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                     bitmapSPDstd=nanstd(bitmapSPD,[],'all');
                     if plotAverageFlag==1
                         title({[modelTypeStr ', cluster ' num2str(cluster) ' average'],...
-                            ['Energy: ' num2str(bitmapSPDhv(1),2) ' & ' num2str(bitmapSPDhv(2),2) ' mW (' num2str(bitmapSPDmean,2) ' \pm ' num2str(bitmapSPDstd,1) ' mW)',...
+                            ['meanPowerDensityWithinROI_mWmm2: ' num2str(bitmapSPDhv(1),2) ' & ' num2str(bitmapSPDhv(2),2) ' mW (' num2str(bitmapSPDmean,2) ' \pm ' num2str(bitmapSPDstd,1) ' mW)',...
                             ', Columns: ' num2str(bitmapColumnhv(1),2) ' & ' num2str(bitmapColumnhv(2),2)]});
                     else
                         %{
                         title({[datastruct(clusterBlocks(block)).date 'R' datastruct(analysisBlockID(block)).run ' (' combinedBLStr ')'],...
-                            ['Energy: ' num2str(bitmapSPDhv(1),2) ' & ' num2str(bitmapSPDhv(2),2) ' mW, ',...
+                            ['meanPowerDensityWithinROI_mWmm2: ' num2str(bitmapSPDhv(1),2) ' & ' num2str(bitmapSPDhv(2),2) ' mW, ',...
                             'Columns: ' num2str(bitmapColumnhv(1),2) ' & ' num2str(bitmapColumnhv(2),2)]});
                         %}
                     end
                     % Labels etc
                     %axis square
-                    xlim([0 50]); ylim([0 100]); xticks(0:12.5:100);addSkippedTicks(0,50,5,'x'); addSkippedTicks(0,100,10,'y'); axis square
+                    xlim(xLimMerged); ylim([0 100]);
+                    xticks(xLimMerged(1):tickCfg.mergedMajor:xLimMerged(2));
+                    addSkippedTicks(xLimMerged(1), xLimMerged(2), tickCfg.mergedSkip, 'x');
+                    addSkippedTicks(0, 100, 10, 'y');
+                    axis square
                     % Adding legend after plotting to ensure it covers all conditions
                     moveLines()
                     h2 = get(gca,'Children');
@@ -293,22 +308,50 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                     ax = gca;
                     ylabel('Correct (%)'); set(gca,'ycolor','k') 
                     xlabel('Gabor contrast (%)');
-                    meanEnergy=squeeze(bitmapData.energy(:, clusterBlocks(block)));
-                    clusterNo=cluster;
-                    meanColumns = mean(bitmapData.nColumns(:, clusterBlocks(block)));
-                    meanPix=mean(bitmapData.pixelsON(:, clusterBlocks(block)));
-                    meanTime=mean(bitmapData.timeONPercent(:, clusterBlocks(block)));
+                    % --- Optostim metadata annotation ---
+                    clusterNo = cluster;
                     
-                    title(sprintf(['%sR%s\n' ...
-                                   'n_{col} = %.0f, Energy = %.2f mW\n' ...
-                                   'n_{pix} = %.0f, time_{on} = %.1f'], ...
-                                   datastruct(analysisBlockID(block)).date, datastruct(analysisBlockID(block)).run, ...
-                                   meanColumns, meanEnergy, ...
-                                   meanPix, meanTime), ...
-                                   'Interpreter', 'tex');
+                    blockIdx = clusterBlocks(block);
+                    
+                    meanColumns = mean(bitmapData.nColumns(:, blockIdx), 'omitnan');
+                    
+                    meanProjectorPD = mean(bitmapData.projectorPowerDensity_mWmm2(:, blockIdx), 'omitnan');
+                    meanAreaROI     = mean(bitmapData.areaFinalROI(:, blockIdx), 'omitnan');
+                    meanAreaON      = mean(bitmapData.areaPixelsONWithinROI(:, blockIdx), 'omitnan');
+                    meanSpatialDC   = mean(bitmapData.spatialDutyCycleWithinROI(:, blockIdx), 'omitnan') * 100;
+                    meanTemporalDC  = mean(bitmapData.temporalDutyCycle(:, blockIdx), 'omitnan') * 100;
+                    
+                    meanROIPD       = mean(bitmapData.meanPowerDensityWithinROI_mWmm2(:, blockIdx), 'omitnan');
+                    meanTotalPower  = mean(bitmapData.totalPowerToOnPixelsWithinROI_mW(:, blockIdx), 'omitnan');
+                    
+                    % Keep title short
+                    title(sprintf('%sR%s', ...
+                          datastruct(analysisBlockID(block)).date, ...
+                          datastruct(analysisBlockID(block)).run), ...
+                          'Interpreter', 'tex');
+                    
+                    % Bottom-centered annotation, normalized to axes
+                    optoText = sprintf([ ...
+                        '%.0f cols\n' ...
+                        'PD_{DMD} %.2f mW/mm^2 | Area_{ROI} %.2f mm^2 | Area_{ON} %.2f mm^2\n' ...
+                        'sDC %.1f%% | tDC %.1f%%\n' ...
+                        'PD_{ROI} %.2f mW/mm^2 | P_{total} %.2f mW'], ...
+                        meanColumns, ...
+                        meanProjectorPD, meanAreaROI, meanAreaON, ...
+                        meanSpatialDC, meanTemporalDC, ...
+                        meanROIPD, meanTotalPower);
+                    
+                        text(0.0, -0.28, optoText, ...
+                            'Units', 'normalized', ...
+                            'HorizontalAlignment', 'left', ...
+                            'VerticalAlignment', 'top', ...
+                            'FontSize', 10, ...
+                            'Interpreter', 'tex', ...
+                            'Clipping', 'off');
+                    1;
                 end
             elseif cond==4
-                subplot(1,2,2)
+                subplot(1,3,3)
                 % Plot line fit
                 if plotLine==1
                     plot(mdl.xFitted(cond,:,block), mdl.yFitted(cond,:,block), 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'on'); hold on;
@@ -354,13 +397,13 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                 end
                 upFontSize(32, 0.01);
                 %annotateDataPoints(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), nTrials, markerFaceColor); hold on;
-                xlim([0 50])
+                xlim(xLimMerged)
                 ylim([-50 50])
-                addSkippedTicks(-40, 40, 10,'y')
+                xticks(xLimMerged(1):tickCfg.mergedMajor:xLimMerged(2));
+                addSkippedTicks(xLimMerged(1), xLimMerged(2), tickCfg.mergedSkip, 'x');
+                addSkippedTicks(-50, 50, 10, 'y');
                 yline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
-                ylabel('\DeltaCorrect_{con-incon} (%)')
-                legend('Con-Incon', 'Location', 'southeast',...
-                'NumColumns',1,'FontSize',32);
+                ylabel('\DeltaCorrect (%)')
                 axis square
                 
             elseif cond==5
@@ -409,13 +452,35 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
                 end
                 upFontSize(32, 0.01);
                 %annotateDataPoints(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), nTrials, markerFaceColor); hold on;
-                xlim([0 50])
+                xlim(xLimMerged)
                 ylim([-50 50])
-                addSkippedTicks(-40, 40, 10,'y')
+                xticks(xLimMerged(1):tickCfg.mergedMajor:xLimMerged(2));
+                addSkippedTicks(xLimMerged(1), xLimMerged(2), tickCfg.mergedSkip, 'x');
+                addSkippedTicks(-50, 50, 10, 'y');
                 yline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
-                ylabel('\DeltaCorrect_{con-incon} (%)')
-                legend('Con-Incon', 'Location', 'southeast',...
-                'NumColumns',1,'FontSize',32);
+                
+                % Explicit legend handles for third panel
+                % Purple = biasing, gray = masking
+                hBiasLegend = plot(nan, nan, 's-', ...
+                    'Color', [127, 0, 255]/255, ...
+                    'MarkerFaceColor', [127, 0, 255]/255, ...
+                    'MarkerEdgeColor', 'k', ...
+                    'LineWidth', 3, ...
+                    'MarkerSize', 20);
+                
+                hMaskLegend = plot(nan, nan, 's-', ...
+                    'Color', [125, 125, 125]/255, ...
+                    'MarkerFaceColor', [125, 125, 125]/255, ...
+                    'MarkerEdgeColor', 'k', ...
+                    'LineWidth', 3, ...
+                    'MarkerSize', 20);
+                
+                legend([hBiasLegend, hMaskLegend], ...
+                    {'Biasing', 'Masking'}, ...
+                    'Location', 'southeast', ...
+                    'NumColumns', 1, ...
+                    'FontSize', 32);
+                
                 axis square
 
 
@@ -436,7 +501,7 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
         ySpacing = 3; % Vertical spacing between rows
 
         % Call the function to create the table
-        subplot(1, 2, 1); ax1=gca;
+        subplot(1, 3, 2); ax1=gca;
         %createCustomTable2(ax1, modelTypeStr, mdl.headers, mdl.fittedParams(block,:), startPos, xSpacing, ySpacing);
         
         if plotAverageFlag==1
@@ -447,6 +512,7 @@ function mdl=plotNakaRushtonFit4(behavioralData, bitmapData, datastruct, analysi
         upFontSize(21, .01);
         %Saving
         if saveFlag
+            forceFigureSansSerif(gcf);
             savePDF(savefilename, monkeyName, 1, block, nBlocks)
             % Png/SVG
             %{
@@ -774,4 +840,463 @@ function [shortXpad, shortYpad, missingIdxInLong] = padMissingX(shortX, shortY, 
 
     shortXpad(keepIdx) = shortX;
     shortYpad(keepIdx) = shortY;
+end
+
+function mdl = plotPreMergedPanel(mdl, block, xLimPre, meanBar, tickCfg)
+    % Plot pre-merged/split data:
+    %   x = signed Gabor contrast
+    %   y = percent correct
+    %
+    % Also save panel-1 side means:
+    %   baseline/con/incon x horizontal/vertical side.
+
+    hold on;
+
+    yline(50, '--', ...
+        'LineWidth', 1.5, ...
+        'Color', .4 * [1 1 1], ...
+        'HandleVisibility', 'off');
+
+    xline(0, '--', ...
+        'LineWidth', 1.5, ...
+        'Color', .4 * [1 1 1], ...
+        'HandleVisibility', 'off');
+
+    % Original-ish colors
+    baselineColor = [0 0 0];
+    conColor = [0.9294, 0.1098, 0.1373] * 1.05;
+    inconColor = [0, 0.0941, 0.6627] * 1.25;
+
+    conColor = min(conColor, 1);
+    inconColor = min(inconColor, 1);
+
+    % Lighten/desaturate for pre-merged panel
+    desatAmount = 0.5;
+    lighten = @(c) c * (1 - desatAmount) + [1 1 1] * desatAmount;
+
+    baselineColorLight = lighten(baselineColor);
+    conColorLight = lighten(conColor);
+    inconColorLight = lighten(inconColor);
+
+    markerSize = 16;
+    lineWidth = 3;
+
+    %% Baseline
+    xBaseline = rmnan(mdl.xBaselinePreMerge(block, :));
+    yBaseline = rmnan(mdl.yBaselinePreMerge(block, :));
+
+    hBaseline = plot(xBaseline, yBaseline, '-', ...
+        'Color', baselineColorLight, ...
+        'LineWidth', lineWidth, ...
+        'Marker', 'o', ...
+        'MarkerFaceColor', baselineColorLight, ...
+        'MarkerEdgeColor', 'k', ...
+        'MarkerSize', markerSize, ...
+        'DisplayName', 'Baseline');
+
+    %% Pool horizontal + vertical opto by congruency
+    xH = rmnan(mdl.xHorizontalOptoPreMerge(block, :));
+    yH = rmnan(mdl.yHorizontalOptoPreMerge(block, :));
+    cH = rmnan(mdl.congruencyHorizontalOptoPreMerge(block, :));
+
+    xV = rmnan(mdl.xVerticalOptoPreMerge(block, :));
+    yV = rmnan(mdl.yVerticalOptoPreMerge(block, :));
+    cV = rmnan(mdl.congruencyVerticalOptoPreMerge(block, :));
+
+    xOpto = [xH, xV];
+    yOpto = [yH, yV];
+    cOpto = [cH, cV];
+
+    hCon = plotByCongruencyPooled( ...
+        xOpto, yOpto, cOpto, 1, ...
+        conColorLight, '^', markerSize, lineWidth, 'Con-Opto');
+
+    hIncon = plotByCongruencyPooled( ...
+        xOpto, yOpto, cOpto, -1, ...
+        inconColorLight, 'v', markerSize, lineWidth, 'Incon-Opto');
+
+    %% Compute and save panel-1 side means
+    idxBaseH = xBaseline <= 0;
+    idxBaseV = xBaseline >= 0;
+
+    idxConH = cOpto == 1  & xOpto <= 0;
+    idxConV = cOpto == 1  & xOpto >= 0;
+
+    idxInconH = cOpto == -1 & xOpto <= 0;
+    idxInconV = cOpto == -1 & xOpto >= 0;
+
+    baseHMean  = computeMeanForPlot(xBaseline, yBaseline, idxBaseH);
+    conHMean   = computeMeanForPlot(xOpto, yOpto, idxConH);
+    inconHMean = computeMeanForPlot(xOpto, yOpto, idxInconH);
+
+    baseVMean  = computeMeanForPlot(xBaseline, yBaseline, idxBaseV);
+    conVMean   = computeMeanForPlot(xOpto, yOpto, idxConV);
+    inconVMean = computeMeanForPlot(xOpto, yOpto, idxInconV);
+
+    mdl.meanBaselineHorizontal(block) = baseHMean;
+    mdl.meanConOptoHorizontal(block) = conHMean;
+    mdl.meanInconOptoHorizontal(block) = inconHMean;
+
+    mdl.meanBaselineVertical(block) = baseVMean;
+    mdl.meanConOptoVertical(block) = conVMean;
+    mdl.meanInconOptoVertical(block) = inconVMean;
+
+    % Also save compact vector forms for convenience
+    mdl.meanPanel1Horizontal(block,:) = [baseHMean, conHMean, inconHMean];
+    mdl.meanPanel1Vertical(block,:)   = [baseVMean, conVMean, inconVMean];
+    mdl.meanPanel1Headers = {'Baseline', 'ConOpto', 'InconOpto'};
+    mdl.meanPanel1SideHeaders = {'Horizontal', 'Vertical'};
+
+    %% Jitter overlapping mean bars for visibility
+    % This only jitters the plotted bars. Saved mdl means remain unjittered.
+    jitterStep = .5;
+
+    horizontalMeans = [baseHMean, conHMean, inconHMean];
+    verticalMeans   = [baseVMean, conVMean, inconVMean];
+
+    horizontalMeansPlot = jitterOverlappingMeans(horizontalMeans, jitterStep);
+    verticalMeansPlot   = jitterOverlappingMeans(verticalMeans, jitterStep);
+
+    %% Mean bars for left and right visual-stimulus sides
+    meanLineWidth = 3;
+
+    % Left-side / horizontal-stimulus mean bars
+    plotMeanBarAtY(horizontalMeansPlot(1), meanBar.leftEdgeRange, baselineColorLight, meanLineWidth);
+    plotMeanBarAtY(horizontalMeansPlot(2), meanBar.leftEdgeRange, conColorLight, meanLineWidth);
+    plotMeanBarAtY(horizontalMeansPlot(3), meanBar.leftEdgeRange, inconColorLight, meanLineWidth);
+
+    % Right-side / vertical-stimulus mean bars
+    plotMeanBarAtY(verticalMeansPlot(1), meanBar.rightEdgeRangePre, baselineColorLight, meanLineWidth);
+    plotMeanBarAtY(verticalMeansPlot(2), meanBar.rightEdgeRangePre, conColorLight, meanLineWidth);
+    plotMeanBarAtY(verticalMeansPlot(3), meanBar.rightEdgeRangePre, inconColorLight, meanLineWidth);
+
+    %% Axes/labels
+    xlim(xLimPre);
+    ylim([0 100]);
+
+    xticks(xLimPre(1):tickCfg.preMajor:xLimPre(2));
+    addSkippedTicks(xLimPre(1), xLimPre(2), tickCfg.preSkip, 'x');
+    addSkippedTicks(0, 100, 10, 'y');
+
+    xlabel('Signed Gabor contrast (%)');
+    ylabel('Correct (%)');
+
+    title('Split data before con/incon merge');
+
+    legend([hBaseline, hCon, hIncon], ...
+        {'Baseline', 'Con-Opto', 'Incon-Opto'}, ...
+        'Location', 'southeast', ...
+        'NumColumns', 1, ...
+        'FontSize', 24);
+
+    axis square;
+    upFontSize(32, 0.01);
+end
+
+function h = plotByCongruencyPooled(x, y, congr, congrValue, colorVal, markerType, markerSize, lineWidth, displayName)
+    idx = congr == congrValue & ~isnan(x) & ~isnan(y);
+
+    if ~any(idx)
+        h = plot(nan, nan, '-', ...
+            'Color', colorVal, ...
+            'LineWidth', lineWidth, ...
+            'Marker', markerType, ...
+            'MarkerFaceColor', colorVal, ...
+            'MarkerEdgeColor', 'k', ...
+            'MarkerSize', markerSize, ...
+            'DisplayName', displayName);
+        return;
+    end
+
+    xUse = x(idx);
+    yUse = y(idx);
+
+    % Split by visual side using signed x.
+    % This prevents the line from connecting the two x=0 points
+    % belonging to horizontal-tagged and vertical-tagged visual stimuli.
+    %
+    % Negative-side branch includes the first zero encountered.
+    % Positive-side branch includes the second zero encountered.
+    zeroIdx = find(xUse == 0);
+
+    if numel(zeroIdx) >= 2
+        idxNegBranch = xUse < 0;
+        idxPosBranch = xUse > 0;
+
+        % Assign duplicate zero points separately.
+        idxNegBranch(zeroIdx(1)) = true;
+        idxPosBranch(zeroIdx(2)) = true;
+
+    elseif numel(zeroIdx) == 1
+        idxNegBranch = xUse < 0;
+        idxPosBranch = xUse > 0;
+
+        % Single zero: attach to both branches only if both sides exist;
+        % otherwise attach to the existing side.
+        if any(xUse < 0) && any(xUse > 0)
+            idxNegBranch(zeroIdx(1)) = true;
+            idxPosBranch(zeroIdx(1)) = true;
+        elseif any(xUse < 0)
+            idxNegBranch(zeroIdx(1)) = true;
+        else
+            idxPosBranch(zeroIdx(1)) = true;
+        end
+
+    else
+        idxNegBranch = xUse < 0;
+        idxPosBranch = xUse > 0;
+    end
+
+    % Plot negative branch. This handle is used for the legend.
+    h = plotOneBranch(xUse(idxNegBranch), yUse(idxNegBranch), ...
+        colorVal, markerType, markerSize, lineWidth, displayName, 'on');
+
+    % Plot positive branch, but hide from legend.
+    plotOneBranch(xUse(idxPosBranch), yUse(idxPosBranch), ...
+        colorVal, markerType, markerSize, lineWidth, displayName, 'off');
+end
+
+
+function h = plotOneBranch(xPlot, yPlot, colorVal, markerType, markerSize, lineWidth, displayName, handleVisibility)
+    if isempty(xPlot)
+        h = plot(nan, nan, '-', ...
+            'Color', colorVal, ...
+            'LineWidth', lineWidth, ...
+            'Marker', markerType, ...
+            'MarkerFaceColor', colorVal, ...
+            'MarkerEdgeColor', 'k', ...
+            'MarkerSize', markerSize, ...
+            'DisplayName', displayName, ...
+            'HandleVisibility', handleVisibility);
+        return;
+    end
+
+    [xPlot, sortIdx] = sort(xPlot);
+    yPlot = yPlot(sortIdx);
+
+    h = plot(xPlot, yPlot, '-', ...
+        'Color', colorVal, ...
+        'LineWidth', lineWidth, ...
+        'Marker', markerType, ...
+        'MarkerFaceColor', colorVal, ...
+        'MarkerEdgeColor', 'k', ...
+        'MarkerSize', markerSize, ...
+        'DisplayName', displayName, ...
+        'HandleVisibility', handleVisibility);
+end
+
+function [xLimPre, xLimMerged, meanBar, tickCfg] = getPsychometricAxisLimits(mdl)
+    % Compute dynamic x-limits, ticks, and mean-bar positions.
+    %
+    % Main rule:
+    %   If max contrast <= 50, use 50.
+    %   If max contrast > 50 and <= 100, use 100.
+    %   If max contrast > 100, round upward to nearest 50.
+    %
+    % Panel 1 uses [-xMax xMax].
+    % Panels 2/3 use [0 xMax].
+
+    %% Collect all x values
+    xPreAll = [];
+
+    preFields = { ...
+        'xBaselinePreMerge', ...
+        'xHorizontalOptoPreMerge', ...
+        'xVerticalOptoPreMerge'};
+
+    for ii = 1:numel(preFields)
+        if isfield(mdl, preFields{ii})
+            xPreAll = [xPreAll, rmnan(mdl.(preFields{ii})(:))'];
+        end
+    end
+
+    xMergedAll = [];
+
+    mergedFields = { ...
+        'xBaseline', ...
+        'xConOpto', ...
+        'xInconOpto'};
+
+    for ii = 1:numel(mergedFields)
+        if isfield(mdl, mergedFields{ii})
+            xMergedAll = [xMergedAll, rmnan(mdl.(mergedFields{ii})(:))'];
+        end
+    end
+
+    maxAbsPre = max(abs(xPreAll), [], 'omitnan');
+    maxMerged = max(xMergedAll, [], 'omitnan');
+
+    maxData = max([maxAbsPre, maxMerged], [], 'omitnan');
+
+    if isempty(maxData) || isnan(maxData) || maxData == 0
+        maxData = 50;
+    end
+
+    %% Choose clean xMax
+    if maxData <= 50
+        xMax = 50;
+    elseif maxData <= 100
+        xMax = 100;
+    else
+        xMax = ceil(maxData / 50) * 50;
+    end
+
+    xLimPre = [-xMax, xMax];
+    xLimMerged = [0, xMax];
+
+    %% Tick density
+    % 4x denser than previous version.
+    %
+    % For xMax = 100:
+    %   Panel 1 ticks every 25: -100 -75 -50 -25 0 25 50 75 100
+    %   Panels 2/3 ticks every 12.5: 0 12.5 25 ... 100
+    %
+    % For xMax = 50:
+    %   Panel 1 ticks every 12.5
+    %   Panels 2/3 ticks every 6.25
+
+    tickCfg.preMajor = xMax / 4;
+    tickCfg.mergedMajor = xMax / 8;
+
+    % For addSkippedTicks, use same intervals as xticks.
+    tickCfg.preSkip = tickCfg.preMajor;
+    tickCfg.mergedSkip = tickCfg.mergedMajor;
+
+    %% Mean-bar geometry
+    % Half the previous visual length.
+    %
+    % Old merged bar width was 10% of panel 2/3 range.
+    % New merged bar width is 5% of panel 2/3 range.
+    barWidthMerged = 0.05 * range(xLimMerged);
+
+    % Panel 1 is twice as wide, so scale bar width accordingly
+    % to preserve visual length across panels.
+    barWidthPre = barWidthMerged * (range(xLimPre) / range(xLimMerged));
+
+    %% Panel 1 edge bars
+    meanBar.leftEdgeRange = [xLimPre(1), xLimPre(1) + barWidthPre];
+    meanBar.rightEdgeRangePre = [xLimPre(2) - barWidthPre, xLimPre(2)];
+
+    %% Panels 2/3 right-edge bars
+    meanBar.rightEdgeRange = [xLimMerged(2) - barWidthMerged, xLimMerged(2)];
+
+    %% Save metadata
+    meanBar.xMax = xMax;
+    meanBar.barWidthMerged = barWidthMerged;
+    meanBar.barWidthPre = barWidthPre;
+end
+
+function h = plotSideMeanBar(x, y, idx, xRange, colorVal, lineWidth)
+    % Plot a short horizontal mean bar for a subset of points.
+    % xRange = [xStart xEnd].
+    % Hidden from legend.
+
+    idx = idx & ~isnan(x) & ~isnan(y);
+
+    if ~any(idx)
+        h = plot(nan, nan, '-', ...
+            'Color', colorVal, ...
+            'LineWidth', lineWidth, ...
+            'HandleVisibility', 'off');
+        return;
+    end
+
+    yMean = mean(y(idx), 'omitnan');
+
+    h = plot(xRange, [yMean yMean], '-', ...
+        'Color', colorVal, ...
+        'LineWidth', lineWidth, ...
+        'HandleVisibility', 'off');
+end
+function forceFigureSansSerif(figHandle)
+    % Force a sans-serif font before export.
+    % This helps prevent PDF/export functions from falling back to serif fonts.
+
+    if nargin < 1 || isempty(figHandle)
+        figHandle = gcf;
+    end
+
+    fontName = 'Arial';
+
+    set(findall(figHandle, '-property', 'FontName'), 'FontName', fontName);
+    set(findall(figHandle, 'Type', 'axes'), 'FontName', fontName);
+    set(findall(figHandle, 'Type', 'text'), 'FontName', fontName);
+    set(findall(figHandle, 'Type', 'legend'), 'FontName', fontName);
+
+    set(figHandle, 'Renderer', 'painters');
+end
+
+function yMean = computeMeanForPlot(x, y, idx)
+    idx = idx & ~isnan(x) & ~isnan(y);
+
+    if ~any(idx)
+        yMean = NaN;
+        return;
+    end
+
+    yMean = mean(y(idx), 'omitnan');
+end
+function yPlot = jitterOverlappingMeans(y, jitterStep)
+    % Apply small vertical jitter only when mean bars are identical.
+    % Saved values remain unjittered.
+    %
+    % Example:
+    %   [75 75 75] -> [74.65 75 75.35] if jitterStep = 0.35
+    %
+    % Non-identical values are unchanged:
+    %   [74.8 75.0 75.2] stays [74.8 75.0 75.2]
+
+    if nargin < 2
+        jitterStep = 0.35;
+    end
+
+    yPlot = y;
+    validIdx = find(~isnan(y));
+
+    if numel(validIdx) <= 1
+        return;
+    end
+
+    % Tiny tolerance: only truly identical/effectively identical values jitter.
+    tol = 1e-9;
+
+    used = false(size(validIdx));
+
+    for ii = 1:numel(validIdx)
+        if used(ii)
+            continue;
+        end
+
+        thisOriginalIdx = validIdx(ii);
+
+        sameGroupLocal = abs(y(validIdx) - y(thisOriginalIdx)) <= tol;
+        sameGroupLocal = sameGroupLocal & ~used;
+
+        groupOriginalIdx = validIdx(sameGroupLocal);
+        used(sameGroupLocal) = true;
+
+        nGroup = numel(groupOriginalIdx);
+
+        if nGroup > 1
+            offsets = ((1:nGroup) - (nGroup + 1)/2) * jitterStep;
+            yPlot(groupOriginalIdx) = y(groupOriginalIdx) + offsets;
+        end
+    end
+end
+function h = plotMeanBarAtY(yMean, xRange, colorVal, lineWidth)
+    % Plot a short horizontal mean bar at yMean.
+    % Hidden from legend.
+
+    if isnan(yMean)
+        h = plot(nan, nan, '-', ...
+            'Color', colorVal, ...
+            'LineWidth', lineWidth, ...
+            'HandleVisibility', 'off');
+        return;
+    end
+
+    h = plot(xRange, [yMean yMean], '-', ...
+        'Color', colorVal, ...
+        'LineWidth', lineWidth, ...
+        'HandleVisibility', 'off');
 end

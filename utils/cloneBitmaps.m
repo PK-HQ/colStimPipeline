@@ -28,10 +28,11 @@ end
 switch cloneLoadFlag
     case {'clone'}
         resultArray = cellfun(@(x) extractAfter(x, 'PK'), bmpFilenamesRaw, 'UniformOutput', false);
-        bmpFilenames = findMatchingFiles([bmpPath 'users/PK/colStimPipeline'],resultArray,currentBlockStruct.date);
+        bmpFilenameTmp = findMatchingFiles([bmpPath 'users/PK/colStimPipeline'],resultArray,currentBlockStruct.date);
+        bmpFilenames = {bmpFilenameTmp.filePaths}';
         % Look for these filenames in directoryPath and copy them to sessionPath
         for i = 1:length(bmpFilenames)
-            srcFile = bmpFilenames{i};
+            srcFile = bmpFilenames{i}; % was {}
             if exist(srcFile, 'file')
                 [~, name, ext] = fileparts(bmpFilenames{i});
                 destFile = fullfile(savePath, [name ext]);
@@ -63,7 +64,7 @@ switch cloneLoadFlag
 
             else
                 bmp(:,:,i)=nan(1080,1920);
-                error('BITMAP MISSING!')
+                disp('BITMAP MISSING!')
             end
         end
 end

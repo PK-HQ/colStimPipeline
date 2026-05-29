@@ -1,5 +1,5 @@
 function mdlStruct=analyzePsychometricModels(monkeyName, chamberWanted, modelTypes, mainPath,...
-    behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, saveFlag)
+    behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, saveFlag)
 %% Plot by cluster, and by model type
 nClusters=sort(clusterIdx,'descend');%unique(clusterIdx);
 % Initialize mdlStruct and other structures
@@ -7,7 +7,7 @@ mdlStruct = struct();
 AICCdeltax = struct();
 AICCbeta = struct();
 thresh=[];beta=[];exp=[];c50=[];
-for cluster=3%1:nClusters%1:nClusters
+for cluster=1:nClusters%1:nClusters
     disp(['Cluster ' num2str(cluster)])
     
     % Get columns
@@ -43,10 +43,10 @@ for cluster=3%1:nClusters%1:nClusters
         % Fit psychometric data
         switch strcmp(modelTypeStr, 'bill')
             case 1
-                [mdl,mdlAvg] = fitPsyMLE(xBlocks, yBlocks, modelTypeStr);
+                [mdl,mdlAvg] = fitPsyMLE(xBlocks, yBlocks, modelTypeStr, plotLine);
                 %[mdl, mdlAvg] = fitBayesianModelMLE(xBlocks, yBlocks, modelTypeStr);
             case 0
-                [mdl,mdlAvg] = fitPsyMLE(xBlocks, yBlocks, modelTypeStr);
+                [mdl,mdlAvg] = fitPsyMLE(xBlocks, yBlocks, modelTypeStr, plotLine);
                 %[mdl,mdlAvg] = fitNakaRushtonMLE3(xBlocks, yBlocks, modelTypeStr);
         end
         xFit = sort([nlinspace(0, 100, 100, 'nonlinear')]);

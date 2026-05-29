@@ -48,7 +48,7 @@ colormap(gray);
 gap=.025;marginV=.01;marginH=.01;
 [hAx,~]=tight_subplot(nRows,nCols,[gap gap], [marginV marginV+.15], [marginH+.05 marginH+.05]);
 plotIdx=[1 7 2 8 3 9 4 10 5 11 6 12];plotCounter=1;
-PCAExplTotal=sum(imagingData.pcaexpl(1:imagingData.npca,blockID));
+PCAExplTotal=sum(imagingData.pcaexpl(1:mean(imagingData.npca),blockID));
 selectedOrts=[1 2];
 plotCounter=plotter(hAx,VERpca,imagingData.mask(:,:,blockID),selectedOrts,plotIdx,plotCounter,...
   ['PCA, nComp=' num2str(imagingData.npca(:,blockID),'%.0f') ', Expl. var=' num2str(PCAExplTotal,'%.0f') '%'],2,6); addPix2MM(VERpca(:,:,1),7,nRows,nCols);
