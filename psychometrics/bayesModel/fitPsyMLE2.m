@@ -77,7 +77,7 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
         opts = optimset(opts, 'MaxFunEvals', maxFunEvalsVal);
         opts = optimset(opts, 'TolX', 1e-6);
         opts = optimset(opts, 'TolFun', 1e-6);
-        opts = optimset(opts, 'Display', 'iter');
+        opts = optimset(opts, 'Display', 'off');
 
         % Get model functions
         modelFunc = modelConfig.getModelFuncs;  % Get the function handle
@@ -115,9 +115,6 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
             %[fittedParams, nLL] = globalSolvers(objectiveFunction, initialParams, lb, ub, opts, data, solverOption, nRestarts);            
             [fittedParams, nLL] = fitParameters(objectiveFunction, initialParams, lb, ub, opts, data);
         end
-        fittedParams
-        
-        
         % Calculate metrics
         n = sum([sumBaseline sumInconOpto]);
         k = sum(~isnan(fittedParams));
@@ -241,7 +238,7 @@ function [fittedParams, nLL] = fitParameters(objectiveFunction, params0, lb, ub,
             'SwarmSize', swarmSize, ...
             'MaxIterations', maxIters, ...
             'UseParallel', false, ...
-            'Display', 'iter', ...
+            'Display', 'off', ...
             'InitialSwarmMatrix', initSwarm);
 
         if ~isempty(hybrid)
@@ -265,7 +262,7 @@ function [fittedParams, nLL] = fitParameters(objectiveFunction, params0, lb, ub,
     if haveFMC
         fopts = optimoptions('fmincon', ...
             'Algorithm','interior-point', ...
-            'Display','iter', ...
+            'Display','off', ...
             'MaxFunctionEvaluations', 5e4, ...
             'FiniteDifferenceType','central');
         u3 = fmincon(obj3, u2, [],[],[],[], zeros(size(u2)), ones(size(u2)), [], fopts);

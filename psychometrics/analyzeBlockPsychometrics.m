@@ -43,6 +43,7 @@ end
 % Store
 behavioralData.gaborContrasts(:,:,blockID)=[gaborContrasts.baselineRaw; gaborContrasts.horizontalOptoRaw; gaborContrasts.verticalOptoRaw];
 behavioralData.percentageCorrect(:,:,blockID)=[percentageCorrect.baselineRaw; percentageCorrect.horizontalOptoRaw; percentageCorrect.verticalOptoRaw];
+behavioralData = storeVisualStimMetadata(behavioralData, runData, blockID);
 1;
 % Fit psychometric function and plot
 %{
@@ -73,6 +74,130 @@ if saveFlag
         export_fig(pdfFilename,'-pdf','-nocrop','-append');
     end
 end
+end
+
+function behavioralData = storeVisualStimMetadata(behavioralData, runData, blockID)
+
+behavioralData.visualStim(blockID).gaborCon = get_stimulus_metadata(runData, ...
+    {'GaborContrast__pc', 'GaborContrast__deg', 'GaborContrast'}, 'StimCon');
+behavioralData.visualStim(blockID).gaborContrast = behavioralData.visualStim(blockID).gaborCon;
+behavioralData.visualStim(blockID).gaborSize = get_stimulus_metadata(runData, ...
+    {'GaborSize__deg', 'GaborSize'}, 'GaborSize');
+behavioralData.visualStim(blockID).gaborSF = get_stimulus_metadata(runData, ...
+    {'GaborSF_cpd', 'GaborSF__deg', 'GaborSF'}, 'GaborSF');
+behavioralData.visualStim(blockID).gaborOrt = get_stimulus_metadata(runData, ...
+    {'GaborOrt__deg', 'GaborOrt'}, 'GaborOrt');
+behavioralData.visualStim(blockID).gaborPhs = get_stimulus_metadata(runData, ...
+    {'GaborPhs__deg', 'GaborPhase__deg', 'GaborPhs', 'GaborPhase'}, 'GaborPhase');
+behavioralData.visualStim(blockID).gaborPos = get_stimulus_position(runData);
+
+behavioralData.visualStim(blockID).gaborConByCondition = get_condition_metadata(runData, 'StimCon', true);
+behavioralData.visualStim(blockID).gaborSizeByCondition = get_condition_metadata(runData, 'GaborSize', true);
+behavioralData.visualStim(blockID).gaborSFByCondition = get_condition_metadata(runData, 'GaborSF', true);
+behavioralData.visualStim(blockID).gaborOrtByCondition = get_condition_metadata(runData, 'GaborOrt', true);
+behavioralData.visualStim(blockID).gaborPhsByCondition = get_condition_metadata(runData, 'GaborPhase', true);
+
+end
+
+
+function val = get_stimulus_metadata(runData, fieldNames, conditionFieldName)
+
+val = NaN;
+
+if isfield(runData, 'TS') && isfield(runData.TS, 'Header') && ...
+        isfield(runData.TS.Header, 'ConditionParams') && ...
+        isfield(runData.TS.Header.ConditionParams, 'Stimulus')
+    stimulusParams = runData.TS.Header.ConditionParams.Stimulus;
+    for fieldID = 1:numel(fieldNames)
+        fieldName = fieldNames{fieldID};
+        if isfield(stimulusParams, fieldName)
+            val = clean_metadata_vector(stimulusParams.(fieldName), false);
+            if ~all(isnan(val))
+                return
+            end
+        end
+    end
+end
+
+val = get_condition_metadata(runData, conditionFieldName, false);
+
+end
+
+
+function val = get_condition_metadata(runData, fieldName, keepRepeats)
+
+val = NaN;
+
+if ~isfield(runData, 'TS') || ~isfield(runData.TS, 'Header') || ...
+        ~isfield(runData.TS.Header, 'Conditions')
+    return
+end
+
+condData = runData.TS.Header.Conditions;
+if ~isfield(condData, 'TypeCond') || ~isfield(condData, fieldName)
+    return
+end
+
+visualOptoTrials = find(condData.TypeCond == 3);
+if isempty(visualOptoTrials)
+    return
+end
+
+conditionValues = condData.(fieldName);
+val = clean_metadata_vector(conditionValues(visualOptoTrials), keepRepeats);
+
+end
+
+
+function pos = get_stimulus_position(runData)
+
+pos = [NaN NaN];
+
+if ~isfield(runData, 'TS') || ~isfield(runData.TS, 'Header') || ...
+        ~isfield(runData.TS.Header, 'ConditionParams') || ...
+        ~isfield(runData.TS.Header.ConditionParams, 'Stimulus_Position')
+    return
+end
+
+stimulusPosition = runData.TS.Header.ConditionParams.Stimulus_Position;
+if isfield(stimulusPosition, 'X__deg')
+    pos(1) = clean_scalar_metadata(stimulusPosition.X__deg);
+end
+if isfield(stimulusPosition, 'Y__deg')
+    pos(2) = clean_scalar_metadata(stimulusPosition.Y__deg);
+end
+
+end
+
+
+function val = clean_scalar_metadata(val)
+
+val = clean_metadata_vector(val, false);
+if numel(val) > 1
+    val = val(1);
+end
+
+end
+
+
+function val = clean_metadata_vector(val, keepRepeats)
+
+if isempty(val)
+    val = NaN;
+    return
+end
+
+val = val(:)';
+if isnumeric(val)
+    val = val(~isnan(val));
+end
+
+if isempty(val)
+    val = NaN;
+elseif ~keepRepeats
+    val = unique(val, 'stable');
+end
+
 end
 
 % Process and sort data for plotting

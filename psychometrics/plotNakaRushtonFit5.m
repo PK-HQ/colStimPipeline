@@ -14,23 +14,46 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
     % These are computed from all currently available mdl rows, so every block
     % in this plotting call uses the same x-limits and same mean-bar geometry.
     [xLimPre, xLimMerged, meanBar, tickCfg] = getPsychometricAxisLimits(mdl);
+    xLimMerged = [0 100];
+    tickCfg.mergedMajor = 100 / 8;
+    tickCfg.mergedSkip = tickCfg.mergedMajor;
+    meanBar.rightEdgeRange = [95 100];
     
     for block = 1:nBlocks
+        blockInfo = getPlotBlockInfo(datastruct, analysisBlockID, clusterBlocks, block, plotAverageFlag);
         % Init figure
         dat=[];
         make_it_tight = true;
         hmarg = .18;
-        subplot = @(m,n,p) subtightplot(m, n, p, [0.1 0.1], [hmarg hmarg], [0.1 0.1]);
+        wmarg = [0.12 0.2];
+        panelGap = [0.09 0.055];
+        subplot = @(m,n,p) subtightplot(m, n, p, panelGap, [hmarg hmarg], wmarg);
         if ~make_it_tight,  clear subplot;  end
        
-        figure('Name', ['Block #', datastruct(clusterBlocks(block)).date]);
+        figure('Name', ['Block ', blockInfo.label]);
         
-        % Panel 1: pre-merged raw/split data
-        subplot(1,3,1)
-        mdl = plotPreMergedPanel(mdl, block, xLimPre, meanBar, tickCfg);
+        sideData = getPreMergedSideData(mdl, block);
+
+        % Row 1, columns 1-2: split pre-merged data by visual stimulus side
+        axRow1Col1 = subplot(2,3,1);
+        [mdl, sideData.horizontal] = plotSidePsychometricPanel(mdl, block, sideData.horizontal, ...
+            xLimMerged, meanBar, tickCfg, 'Horizontal visual stimulus');
+
+        subplot(2,3,2)
+        [mdl, sideData.vertical] = plotSidePsychometricPanel(mdl, block, sideData.vertical, ...
+            xLimMerged, meanBar, tickCfg, 'Vertical visual stimulus');
+
+        % Row 2, columns 1-2: deltas from the side-specific split data
+        subplot(2,3,4)
+        mdl = plotSideDeltaPanel(mdl, block, sideData.horizontal, ...
+            xLimMerged, meanBar, tickCfg, 'Horizontal visual stimulus', 'Horizontal');
+
+        subplot(2,3,5)
+        mdl = plotSideDeltaPanel(mdl, block, sideData.vertical, ...
+            xLimMerged, meanBar, tickCfg, 'Vertical visual stimulus', 'Vertical');
         
-        % Panel 2: merged fitted data
-        subplot(1,3,2)
+        % Row 1, column 3: merged fitted data
+        axMergedPanel = subplot(2,3,3);
         hold on;
         yline(50,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
 
@@ -231,7 +254,22 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                                 'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize}); hold on;
                 % Average
                 barLength = meanBar.rightEdgeRange;
-                plot(barLength, repmat(nanmean(mdl.yBlock(cond,:,block)),1,numel(barLength)), '-', 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'off')
+                meanMergedVal = weightedMeanForPlot(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), 'merged');
+                plot(barLength, repmat(meanMergedVal,1,numel(barLength)), '-', 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'off')
+
+                switch cond
+                    case 1
+                        mdl.meanBaselineMerged(block) = meanMergedVal;
+                    case 2
+                        mdl.meanConOptoMerged(block) = meanMergedVal;
+                    case 3
+                        mdl.meanInconOptoMerged(block) = meanMergedVal;
+                        mdl.meanPsychometricMerged(block,:) = [ ...
+                            mdl.meanBaselineMerged(block), ...
+                            mdl.meanConOptoMerged(block), ...
+                            mdl.meanInconOptoMerged(block)];
+                        mdl.meanPsychometricHeaders = {'Baseline', 'ConOpto', 'InconOpto'};
+                end
 
                 % Add datapoints's count annotation
                 zeroConstrastPoint=xBlock==0;
@@ -254,15 +292,15 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
             
                 
                 if cond==3
-                    [combinedBLStr,mdl.combinedBL(block)]=checkMergedBaseline(datastruct,analysisBlockID,block);
+                    [combinedBLStr,mdl.combinedBL(block)]=checkMergedBaseline(datastruct,analysisBlockID,blockInfo.blockIdx);
 
-                    if isfield(bitmapData, 'meanPowerDensityWithinROI_mWmm2') & ~isempty(bitmapData.meanPowerDensityWithinROI_mWmm2(:,:,clusterBlocks(block)))
+                    if isfield(bitmapData, 'meanPowerDensityWithinROI_mWmm2') & ~isempty(bitmapData.meanPowerDensityWithinROI_mWmm2(:,:,blockInfo.blockIdx))
                         if plotAverageFlag % for plotting the average across all blocks
                             bitmapSPD=squeeze(bitmapData.meanPowerDensityWithinROI_mWmm2(:,:,clusterBlocks));
                             bitmapColumns=bitmapData.nColumns(:,clusterBlocks)';
                         else
-                            bitmapSPD=squeeze(bitmapData.meanPowerDensityWithinROI_mWmm2(:,:,clusterBlocks(block)));
-                            bitmapColumns=bitmapData.nColumns(:,block)';
+                            bitmapSPD=squeeze(bitmapData.meanPowerDensityWithinROI_mWmm2(:,:,blockInfo.blockIdx));
+                            bitmapColumns=bitmapData.nColumns(:,blockInfo.blockIdx)';
                         end
                     else
                         bitmapSPD=[0 0];
@@ -277,7 +315,7 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                             ', Columns: ' num2str(bitmapColumnhv(1),2) ' & ' num2str(bitmapColumnhv(2),2)]});
                     else
                         %{
-                        title({[datastruct(clusterBlocks(block)).date 'R' datastruct(analysisBlockID(block)).run ' (' combinedBLStr ')'],...
+                        title({[blockInfo.label ' (' combinedBLStr ')'],...
                             ['meanPowerDensityWithinROI_mWmm2: ' num2str(bitmapSPDhv(1),2) ' & ' num2str(bitmapSPDhv(2),2) ' mW, ',...
                             'Columns: ' num2str(bitmapColumnhv(1),2) ' & ' num2str(bitmapColumnhv(2),2)]});
                         %}
@@ -311,7 +349,7 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                     % --- Optostim metadata annotation ---
                     clusterNo = cluster;
                     
-                    blockIdx = clusterBlocks(block);
+                    blockIdx = blockInfo.blockIdx;
                     
                     meanColumns = mean(bitmapData.nColumns(:, blockIdx), 'omitnan');
                     
@@ -324,34 +362,32 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                     meanROIPD       = mean(bitmapData.meanPowerDensityWithinROI_mWmm2(:, blockIdx), 'omitnan');
                     meanTotalPower  = mean(bitmapData.totalPowerToOnPixelsWithinROI_mW(:, blockIdx), 'omitnan');
                     
-                    % Keep title short
-                    title(sprintf('%sR%s', ...
-                          datastruct(analysisBlockID(block)).date, ...
-                          datastruct(analysisBlockID(block)).run), ...
-                          'Interpreter', 'tex');
-                    
-                    % Bottom-centered annotation, normalized to axes
+                    title('Merged fitted', 'Interpreter', 'none');
+
                     optoText = sprintf([ ...
                         '%.0f cols\n' ...
-                        'PD_{DMD} %.2f mW/mm^2 | Area_{ROI} %.2f mm^2 | Area_{ON} %.2f mm^2\n' ...
+                        'PD_{DMD} %.2f mW/mm^2\n' ...
+                        'Area_{ROI} %.2f mm^2\n' ...
+                        'Area_{ON} %.2f mm^2\n' ...
                         'sDC %.1f%% | tDC %.1f%%\n' ...
-                        'PD_{ROI} %.2f mW/mm^2 | P_{total} %.2f mW'], ...
+                        'PD_{ROI} %.2f mW/mm^2\n' ...
+                        'P_{total} %.2f mW'], ...
                         meanColumns, ...
-                        meanProjectorPD, meanAreaROI, meanAreaON, ...
+                        meanProjectorPD, ...
+                        meanAreaROI, ...
+                        meanAreaON, ...
                         meanSpatialDC, meanTemporalDC, ...
-                        meanROIPD, meanTotalPower);
+                        meanROIPD, ...
+                        meanTotalPower);
+
+                    addOptoStatsText(axRow1Col1, optoText);
+
+                    addFitParameterTable(axMergedPanel, mdl.headers, fitParams(block,:));
                     
-                        text(0.0, -0.28, optoText, ...
-                            'Units', 'normalized', ...
-                            'HorizontalAlignment', 'left', ...
-                            'VerticalAlignment', 'top', ...
-                            'FontSize', 10, ...
-                            'Interpreter', 'tex', ...
-                            'Clipping', 'off');
                     1;
                 end
             elseif cond==4
-                subplot(1,3,3)
+                subplot(2,3,6)
                 % Plot line fit
                 if plotLine==1
                     plot(mdl.xFitted(cond,:,block), mdl.yFitted(cond,:,block), 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'on'); hold on;
@@ -376,7 +412,9 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                                {'Color', lineColor, 'LineStyle', 'none', 'LineWidth', 3, 'Marker', markerType, ...
                                 'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize}); hold on;
                 % Average
-                plot(barLength, repmat(nanmean(mdl.yBlock(cond,:,block)),1,numel(barLength)), '-', 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'off')
+                [baseMeanMerged, conMeanMerged, inconMeanMerged] = computeMergedConditionMeans(mdl, block);
+                [deltaBiasMergedForPlot, ~] = computeDeltaFromConditionMeans(baseMeanMerged, conMeanMerged, inconMeanMerged);
+                plot(barLength, repmat(deltaBiasMergedForPlot,1,numel(barLength)), '-', 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'off')
 
                 % Add datapoints's count annotation
                 zeroConstrastPoint=xBlock==0;
@@ -431,7 +469,9 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                                {'Color', lineColor, 'LineStyle', 'none', 'LineWidth', 3, 'Marker', markerType, ...
                                 'MarkerFaceColor', markerFaceColor, 'MarkerEdgeColor', edgeColor, 'MarkerSize', markerSize}); hold on;
                 % Average
-                plot(barLength, repmat(nanmean(mdl.yBlock(cond,:,block)),1,numel(barLength)), '-', 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'off')
+                [baseMeanMerged, conMeanMerged, inconMeanMerged] = computeMergedConditionMeans(mdl, block);
+                [~, deltaMaskMergedForPlot] = computeDeltaFromConditionMeans(baseMeanMerged, conMeanMerged, inconMeanMerged);
+                plot(barLength, repmat(deltaMaskMergedForPlot,1,numel(barLength)), '-', 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'off')
 
                 % Add datapoints's count annotation
                 zeroConstrastPoint=xBlock==0;
@@ -458,6 +498,7 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                 addSkippedTicks(xLimMerged(1), xLimMerged(2), tickCfg.mergedSkip, 'x');
                 addSkippedTicks(-50, 50, 10, 'y');
                 yline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
+                xlabel('Gabor contrast (%)')
                 
                 % Explicit legend handles for third panel
                 % Purple = biasing, gray = masking
@@ -484,14 +525,16 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                 axis square
 
 
-                deltaBias=mean((rmnan(mdl.yBlock(2,:,block)))-rmnan(mdl.yBlock(3,:,block)));
-                deltaMask=mean(rmnan(mdl.yBlock(1,:,block)))-mean(mean(rmnan(mdl.yBlock(2:3,:,block))));
+                [baseMeanMerged, conMeanMerged, inconMeanMerged] = computeMergedConditionMeans(mdl, block);
+                [deltaBias, deltaMask] = computeDeltaFromConditionMeans(baseMeanMerged, conMeanMerged, inconMeanMerged);
                 mdl.deltaBias(block)=deltaBias;
                 mdl.deltaMask(block)=deltaMask;
-                title(sprintf(['ΔBias_{con-incon} = %.1f%%\n',...
-               'ΔMask_{base-opto} = %.1f%%'], ...
-               deltaBias, deltaMask), ...
-               'Interpreter', 'tex');
+                mdl.deltaBiasMerged(block)=deltaBias;
+                mdl.deltaMaskMerged(block)=deltaMask;
+                mdl.meanDeltaMerged(block,:) = [deltaBias, deltaMask];
+                mdl.meanDeltaHeaders = {'Biasing', 'Masking'};
+                title('');
+                addDeltaSummaryText(deltaBias, deltaMask);
             end
         end
         
@@ -501,7 +544,7 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
         ySpacing = 3; % Vertical spacing between rows
 
         % Call the function to create the table
-        subplot(1, 3, 2); ax1=gca;
+        subplot(2, 3, 3); ax1=gca;
         %createCustomTable2(ax1, modelTypeStr, mdl.headers, mdl.fittedParams(block,:), startPos, xSpacing, ySpacing);
         
         if plotAverageFlag==1
@@ -510,22 +553,24 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
             block=1;
         end
         upFontSize(21, .01);
+        addBlockSuplabel(blockInfo.label);
+        setPlotAnnotationFontSizes();
         %Saving
         if saveFlag
             forceFigureSansSerif(gcf);
             savePDF(savefilename, monkeyName, 1, block, nBlocks)
             % Png/SVG
             %{
-            monkey=datastruct(clusterBlocks(block)).monkey;
-            date= datastruct(clusterBlocks(block)).date;
-            run=datastruct(clusterBlocks(block)).run;
+            monkey=datastruct(blockInfo.datastructIdx).monkey;
+            date= blockInfo.date;
+            run=blockInfo.run;
             if ispc
               mainPath='Y:/';
             elseif contains(getenv('HOSTNAME'),'psy.utexas.edu')
               mainPath='/eslab/data/';
             end
-            figPath=[mainPath monkey '\Meta\psychometrics\' datastruct(clusterBlocks(block)).chamber '-chamber\' modelTypeStr];
-            figName=['\C' num2str(cluster) 'M' datastruct(clusterBlocks(block)).monkeyNo 'D' date 'R' run];
+            figPath=[mainPath monkey '\Meta\psychometrics\' datastruct(blockInfo.datastructIdx).chamber '-chamber\' modelTypeStr];
+            figName=['\C' num2str(cluster) 'M' datastruct(blockInfo.datastructIdx).monkeyNo 'D' date 'R' run];
             set(findall(gcf, '-property', 'FontName'), 'FontName', 'SansSerif');                
             set(gcf, 'Renderer', 'painters'); % Use painters for vector graphics
             %print(gcf, [figPath '\png' figName '.png'], '-dpng', '-r600'); % High-res PNG
@@ -840,6 +885,551 @@ function [shortXpad, shortYpad, missingIdxInLong] = padMissingX(shortX, shortY, 
 
     shortXpad(keepIdx) = shortX;
     shortYpad(keepIdx) = shortY;
+end
+
+function sideData = getPreMergedSideData(mdl, block)
+    xBaseline = rmnan(mdl.xBaselinePreMerge(block, :));
+    yBaseline = rmnan(mdl.yBaselinePreMerge(block, :));
+
+    xH = rmnan(mdl.xHorizontalOptoPreMerge(block, :));
+    yH = rmnan(mdl.yHorizontalOptoPreMerge(block, :));
+    tagH = rmnan(mdl.visualTagHorizontalOptoPreMerge(block, :));
+    congrH = rmnan(mdl.congruencyHorizontalOptoPreMerge(block, :));
+
+    xV = rmnan(mdl.xVerticalOptoPreMerge(block, :));
+    yV = rmnan(mdl.yVerticalOptoPreMerge(block, :));
+    tagV = rmnan(mdl.visualTagVerticalOptoPreMerge(block, :));
+    congrV = rmnan(mdl.congruencyVerticalOptoPreMerge(block, :));
+
+    xOpto = [xH, xV];
+    yOpto = [yH, yV];
+    tagOpto = [tagH, tagV];
+    congrOpto = [congrH, congrV];
+
+    idxBaseHorizontal = xBaseline <= 0;
+    idxBaseVertical = xBaseline >= 0;
+
+    % Split by visual stimulus tag, not contrast sign. This is especially
+    % important at x=0, where the contrast sign does not identify the side.
+    idxConHorizontal = tagOpto == 0 & congrOpto == 1;
+    idxInconHorizontal = tagOpto == 0 & congrOpto == -1;
+
+    idxConVertical = tagOpto == 90 & congrOpto == 1;
+    idxInconVertical = tagOpto == 90 & congrOpto == -1;
+
+    sideData.horizontal = makeVisualSideData('Horizontal', ...
+        abs(xBaseline(idxBaseHorizontal)), yBaseline(idxBaseHorizontal), ...
+        abs(xOpto(idxConHorizontal)), yOpto(idxConHorizontal), ...
+        abs(xOpto(idxInconHorizontal)), yOpto(idxInconHorizontal));
+
+    sideData.vertical = makeVisualSideData('Vertical', ...
+        xBaseline(idxBaseVertical), yBaseline(idxBaseVertical), ...
+        xOpto(idxConVertical), yOpto(idxConVertical), ...
+        xOpto(idxInconVertical), yOpto(idxInconVertical));
+end
+
+function sideData = makeVisualSideData(sideName, xBaseline, yBaseline, xConOpto, yConOpto, xInconOpto, yInconOpto)
+    [xBaseline, yBaseline] = cleanAndSortXY(xBaseline, yBaseline);
+    [xConOpto, yConOpto] = cleanAndSortXY(xConOpto, yConOpto);
+    [xInconOpto, yInconOpto] = cleanAndSortXY(xInconOpto, yInconOpto);
+
+    sideData = struct();
+    sideData.sideName = sideName;
+    sideData.xBaseline = xBaseline;
+    sideData.yBaseline = yBaseline;
+    sideData.wBaseline = getPlotMeanWeights(xBaseline, 'sideBaseline');
+    sideData.xConOpto = xConOpto;
+    sideData.yConOpto = yConOpto;
+    sideData.wConOpto = getPlotMeanWeights(xConOpto, 'sideOpto');
+    sideData.xInconOpto = xInconOpto;
+    sideData.yInconOpto = yInconOpto;
+    sideData.wInconOpto = getPlotMeanWeights(xInconOpto, 'sideOpto');
+end
+
+function [mdl, sideData] = plotSidePsychometricPanel(mdl, block, sideData, xLimMerged, meanBar, tickCfg, titleStr)
+    hold on;
+
+    style = getPreMergedPlotStyle();
+    markerSize = 16;
+    lineWidth = 3;
+
+    yline(50, '--', ...
+        'LineWidth', 1.5, ...
+        'Color', .4 * [1 1 1], ...
+        'HandleVisibility', 'off');
+
+    hBaseline = plotConditionSeries(sideData.xBaseline, sideData.yBaseline, ...
+        style.baselineColor, 'o', style.baselineFaceColor, markerSize, lineWidth, 'Baseline', 'on');
+
+    hCon = plotConditionSeries(sideData.xConOpto, sideData.yConOpto, ...
+        style.conColor, '^', style.conColor, markerSize, lineWidth, 'Con-Opto', 'on');
+
+    hIncon = plotConditionSeries(sideData.xInconOpto, sideData.yInconOpto, ...
+        style.inconColor, 'v', style.inconColor, markerSize, lineWidth, 'Incon-Opto', 'on');
+
+    sideData.meanBaseline = weightedMeanForPlot(sideData.xBaseline, sideData.yBaseline, 'sideBaseline');
+    sideData.meanConOpto = weightedMeanForPlot(sideData.xConOpto, sideData.yConOpto, 'sideOpto');
+    sideData.meanInconOpto = weightedMeanForPlot(sideData.xInconOpto, sideData.yInconOpto, 'sideOpto');
+    meanVals = [sideData.meanBaseline, sideData.meanConOpto, sideData.meanInconOpto];
+
+    if strcmp(sideData.sideName, 'Horizontal')
+        mdl.meanBaselineHorizontal(block) = sideData.meanBaseline;
+        mdl.meanConOptoHorizontal(block) = sideData.meanConOpto;
+        mdl.meanInconOptoHorizontal(block) = sideData.meanInconOpto;
+        mdl.meanPanel1Horizontal(block,:) = meanVals;
+        mdl.meanPsychometricHorizontal(block,:) = meanVals;
+    else
+        mdl.meanBaselineVertical(block) = sideData.meanBaseline;
+        mdl.meanConOptoVertical(block) = sideData.meanConOpto;
+        mdl.meanInconOptoVertical(block) = sideData.meanInconOpto;
+        mdl.meanPanel1Vertical(block,:) = meanVals;
+        mdl.meanPsychometricVertical(block,:) = meanVals;
+    end
+
+    mdl.meanPanel1Headers = {'Baseline', 'ConOpto', 'InconOpto'};
+    mdl.meanPanel1SideHeaders = {'Horizontal', 'Vertical'};
+    mdl.meanPsychometricHeaders = {'Baseline', 'ConOpto', 'InconOpto'};
+
+    meanValsPlot = jitterOverlappingMeans(meanVals, .5);
+    plotMeanBarAtY(meanValsPlot(1), meanBar.rightEdgeRange, style.baselineColor, lineWidth);
+    plotMeanBarAtY(meanValsPlot(2), meanBar.rightEdgeRange, style.conColor, lineWidth);
+    plotMeanBarAtY(meanValsPlot(3), meanBar.rightEdgeRange, style.inconColor, lineWidth);
+
+    xlim(xLimMerged);
+    ylim([0 100]);
+    xticks(xLimMerged(1):tickCfg.mergedMajor:xLimMerged(2));
+    addSkippedTicks(xLimMerged(1), xLimMerged(2), tickCfg.mergedSkip, 'x');
+    addSkippedTicks(0, 100, 10, 'y');
+
+    xlabel('Gabor contrast (%)');
+    ylabel('Correct (%)');
+    title(titleStr);
+
+    legend([hBaseline, hCon, hIncon], ...
+        {'Baseline', 'Con-Opto', 'Incon-Opto'}, ...
+        'Location', 'southeast', ...
+        'NumColumns', 1, ...
+        'FontSize', 24);
+
+    axis square;
+    upFontSize(32, 0.01);
+end
+
+function mdl = plotSideDeltaPanel(mdl, block, sideData, xLimMerged, meanBar, tickCfg, titleStr, sideFieldName)
+    hold on;
+
+    lineWidth = 3;
+    markerSize = 20;
+    biasColor = [127, 0, 255] / 255;
+    maskColor = [125, 125, 125] / 255;
+
+    [xBias, yBias, xMask, yMask] = computeSideDeltaData(sideData);
+
+    hBias = plotConditionSeries(xBias, yBias, ...
+        biasColor, 's', biasColor, markerSize, lineWidth, 'Biasing', 'on');
+
+    hMask = plotConditionSeries(xMask, yMask, ...
+        maskColor, 's', maskColor, markerSize, lineWidth, 'Masking', 'on');
+
+    [deltaBias, deltaMask] = computeDeltaFromConditionMeans( ...
+        sideData.meanBaseline, sideData.meanConOpto, sideData.meanInconOpto);
+
+    mdl.(['deltaBias' sideFieldName])(block) = deltaBias;
+    mdl.(['deltaMask' sideFieldName])(block) = deltaMask;
+    mdl.(['meanDelta' sideFieldName])(block,:) = [deltaBias, deltaMask];
+    mdl.meanDeltaHeaders = {'Biasing', 'Masking'};
+
+    deltaMeansPlot = jitterOverlappingMeans([deltaBias, deltaMask], .5);
+    plotMeanBarAtY(deltaMeansPlot(1), meanBar.rightEdgeRange, biasColor, lineWidth);
+    plotMeanBarAtY(deltaMeansPlot(2), meanBar.rightEdgeRange, maskColor, lineWidth);
+
+    xlim(xLimMerged);
+    ylim([-50 50]);
+    xticks(xLimMerged(1):tickCfg.mergedMajor:xLimMerged(2));
+    addSkippedTicks(xLimMerged(1), xLimMerged(2), tickCfg.mergedSkip, 'x');
+    addSkippedTicks(-50, 50, 10, 'y');
+    yline(0, '--', 'LineWidth', 1.5, 'Color', .4 * [1 1 1], 'HandleVisibility', 'off');
+
+    xlabel('Gabor contrast (%)');
+    ylabel('\DeltaCorrect (%)');
+    title('');
+
+    legend([hBias, hMask], ...
+        {'Biasing', 'Masking'}, ...
+        'Location', 'southeast', ...
+        'NumColumns', 1, ...
+        'FontSize', 24);
+
+    axis square;
+    upFontSize(32, 0.01);
+    addDeltaSummaryText(deltaBias, deltaMask);
+end
+
+function addDeltaSummaryText(deltaBias, deltaMask)
+    ax = gca;
+    axPos = get(ax, 'Position');
+    textWidth = 0.58 * axPos(3);
+    textX = axPos(1) + 0.5 * axPos(3) - 0.5 * textWidth;
+    textY = max(0.001, axPos(2) - 0.23);
+    textHeight = 0.085;
+
+    annotation(gcf, 'textbox', [textX, textY, textWidth, textHeight], ...
+        'String', sprintf('biasing: %.1f%%\nmasking: %.1f%%', deltaBias, deltaMask), ...
+        'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'top', ...
+        'FontSize', 13.5, ...
+        'Interpreter', 'tex', ...
+        'EdgeColor', 'none', ...
+        'BackgroundColor', 'none', ...
+        'FitBoxToText', 'off', ...
+        'Tag', 'PlotNakaDeltaText');
+end
+
+function addOptoStatsText(ax, optoText)
+    axPos = get(ax, 'Position');
+    statsRight = axPos(1) - 0.012;
+    statsX = 0.002;
+    statsWidth = max(0.02, statsRight - statsX);
+    statsHeight = 0.24;
+    statsY = axPos(2) + 0.5 * axPos(4) - 0.5 * statsHeight;
+
+    annotation(gcf, 'textbox', [statsX, statsY, statsWidth, statsHeight], ...
+        'String', optoText, ...
+        'Units', 'normalized', ...
+        'HorizontalAlignment', 'left', ...
+        'VerticalAlignment', 'middle', ...
+        'FontSize', 10.5, ...
+        'Interpreter', 'tex', ...
+        'EdgeColor', 'none', ...
+        'BackgroundColor', 'none', ...
+        'FitBoxToText', 'off', ...
+        'Tag', 'PlotNakaStatsText');
+end
+
+function addFitParameterTable(ax, headers, fitParamRow)
+    if isempty(headers) || isempty(fitParamRow)
+        return;
+    end
+
+    headers = headers(:)';
+    fitParamRow = squeeze(fitParamRow);
+    fitParamRow = fitParamRow(:)';
+
+    nParams = min(numel(headers), numel(fitParamRow));
+    headers = headers(1:nParams);
+    fitParamRow = fitParamRow(1:nParams);
+
+    paramHeaders = {'A', 'B', '\alpha', '\beta'};
+    paramDisplayHeaders = {'A', 'B', '\alpha', '\beta'};
+    rowLabels = {'Baseline', 'Con-Opto', 'Incon-Opto'};
+    rowColors = [0 0 0; 0.55 0 0; 0 0.05 0.45];
+    tableValues = nan(numel(rowLabels), numel(paramHeaders));
+
+    for ii = 1:nParams
+        header = headers{ii};
+        if startsWith(header, 'AUC') || contains(header, 'AICc')
+            continue;
+        end
+
+        [rowIdx, paramIdx] = parseFitParameterHeader(header, paramHeaders);
+        if ~isnan(rowIdx) && ~isnan(paramIdx)
+            tableValues(rowIdx, paramIdx) = fitParamRow(ii);
+        end
+    end
+
+    if all(isnan(tableValues(:)))
+        return;
+    end
+
+    % Opto parameters are fitted as deltas from baseline. B is symmetric:
+    % B_con = 0.5 + deltaB_con and B_incon = 0.5 - deltaB_con.
+    baselineValues = tableValues(1,:);
+    conDeltas = tableValues(2,:);
+    inconDeltas = tableValues(3,:);
+    bIdx = strcmp(paramHeaders, 'B');
+    nonBIdx = ~bIdx;
+
+    tableValues(1, bIdx) = 0.5;
+    tableValues(2, nonBIdx) = baselineValues(nonBIdx) + conDeltas(nonBIdx);
+    tableValues(3, nonBIdx) = baselineValues(nonBIdx) + inconDeltas(nonBIdx);
+    tableValues(2, bIdx) = 0.5 + conDeltas(bIdx);
+    tableValues(3, bIdx) = 0.5 - conDeltas(bIdx);
+
+    axPos = get(ax, 'Position');
+    tableGap = 0.010;
+    maxTableRight = 0.992;
+    tableX = axPos(1) + axPos(3) + tableGap;
+    availableWidth = maxTableRight - tableX;
+    tableWidth = min(0.22, availableWidth);
+    if tableWidth < 0.18
+        tableWidth = 0.18;
+        tableX = max(0.01, maxTableRight - tableWidth);
+    end
+
+    tableHeight = 0.44 * axPos(4);
+    tableY = axPos(2) + 0.5 * axPos(4) - 0.5 * tableHeight;
+    rowHeight = tableHeight / 4;
+    labelWidth = 0.070;
+    labelGap = 0.0015;
+    paramGap = 0.0100;
+    valueWidth = (tableWidth - labelWidth - labelGap - (numel(paramHeaders) - 1) * paramGap) / numel(paramHeaders);
+    fontSize = 10.5;
+
+    addFitTableCell(tableX, tableY + 3 * rowHeight, labelWidth, rowHeight, '', [0 0 0], fontSize, 'bold', 'left');
+    for col = 1:numel(paramHeaders)
+        addFitTableCell(tableX + labelWidth + labelGap + (col - 1) * (valueWidth + paramGap), ...
+            tableY + 3 * rowHeight, valueWidth, rowHeight, paramDisplayHeaders{col}, ...
+            [0 0 0], fontSize, 'bold', 'center');
+    end
+
+    for row = 1:numel(rowLabels)
+        yPos = tableY + (3 - row) * rowHeight;
+        addFitTableCell(tableX, yPos, labelWidth, rowHeight, rowLabels{row}, ...
+            rowColors(row,:), fontSize, 'bold', 'left');
+        for col = 1:numel(paramHeaders)
+            valueStr = formatFitParameterValue(tableValues(row, col), paramHeaders{col});
+            addFitTableCell(tableX + labelWidth + labelGap + (col - 1) * (valueWidth + paramGap), ...
+                yPos, valueWidth, rowHeight, valueStr, rowColors(row,:), ...
+                fontSize, 'normal', 'center');
+        end
+    end
+end
+
+function [rowIdx, paramIdx] = parseFitParameterHeader(header, paramHeaders)
+    rowIdx = nan;
+    paramIdx = nan;
+
+    if contains(header, 'incon-bl')
+        rowIdx = 3;
+    elseif contains(header, 'con-bl')
+        rowIdx = 2;
+    elseif contains(header, '^{bl}')
+        rowIdx = 1;
+    end
+
+    paramName = regexprep(header, '^\\Delta', '');
+    paramName = regexprep(paramName, '\^\{[^}]+\}', '');
+    paramName = strtrim(paramName);
+
+    for ii = 1:numel(paramHeaders)
+        if strcmp(paramName, paramHeaders{ii})
+            paramIdx = ii;
+            return;
+        end
+    end
+end
+
+function addFitTableCell(xPos, yPos, widthVal, heightVal, textVal, colorVal, fontSize, fontWeight, horizontalAlignment)
+    xPos = max(0, min(0.999, xPos));
+    yPos = max(0, min(0.999, yPos));
+    widthVal = max(0.001, min(widthVal, 1 - xPos));
+    heightVal = max(0.001, min(heightVal, 1 - yPos));
+
+    annotation(gcf, 'textbox', [xPos, yPos, widthVal, heightVal], ...
+        'String', textVal, ...
+        'HorizontalAlignment', horizontalAlignment, ...
+        'VerticalAlignment', 'middle', ...
+        'FontSize', fontSize, ...
+        'FontWeight', fontWeight, ...
+        'Interpreter', 'tex', ...
+        'Color', colorVal, ...
+        'EdgeColor', 'none', ...
+        'BackgroundColor', 'none', ...
+        'FitBoxToText', 'off', ...
+        'Tag', 'PlotNakaFitParamText');
+end
+
+function valueStr = formatFitParameterValue(value, paramName)
+    if isnan(value)
+        valueStr = '';
+        return;
+    end
+
+    isPercentParam = any(strcmp(paramName, {'A', 'B'}));
+    if isPercentParam
+        value = value * 100;
+    end
+
+    valueStr = sprintf('%.1f', value);
+end
+
+function addBlockSuplabel(blockLabel)
+    [~, hLabel] = suplabel(blockLabel, 't', [.1 .1 .82 .88]);
+    set(hLabel, ...
+        'FontSize', 16, ...
+        'FontWeight', 'normal', ...
+        'Interpreter', 'none', ...
+        'Tag', 'PlotNakaBlockLabel');
+end
+
+function setPlotAnnotationFontSizes()
+    set(findall(gcf, 'Tag', 'PlotNakaStatsText'), 'FontSize', 10.5);
+    set(findall(gcf, 'Tag', 'PlotNakaDeltaText'), 'FontSize', 13.5);
+    set(findall(gcf, 'Tag', 'PlotNakaFitParamText'), 'FontSize', 10.5);
+    set(findall(gcf, 'Tag', 'PlotNakaBlockLabel'), 'FontSize', 16);
+end
+
+function blockInfo = getPlotBlockInfo(datastruct, analysisBlockID, clusterBlocks, block, plotAverageFlag)
+    if plotAverageFlag == 1
+        blockInfo.blockIdx = clusterBlocks(1);
+    else
+        blockInfo.blockIdx = clusterBlocks(block);
+    end
+
+    if numel(analysisBlockID) >= blockInfo.blockIdx
+        blockInfo.datastructIdx = analysisBlockID(blockInfo.blockIdx);
+    else
+        blockInfo.datastructIdx = blockInfo.blockIdx;
+    end
+
+    blockInfo.date = valueToChar(datastruct(blockInfo.datastructIdx).date);
+    blockInfo.run = valueToChar(datastruct(blockInfo.datastructIdx).run);
+    blockInfo.label = [blockInfo.date 'R' blockInfo.run];
+end
+
+function str = valueToChar(value)
+    if ischar(value)
+        str = value;
+    elseif isstring(value)
+        str = char(value);
+    elseif isnumeric(value)
+        str = num2str(value);
+    else
+        str = char(string(value));
+    end
+end
+
+function [baseMean, conMean, inconMean] = computeMergedConditionMeans(mdl, block)
+    baseMean = weightedMeanForPlot(mdl.xBlock(1,:,block), mdl.yBlock(1,:,block), 'merged');
+    conMean = weightedMeanForPlot(mdl.xBlock(2,:,block), mdl.yBlock(2,:,block), 'merged');
+    inconMean = weightedMeanForPlot(mdl.xBlock(3,:,block), mdl.yBlock(3,:,block), 'merged');
+end
+
+function [deltaBias, deltaMask] = computeDeltaFromConditionMeans(baseMean, conMean, inconMean)
+    deltaBias = conMean - inconMean;
+    optoMean = mean([conMean, inconMean], 'omitnan');
+    deltaMask = baseMean - optoMean;
+end
+
+function yMean = weightedMeanForPlot(x, y, weightMode)
+    x = x(:)';
+    y = y(:)';
+
+    validIdx = ~isnan(x) & ~isnan(y);
+    if ~any(validIdx)
+        yMean = NaN;
+        return;
+    end
+
+    x = x(validIdx);
+    y = y(validIdx);
+    weights = getPlotMeanWeights(x, weightMode);
+
+    yMean = sum(y .* weights, 'omitnan') / sum(weights, 'omitnan');
+end
+
+function weights = getPlotMeanWeights(x, weightMode)
+    x = x(:)';
+    weights = ones(size(x));
+
+    switch weightMode
+        case 'sideBaseline'
+            % Split baseline panels: 0 contrast combines the two visual tags.
+            weights(:) = 10;
+            weights(abs(x) == 0) = 20;
+        case 'sideOpto'
+            % Split opto panels keep con/incon separated by visual tag.
+            weights(:) = 10;
+        case 'merged'
+            % Merged panel: 0 contrast combines both visual tags/opto sides.
+            weights(:) = 20;
+            weights(abs(x) == 0) = 40;
+        otherwise
+            error('Unknown plot mean weight mode: %s', weightMode);
+    end
+end
+
+function [xBias, yBias, xMask, yMask] = computeSideDeltaData(sideData)
+    [xBase, yBase] = collapseConditionData(sideData.xBaseline, sideData.yBaseline);
+    [xCon, yCon] = collapseConditionData(sideData.xConOpto, sideData.yConOpto);
+    [xIncon, yIncon] = collapseConditionData(sideData.xInconOpto, sideData.yInconOpto);
+
+    [xBias, idxCon, idxIncon] = intersect(xCon, xIncon);
+    yBias = yCon(idxCon) - yIncon(idxIncon);
+
+    yOptoMean = (yCon(idxCon) + yIncon(idxIncon)) / 2;
+    [xMask, idxBase, idxOpto] = intersect(xBase, xBias);
+    yMask = yBase(idxBase) - yOptoMean(idxOpto);
+end
+
+function [xOut, yOut] = collapseConditionData(xIn, yIn)
+    [xIn, yIn] = cleanAndSortXY(xIn, yIn);
+
+    if isempty(xIn)
+        xOut = [];
+        yOut = [];
+        return;
+    end
+
+    [xOut, ~, groupIdx] = unique(xIn, 'stable');
+    yOut = nan(size(xOut));
+
+    for ii = 1:numel(xOut)
+        yOut(ii) = nanmean(yIn(groupIdx == ii));
+    end
+end
+
+function [xOut, yOut] = cleanAndSortXY(xIn, yIn)
+    xIn = xIn(:)';
+    yIn = yIn(:)';
+
+    validIdx = ~isnan(xIn) & ~isnan(yIn);
+    xOut = xIn(validIdx);
+    yOut = yIn(validIdx);
+
+    [xOut, sortIdx] = sort(xOut);
+    yOut = yOut(sortIdx);
+end
+
+function h = plotConditionSeries(xPlot, yPlot, colorVal, markerType, markerFaceColor, markerSize, lineWidth, displayName, handleVisibility)
+    [xPlot, yPlot] = cleanAndSortXY(xPlot, yPlot);
+
+    if isempty(xPlot)
+        h = plot(nan, nan, '-', ...
+            'Color', colorVal, ...
+            'LineWidth', lineWidth, ...
+            'Marker', markerType, ...
+            'MarkerFaceColor', markerFaceColor, ...
+            'MarkerEdgeColor', 'k', ...
+            'MarkerSize', markerSize, ...
+            'DisplayName', displayName, ...
+            'HandleVisibility', handleVisibility);
+        return;
+    end
+
+    h = plot(xPlot, yPlot, '-', ...
+        'Color', colorVal, ...
+        'LineWidth', lineWidth, ...
+        'Marker', markerType, ...
+        'MarkerFaceColor', markerFaceColor, ...
+        'MarkerEdgeColor', 'k', ...
+        'MarkerSize', markerSize, ...
+        'DisplayName', displayName, ...
+        'HandleVisibility', handleVisibility);
+end
+
+function style = getPreMergedPlotStyle()
+    baselineColor = [0 0 0];
+    conColor = min([0.9294, 0.1098, 0.1373] * 1.05, 1);
+    inconColor = min([0, 0.0941, 0.6627] * 1.25, 1);
+
+    desatAmount = 0.5;
+    lighten = @(c) c * (1 - desatAmount) + [1 1 1] * desatAmount;
+
+    style.baselineColor = lighten(baselineColor);
+    style.baselineFaceColor = style.baselineColor;
+    style.conColor = lighten(conColor);
+    style.inconColor = lighten(inconColor);
 end
 
 function mdl = plotPreMergedPanel(mdl, block, xLimPre, meanBar, tickCfg)

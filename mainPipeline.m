@@ -14,11 +14,11 @@
 
 %% Change these for experiment runs
 analysisMode='psycluster';%psyphidist
-monkeyName='Pepper';%Pepper or Chip
+monkeyName='Chip';%Pepper or Chip
 currentSessID=81;%for biasing expt
 
 % Saving and plotting flags
-saveFlag=1;
+saveFlag=0;
 saveFlagBMP=0;
 plotFlag=1;
 skipImaging=1;
@@ -26,7 +26,7 @@ skipImaging=1;
 %% Load dataStruct for the desired chamber
 [mainPath, datastruct]=setupEnv(['users/PK/colStimPipeline/exptListBiasingFull' monkeyName '.m']);
 chambers={'R', 'L'};
-for chamberID=1
+for chamberID=2
     nColumnsWanted=[]; chamberWanted=chambers{chamberID};
     analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted);
     nBlockStr=num2str(numel(analysisBlockID));
@@ -214,14 +214,13 @@ for chamberID=1
                 behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, saveFlag);
             
             save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-final' nBlockStr '.mat'],'blockData','bitmapData','behavioralData','analysisBlockID','datastruct','dataTag','mdlStruct')
-
             %{
             %% 20 column power x biasing
             figure
             conY = mdlStruct.([chamberWanted, 'weibullfreeAll' , 'C1']).yConOpto;
             inconY = mdlStruct.([chamberWanted, 'weibullfreeAll' , 'C1']).yInconOpto;
             deltaY = nanmean(conY-inconY,2);
-            bitmapEnergy=mean(squeeze(bitmapData.energy(:,:,:))',2);
+            bitmapEnergy=mean(squeeze(bitmapData.totalPowerToOnPixelsWithinROI_mW(:,:,:))',2);
             columns=mean(bitmapData.nColumns(:,:))';
             columnsDesired=20; columnSpread=2;
             blocksActual = find(columns >= columnsDesired-columnSpread &...
@@ -275,7 +274,7 @@ for chamberID=1
                 nClusterBlocks=numel(clusterBlocks);
                 % Get values
                 nColumnsCluster=mean(bitmapData.nColumns(:,clusterBlocks)',2);
-                bitmapEnergyCluster=mean(squeeze(bitmapData.energy(:,:,clusterBlocks))',2);
+                bitmapEnergyCluster=mean(squeeze(bitmapData.totalPowerToOnPixelsWithinROI_mW(:,:,clusterBlocks))',2);
                 betaCluster = mdlStruct.([chamberWanted, 'beta' , 'C' num2str(cluster)]).fittedParams(clusterBlocks, 1);
                 % plot
                 plot(nColumnsCluster,betaCluster, 'square', 'MarkerSize', 15, 'MarkerFaceColor', mkrColors(cluster,:), 'MarkerEdgeColor', 'k', 'linewidth', 2.5); hold on
@@ -296,7 +295,7 @@ for chamberID=1
 
             columns=mean(bitmapData.nColumns',2);
             columnsDesired=20; columnSpread=4;
-            bitmapEnergy=mean(squeeze(bitmapData.energy(:,:,:))',2);
+            bitmapEnergy=mean(squeeze(bitmapData.totalPowerToOnPixelsWithinROI_mW(:,:,:))',2);
             blocksDesired = find(columns >= columnsDesired-columnSpread & columns <= columnsDesired+columnSpread & bitmapEnergy<3.5);
 
             % Set xyz data
@@ -339,7 +338,13 @@ for chamberID=1
             export_fig(['Y:\users\PK\posters\figures\2024\betaSessions' chamberWanted],'-svg','-png','-nocrop','-r600');
             %}
                                     
-            %% Neurometrics
+        %% Metatable
+        case {'metatable'}
+            load([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-final' nBlockStr '.mat'],'blockData','bitmapData','behavioralData','analysisBlockID','datastruct','dataTag','mdlStruct')
+            columnsDesired=20; columnSpread=4;
+            MetaTable = buildBlockMetadata(behavioralData, bitmapData, columnsDesired, columnSpread, ...
+                blockData, datastruct, analysisBlockID, mdlStruct);
+        %% Neurometrics
         case {'neurometrics'}
             clc; neuroStruct=[];
             nColumnsWanted=[]; chamberWanted=chambers{chamberID};
@@ -357,9 +362,9 @@ for chamberID=1
             
             analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted); %RESET
 
-            %[bins, clusterIdx] = clusterEnergy(squeeze(bitmapData.energy), 'bin', 2);          
+            %[bins, clusterIdx] = clusterEnergy(squeeze(bitmapData.totalPowerToOnPixelsWithinROI_mW), 'bin', 2);
             analysisParams=[];
-            [bins, binEdges, clusterIdx] =  clusterEnergy(squeeze(bitmapData.energy), squeeze(bitmapData.nColumns), 'bin', 5, analysisParams);
+            [bins, binEdges, clusterIdx] =  clusterEnergy(squeeze(bitmapData.totalPowerToOnPixelsWithinROI_mW), squeeze(bitmapData.nColumns), 'bin', 5, analysisParams);
 
             monkeyName='Chip';
             trialOutcomeType='average';  % 'average' or 'averageColumn'
@@ -404,7 +409,7 @@ for chamberID=1
             
         case {'psyphidist'}
                 chamberIDs=chamberID; saveFlag=1; filterColumns=1;
-                plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, nBlockStr, filterColumns, saveFlag)
+                plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, filterColumns, saveFlag)
 
         case {'PRF'}
             fitPRFv2
