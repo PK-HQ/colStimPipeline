@@ -194,10 +194,24 @@ for chamberID=2
                 analysisParams.columnRange=4; % stdev
             end
             analysisParams=[];
-            nBlocks=numel(analysisBlockID);
-            method='kmeans';
-            [bins, binEdges, clusterIdx, validBlocks] = clusterEnergy(squeeze(bitmapData.meanPowerDensityWithinROI_mWmm2),...
-                squeeze(bitmapData.nColumns), method, 1, analysisParams);
+            nBehaviorBlocks=size(behavioralData.gaborContrasts,3);
+            nBitmapBlocks=size(bitmapData.nColumns,2);
+            if nBehaviorBlocks ~= nBitmapBlocks
+                error(['psycluster block mismatch: behavioralData has %d blocks, ' ...
+                    'but bitmapData.nColumns has %d blocks.'], ...
+                    nBehaviorBlocks, nBitmapBlocks);
+            end
+            if numel(analysisBlockID) < nBehaviorBlocks
+                error(['psycluster block mismatch: analysisBlockID has %d entries, ' ...
+                    'but the loaded psychometric data have %d blocks.'], ...
+                    numel(analysisBlockID), nBehaviorBlocks);
+            end
+            nBlocks=nBehaviorBlocks;
+            clusterMethod='orderedPowerEffect';
+            % Fit all eligible sessions once so per-session deltaBias is
+            % available for the ordered power-band segmentation below.
+            clusterIdx=ones(nBlocks,1);
+            validBlocks=analysisBlockID(1:nBlocks);
             %save([mainPath '/' monkeyName '/Meta/psychometrics/powercluster_' method monkeyName chamberWanted '_' analysisParams.columnMean '±' analysisParams.columnRange '.mat'],'bitmapData','behavioralData','analysisBlockID','datastruct','dataTag')
 
             %savePDF(['psychometrics/' chamberWanted '-chamber/' num2str(numel(bins)) 'clusters'], 'Chip', 1, 1, 1)
@@ -209,10 +223,88 @@ for chamberID=2
             constrainedParamStr='';
             plotLine=1;
                        
-            validBlocks=analysisBlockID;
+            validBlocks=analysisBlockID(1:nBlocks);
             mdlStruct=analyzePsychometricModels(monkeyName, chamberWanted, modelTypes, mainPath, ...
                 behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, saveFlag);
-            
+
+            if plotFlag
+                aggregateOpts = struct('binWidth', 5, ...
+                    'useMedianForPlot', false, 'minSessionsPerBin', 1);
+                clusterOpts = struct( ...
+                    'minSessionsPerCluster', 3, ...
+                    'effectWeight', 1, ...
+                    'monotonicPenalty', 2, ...
+                    'kCandidates', [2 3], ...
+                    'minRelativeImprovementFor3Clusters', 0.10);
+                meanPowerDensityByBlock = mean( ...
+                    squeeze(bitmapData.meanPowerDensityWithinROI_mWmm2), 1, 'omitnan');
+                aggregateModelType = modelTypes{2};
+                sourceMdlField = [chamberWanted, aggregateModelType, 'C1'];
+
+                if isfield(mdlStruct, sourceMdlField)
+                    clusterMdl = mdlStruct.(sourceMdlField);
+                    clusterBlocks = clusterMdl.clusterBlocksIdx(:);
+                    sessionPower = meanPowerDensityByBlock(clusterBlocks)';
+                    sessionBias = clusterMdl.deltaBias(:);
+                    sessionMask = clusterMdl.deltaMask(:);
+
+                    [powerEffectCluster, clusterSummary, clusterDiagnostics] = ...
+                        clusterOrderedPowerEffect(sessionPower, sessionBias, ...
+                        sessionMask, clusterOpts);
+                    powerEffectClusterByBlock = nan(nBlocks, 1);
+                    powerEffectClusterByBlock(clusterBlocks) = powerEffectCluster;
+                    plotOrderedPowerEffectClusters(sessionPower, sessionBias, ...
+                        powerEffectCluster, clusterDiagnostics);
+                    experimentNumber = analysisBlockID(clusterBlocks);
+                    plotDeltaBiasChronology(experimentNumber, sessionBias, ...
+                        powerEffectCluster);
+
+                    aggregatePsychometrics = ...
+                        aggregatePsychometricCountsByPowerCluster( ...
+                        clusterMdl, powerEffectCluster, aggregateOpts);
+                    for aggregateClusterIdx = 1:numel(aggregatePsychometrics)
+                        clusterID = aggregatePsychometrics(aggregateClusterIdx).clusterID;
+                        localBlocks = find(powerEffectCluster == clusterID);
+                        sourceBlocks = clusterBlocks(localBlocks);
+                        clusterPowers = sessionPower(localBlocks);
+
+                        aggregatePsychometrics(aggregateClusterIdx).clusterMethod = ...
+                            clusterMethod;
+                        aggregatePsychometrics(aggregateClusterIdx).powerRange = ...
+                            [min(clusterPowers), max(clusterPowers)];
+                        aggregatePsychometrics(aggregateClusterIdx).powerMedian = ...
+                            median(clusterPowers);
+                        aggregatePsychometrics(aggregateClusterIdx).powerUnits = ...
+                            'mW/mm^2';
+                        aggregatePsychometrics(aggregateClusterIdx).sourceBlockIndices = ...
+                            sourceBlocks(:)';
+                        aggregatePsychometrics(aggregateClusterIdx).stimulationStats = ...
+                            summarizeClusterStimulationParameters(bitmapData, sourceBlocks);
+                    end
+
+                    for summaryIdx = 1:numel(clusterSummary)
+                        localBlocks = clusterSummary(summaryIdx).sessionIndices;
+                        clusterSummary(summaryIdx).mdlRowIndices = localBlocks;
+                        clusterSummary(summaryIdx).blockIndices = ...
+                            clusterBlocks(localBlocks)';
+                        clusterSummary(summaryIdx).datastructIndices = ...
+                            analysisBlockID(clusterBlocks(localBlocks));
+                    end
+
+                    [aggregatePsychometricFits, ~] = ...
+                        plotAggregatedPowerClusterPsychometrics(aggregatePsychometrics);
+                    aggregateField = [chamberWanted, aggregateModelType, ...
+                        'PowerClusterAggregate'];
+                    mdlStruct.(aggregateField) = aggregatePsychometrics;
+                    mdlStruct.([aggregateField, 'Fit']) = aggregatePsychometricFits;
+                    mdlStruct.([aggregateField, 'Summary']) = clusterSummary;
+                    mdlStruct.([aggregateField, 'Diagnostics']) = clusterDiagnostics;
+                    mdlStruct.([aggregateField, 'Labels']) = powerEffectCluster;
+                    mdlStruct.([aggregateField, 'LabelsByBlock']) = ...
+                        powerEffectClusterByBlock;
+                end
+            end
+
             save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-final' nBlockStr '.mat'],'blockData','bitmapData','behavioralData','analysisBlockID','datastruct','dataTag','mdlStruct')
             %{
             %% 20 column power x biasing
