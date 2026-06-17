@@ -21,6 +21,14 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
     
     for block = 1:nBlocks
         blockInfo = getPlotBlockInfo(datastruct, analysisBlockID, clusterBlocks, block, plotAverageFlag);
+        [baselineModeThis, baselineSeparateThis, baselineSourceThis] = ...
+            detectBaselineModeByBlock(datastruct, analysisBlockID, blockInfo.blockIdx);
+        baselineModeThis = baselineModeThis(1);
+        baselineSourceThis = baselineSourceThis(1);
+        mdl.baselineMode(block, 1) = baselineModeThis;
+        mdl.baselineModeSourceField = 'datastruct(analysisBlockID(blockIdx)).baselineTS';
+        mdl.baselineTSValue(block, 1) = baselineSourceThis;
+        mdl.combinedBL(block) = ~baselineSeparateThis(1);
         % Init figure
         dat=[];
         make_it_tight = true;
@@ -46,11 +54,13 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
         % Row 2, columns 1-2: deltas from the side-specific split data
         subplot(2,3,4)
         mdl = plotSideDeltaPanel(mdl, block, sideData.horizontal, ...
-            xLimMerged, meanBar, tickCfg, 'Horizontal visual stimulus', 'Horizontal');
+            xLimMerged, meanBar, tickCfg, 'Horizontal visual stimulus', ...
+            'Horizontal', blockInfo, baselineModeThis);
 
         subplot(2,3,5)
         mdl = plotSideDeltaPanel(mdl, block, sideData.vertical, ...
-            xLimMerged, meanBar, tickCfg, 'Vertical visual stimulus', 'Vertical');
+            xLimMerged, meanBar, tickCfg, 'Vertical visual stimulus', ...
+            'Vertical', blockInfo, baselineModeThis);
         
         % Row 1, column 3: merged fitted data
         axMergedPanel = subplot(2,3,3);
@@ -246,7 +256,7 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                 end
 
                 % Add data points and shaded error bar
-                markerSize = 16;
+                markerSize = 12;
                 patchSaturationVal=1;
                 % Data points
                 shadedErrorBar(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), semY', 'patchSaturation', patchSaturationVal, 'lineprops', ...
@@ -292,7 +302,7 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
             
                 
                 if cond==3
-                    [combinedBLStr,mdl.combinedBL(block)]=checkMergedBaseline(datastruct,analysisBlockID,blockInfo.blockIdx);
+                    combinedBLStr = char(baselineModeThis);
 
                     if isfield(bitmapData, 'meanPowerDensityWithinROI_mWmm2') & ~isempty(bitmapData.meanPowerDensityWithinROI_mWmm2(:,:,blockInfo.blockIdx))
                         if plotAverageFlag % for plotting the average across all blocks
@@ -351,27 +361,35 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                     
                     blockIdx = blockInfo.blockIdx;
                     
-                    meanColumns = mean(bitmapData.nColumns(:, blockIdx), 'omitnan');
-                    
-                    meanProjectorPD = mean(bitmapData.projectorPowerDensity_mWmm2(:, blockIdx), 'omitnan');
-                    meanAreaROI     = mean(bitmapData.areaFinalROI(:, blockIdx), 'omitnan');
-                    meanAreaON      = mean(bitmapData.areaPixelsONWithinROI(:, blockIdx), 'omitnan');
-                    meanSpatialDC   = mean(bitmapData.spatialDutyCycleWithinROI(:, blockIdx), 'omitnan') * 100;
-                    meanTemporalDC  = mean(bitmapData.temporalDutyCycle(:, blockIdx), 'omitnan') * 100;
-                    
-                    meanROIPD       = mean(bitmapData.meanPowerDensityWithinROI_mWmm2(:, blockIdx), 'omitnan');
-                    meanTotalPower  = mean(bitmapData.totalPowerToOnPixelsWithinROI_mW(:, blockIdx), 'omitnan');
+                    powerMetrics = computePowerMetricsFromSource(bitmapData, blockIdx);
+                    powerSummary = powerMetrics.summary;
+                    if ~powerMetrics.pass
+                        warning('plotNakaRushtonFit5:PowerAuditMismatch', ...
+                            ['%s: stored power fields differ from canonical ' ...
+                            'PDDMD*area*duty-cycle recomputation. Using ' ...
+                            'recomputed values for plot text.'], blockInfo.label);
+                    end
+                    meanColumns = powerSummary.columns;
+                    meanProjectorPD = powerSummary.projectorPowerDensity;
+                    meanAreaROI = powerSummary.areaROI;
+                    meanAreaON = powerSummary.areaON;
+                    meanSpatialDC = powerSummary.spatialDutyCycleFraction * 100;
+                    meanTemporalDC = powerSummary.temporalDutyCycleFraction * 100;
+                    meanROIPD = powerSummary.roiPowerDensityRecomputed;
+                    meanTotalPower = powerSummary.totalPowerRecomputed;
                     
                     title('Merged fitted', 'Interpreter', 'none');
 
                     optoText = sprintf([ ...
+                        'BL: %s\n' ...
                         '%.0f cols\n' ...
-                        'PD_{DMD} %.2f mW/mm^2\n' ...
+                        'PD_{DMD} %.2f mW mm^{-2}\n' ...
                         'Area_{ROI} %.2f mm^2\n' ...
                         'Area_{ON} %.2f mm^2\n' ...
                         'sDC %.1f%% | tDC %.1f%%\n' ...
-                        'PD_{ROI} %.2f mW/mm^2\n' ...
+                        'PD_{ROI} %.2f mW mm^{-2}\n' ...
                         'P_{total} %.2f mW'], ...
+                        char(baselineModeThis), ...
                         meanColumns, ...
                         meanProjectorPD, ...
                         meanAreaROI, ...
@@ -405,7 +423,7 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                 end
 
                 % Add data points and shaded error bar
-                markerSize = 20;
+                markerSize = 15;
                 patchSaturationVal=1;
                 % Data points
                 shadedErrorBar(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), semY', 'patchSaturation', patchSaturationVal, 'lineprops', ...
@@ -436,10 +454,10 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                 upFontSize(32, 0.01);
                 %annotateDataPoints(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), nTrials, markerFaceColor); hold on;
                 xlim(xLimMerged)
-                ylim([-50 50])
+                ylim([-75 75])
                 xticks(xLimMerged(1):tickCfg.mergedMajor:xLimMerged(2));
                 addSkippedTicks(xLimMerged(1), xLimMerged(2), tickCfg.mergedSkip, 'x');
-                addSkippedTicks(-50, 50, 10, 'y');
+                addSkippedTicks(-75, 75, 15, 'y');
                 yline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
                 ylabel('\DeltaCorrect (%)')
                 axis square
@@ -462,7 +480,7 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                 end
 
                 % Add data points and shaded error bar
-                markerSize = 20;
+                markerSize = 15;
                 patchSaturationVal=1;
                 % Data points
                 shadedErrorBar(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), semY', 'patchSaturation', patchSaturationVal, 'lineprops', ...
@@ -493,10 +511,10 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                 upFontSize(32, 0.01);
                 %annotateDataPoints(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), nTrials, markerFaceColor); hold on;
                 xlim(xLimMerged)
-                ylim([-50 50])
+                ylim([-75 75])
                 xticks(xLimMerged(1):tickCfg.mergedMajor:xLimMerged(2));
                 addSkippedTicks(xLimMerged(1), xLimMerged(2), tickCfg.mergedSkip, 'x');
-                addSkippedTicks(-50, 50, 10, 'y');
+                addSkippedTicks(-75, 75, 15, 'y');
                 yline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
                 xlabel('Gabor contrast (%)')
                 
@@ -507,14 +525,14 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                     'MarkerFaceColor', [127, 0, 255]/255, ...
                     'MarkerEdgeColor', 'k', ...
                     'LineWidth', 3, ...
-                    'MarkerSize', 20);
+                    'MarkerSize', 15);
                 
                 hMaskLegend = plot(nan, nan, 's-', ...
                     'Color', [125, 125, 125]/255, ...
                     'MarkerFaceColor', [125, 125, 125]/255, ...
                     'MarkerEdgeColor', 'k', ...
                     'LineWidth', 3, ...
-                    'MarkerSize', 20);
+                    'MarkerSize', 15);
                 
                 legend([hBiasLegend, hMaskLegend], ...
                     {'Biasing', 'Masking'}, ...
@@ -558,7 +576,8 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
         %Saving
         if saveFlag
             forceFigureSansSerif(gcf);
-            savePDF(savefilename, monkeyName, 1, block, nBlocks)
+            saveCompressedPDFPage(savefilename, monkeyName, gcf, block > 1);
+            close(gcf);
             % Png/SVG
             %{
             monkey=datastruct(blockInfo.datastructIdx).monkey;
@@ -950,7 +969,7 @@ function [mdl, sideData] = plotSidePsychometricPanel(mdl, block, sideData, xLimM
     hold on;
 
     style = getPreMergedPlotStyle();
-    markerSize = 16;
+    markerSize = 12;
     lineWidth = 3;
 
     yline(50, '--', ...
@@ -1015,15 +1034,28 @@ function [mdl, sideData] = plotSidePsychometricPanel(mdl, block, sideData, xLimM
     upFontSize(32, 0.01);
 end
 
-function mdl = plotSideDeltaPanel(mdl, block, sideData, xLimMerged, meanBar, tickCfg, titleStr, sideFieldName)
+function mdl = plotSideDeltaPanel(mdl, block, sideData, xLimMerged, meanBar, tickCfg, titleStr, sideFieldName, blockInfo, baselineMode)
     hold on;
 
     lineWidth = 3;
-    markerSize = 20;
+    markerSize = 15;
     biasColor = [127, 0, 255] / 255;
     maskColor = [125, 125, 125] / 255;
 
-    [xBias, yBias, xMask, yMask] = computeSideDeltaData(sideData);
+    [xBias, yBias, xMask, yMask, deltaAudit] = computeSideDeltaData(sideData);
+    deltaAudit = addDeltaPointAuditMetadata( ...
+        deltaAudit, block, blockInfo, baselineMode);
+    if ~isfield(mdl, 'deltaPointAudit') || isempty(mdl.deltaPointAudit)
+        mdl.deltaPointAudit = emptyDeltaPointAuditTable();
+    elseif ~isequal(mdl.deltaPointAudit.Properties.VariableNames, ...
+            deltaAudit.Properties.VariableNames)
+        warning('plotNakaRushtonFit5:DeltaAuditSchemaChanged', ...
+            ['Existing mdl.deltaPointAudit schema does not match the ' ...
+            'current strict audit schema; resetting the table.']);
+        mdl.deltaPointAudit = emptyDeltaPointAuditTable();
+    end
+    mdl.deltaPointAudit = [mdl.deltaPointAudit; deltaAudit];
+    printDeltaPointAuditSummary(deltaAudit, blockInfo.label);
 
     hBias = plotConditionSeries(xBias, yBias, ...
         biasColor, 's', biasColor, markerSize, lineWidth, 'Biasing', 'on');
@@ -1044,10 +1076,10 @@ function mdl = plotSideDeltaPanel(mdl, block, sideData, xLimMerged, meanBar, tic
     plotMeanBarAtY(deltaMeansPlot(2), meanBar.rightEdgeRange, maskColor, lineWidth);
 
     xlim(xLimMerged);
-    ylim([-50 50]);
+    ylim([-75 75]);
     xticks(xLimMerged(1):tickCfg.mergedMajor:xLimMerged(2));
     addSkippedTicks(xLimMerged(1), xLimMerged(2), tickCfg.mergedSkip, 'x');
-    addSkippedTicks(-50, 50, 10, 'y');
+    addSkippedTicks(-75, 75, 15, 'y');
     yline(0, '--', 'LineWidth', 1.5, 'Color', .4 * [1 1 1], 'HandleVisibility', 'off');
 
     xlabel('Gabor contrast (%)');
@@ -1063,6 +1095,82 @@ function mdl = plotSideDeltaPanel(mdl, block, sideData, xLimMerged, meanBar, tic
     axis square;
     upFontSize(32, 0.01);
     addDeltaSummaryText(deltaBias, deltaMask);
+end
+
+function audit = addDeltaPointAuditMetadata(audit, block, blockInfo, baselineMode)
+    if isempty(audit) || height(audit) == 0
+        return;
+    end
+    audit.sessionRowIndex(:) = block;
+    audit.blockIndex(:) = blockInfo.blockIdx;
+    audit.experimentID(:) = string(blockInfo.label);
+    audit.baselineMode(:) = string(baselineMode);
+end
+
+function printDeltaPointAuditSummary(audit, experimentID)
+    experimentLabel = char(string(experimentID));
+    if isempty(audit) || height(audit) == 0
+        warning('plotNakaRushtonFit5:NoDeltaPairs', ...
+            '%s: no side-specific delta pairs were plotted.', experimentLabel);
+        return;
+    end
+    metrics = unique(audit.deltaMetric, 'stable');
+    for metricIdx = 1:numel(metrics)
+        metricRows = audit.deltaMetric == metrics(metricIdx);
+        metricAudit = audit(metricRows, :);
+        plottedRows = metricAudit.isPlotted;
+        expectedCount = firstFiniteValue(metricAudit.expectedPointCount);
+        plottedCount = sum(plottedRows);
+        skippedCount = sum(~plottedRows);
+        sideLabel = char(metricAudit.visualSide(1));
+        metricLabel = char(metrics(metricIdx));
+        methodLabel = char(strjoin(unique(metricAudit.pairingMethod), ','));
+        fprintf(['Delta point audit: %s | side=%s | metric=%s | ' ...
+            'plotted=%d/%g | skipped=%d | method=%s | ' ...
+            'max contrast diff=%0.3g | x=%s | delta=%s\n'], ...
+            experimentLabel, sideLabel, metricLabel, ...
+            plottedCount, expectedCount, skippedCount, methodLabel, ...
+            maxFiniteValue(metricAudit.maxAbsContrastDiff(plottedRows)), ...
+            formatAuditNumberList(metricAudit.xDelta(plottedRows)), ...
+            formatAuditNumberList(metricAudit.deltaValue(plottedRows)));
+        if skippedCount > 0 || plottedCount < expectedCount
+            skippedReasons = unique(metricAudit.reasonExcluded(~plottedRows));
+            skippedReasons = skippedReasons(strlength(skippedReasons) > 0);
+            warning('plotNakaRushtonFit5:DeltaPointMismatch', ...
+                ['%s %s %s plotted %d of expected %g delta points. ' ...
+                'Skipped reasons: %s'], experimentLabel, sideLabel, ...
+                metricLabel, plottedCount, expectedCount, ...
+                char(strjoin(skippedReasons, '; ')));
+        end
+    end
+end
+
+function value = maxFiniteValue(values)
+    values = values(isfinite(values));
+    if isempty(values)
+        value = NaN;
+    else
+        value = max(values);
+    end
+end
+
+function value = firstFiniteValue(values)
+    idx = find(isfinite(values), 1, 'first');
+    if isempty(idx)
+        value = NaN;
+    else
+        value = values(idx);
+    end
+end
+
+function label = formatAuditNumberList(values)
+    values = values(:)';
+    values = values(isfinite(values));
+    if isempty(values)
+        label = '[]';
+    else
+        label = ['[', strtrim(sprintf('%0.3g ', values)), ']'];
+    end
 end
 
 function addDeltaSummaryText(deltaBias, deltaMask)
@@ -1090,7 +1198,7 @@ function addOptoStatsText(ax, optoText)
     statsRight = axPos(1) - 0.012;
     statsX = 0.002;
     statsWidth = max(0.02, statsRight - statsX);
-    statsHeight = 0.24;
+    statsHeight = 0.27;
     statsY = axPos(2) + 0.5 * axPos(4) - 0.5 * statsHeight;
 
     annotation(gcf, 'textbox', [statsX, statsY, statsWidth, statsHeight], ...
@@ -1349,17 +1457,10 @@ function weights = getPlotMeanWeights(x, weightMode)
     end
 end
 
-function [xBias, yBias, xMask, yMask] = computeSideDeltaData(sideData)
-    [xBase, yBase] = collapseConditionData(sideData.xBaseline, sideData.yBaseline);
-    [xCon, yCon] = collapseConditionData(sideData.xConOpto, sideData.yConOpto);
-    [xIncon, yIncon] = collapseConditionData(sideData.xInconOpto, sideData.yInconOpto);
-
-    [xBias, idxCon, idxIncon] = intersect(xCon, xIncon);
-    yBias = yCon(idxCon) - yIncon(idxIncon);
-
-    yOptoMean = (yCon(idxCon) + yIncon(idxIncon)) / 2;
-    [xMask, idxBase, idxOpto] = intersect(xBase, xBias);
-    yMask = yBase(idxBase) - yOptoMean(idxOpto);
+function [xBias, yBias, xMask, yMask, audit] = computeSideDeltaData(sideData)
+    [xBias, yBias, xMask, yMask, audit] = ...
+        matchPsychometricDeltaPoints(sideData, ...
+        struct('contrastPairTolerance', 5));
 end
 
 function [xOut, yOut] = collapseConditionData(xIn, yIn)
@@ -1468,7 +1569,7 @@ function mdl = plotPreMergedPanel(mdl, block, xLimPre, meanBar, tickCfg)
     conColorLight = lighten(conColor);
     inconColorLight = lighten(inconColor);
 
-    markerSize = 16;
+    markerSize = 12;
     lineWidth = 3;
 
     %% Baseline

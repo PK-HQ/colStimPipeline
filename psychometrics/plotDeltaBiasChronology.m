@@ -10,13 +10,18 @@ function figureHandle = plotDeltaBiasChronology(experimentNumber, deltaBias, clu
     if ~isfield(opts, 'figureVisible') || isempty(opts.figureVisible)
         opts.figureVisible = 'on';
     end
+    if ~isfield(opts, 'controlMask') || isempty(opts.controlMask)
+        opts.controlMask = false(size(deltaBias));
+    end
 
     experimentNumber = experimentNumber(:);
     deltaBias = deltaBias(:);
     clusterLabels = clusterLabels(:);
+    controlMask = logical(opts.controlMask(:));
     if numel(experimentNumber) ~= numel(deltaBias) || ...
-            numel(experimentNumber) ~= numel(clusterLabels)
-        error('experimentNumber, deltaBias, and clusterLabels must have the same length.');
+            numel(experimentNumber) ~= numel(clusterLabels) || ...
+            numel(experimentNumber) ~= numel(controlMask)
+        error('All chronology inputs must have the same length.');
     end
 
     valid = isfinite(experimentNumber) & isfinite(deltaBias) & ...
@@ -26,6 +31,8 @@ function figureHandle = plotDeltaBiasChronology(experimentNumber, deltaBias, clu
     deltaBias = deltaBias(sortOrder);
     clusterLabels = clusterLabels(valid);
     clusterLabels = clusterLabels(sortOrder);
+    controlMask = controlMask(valid);
+    controlMask = controlMask(sortOrder);
     experimentCount = (1:numel(experimentNumber))';
 
     figureHandle = figure( ...
@@ -43,12 +50,19 @@ function figureHandle = plotDeltaBiasChronology(experimentNumber, deltaBias, clu
     labels = cell(1, numel(clusterIDs));
     for clusterIdx = 1:numel(clusterIDs)
         clusterID = clusterIDs(clusterIdx);
-        inCluster = clusterLabels == clusterID;
+        inCluster = clusterLabels == clusterID & ~controlMask;
         handles(clusterIdx) = scatter(ax, experimentCount(inCluster), ...
             deltaBias(inCluster), 110, colors(clusterIdx,:), ...
             'filled', 'Marker', 'o', ...
             'MarkerEdgeColor', 'k', 'LineWidth', 2);
         labels{clusterIdx} = sprintf('C%d', clusterID);
+    end
+    if any(controlMask)
+        handles(end + 1) = scatter(ax, experimentCount(controlMask), ...
+            deltaBias(controlMask), 110, [1.00 0.62 0.05], ...
+            'filled', 'Marker', 'o', ...
+            'MarkerEdgeColor', 'k', 'LineWidth', 2);
+        labels{end + 1} = '45^{\circ}/135^{\circ} control';
     end
 
     xlabel(ax, 'Experiment count');
@@ -56,32 +70,48 @@ function figureHandle = plotDeltaBiasChronology(experimentNumber, deltaBias, clu
     title(ax, '\Delta biasing by experiment chronology', ...
         'FontWeight', 'normal');
     if ~isempty(handles)
-        legend(ax, handles, labels, 'Location', 'best');
+        legend(ax, handles, labels, 'Location', 'southeast');
     end
     box(ax, 'off');
     axis(ax, 'square');
 
     [xLimits, xInterval] = chronologyLimits(experimentCount, true);
-    [yLimits, yInterval] = positiveBiasLimits(deltaBias);
+    [yLimits, yInterval] = signedBiasLimits(deltaBias);
     axes(ax);
     addSkippedTicks(xLimits(1), xLimits(2), xInterval, 'x');
-    addSkippedTicks(yLimits(1), yLimits(2), yInterval, 'y');
+    setAlternatingTickLabels(ax, yLimits, yInterval);
     upFontSize(24, 0.01);
     set(ax, 'LineWidth', 2, 'TickDir', 'out', ...
         'TickLength', [0.01 0.01], 'FontName', 'FreeSans');
 end
 
-function [limits, interval] = positiveBiasLimits(values)
+function [limits, interval] = signedBiasLimits(values)
     values = values(isfinite(values));
     if isempty(values)
-        limits = [0 10];
-        interval = 1;
+        limits = [-10 10];
+        interval = 2;
         return;
     end
-    upperValue = max([values; 0]);
-    interval = niceStep(max(upperValue, 1) ./ 8);
-    upperLimit = max(interval, ceil(upperValue ./ interval) .* interval);
-    limits = [0 upperLimit];
+    valueRange = max(values) - min(values);
+    interval = niceStep(max(valueRange, 1) ./ 10);
+    limits = [min(0, floor(min(values) ./ interval) .* interval), ...
+        max(0, ceil(max(values) ./ interval) .* interval)];
+    if limits(1) == limits(2)
+        limits = limits + [-interval interval];
+    end
+end
+
+function setAlternatingTickLabels(ax, limits, interval)
+    ticks = limits(1):interval:limits(2);
+    labels = strings(size(ticks));
+    zeroIdx = find(abs(ticks) < max(eps(max(abs(limits))), 1e-12), 1);
+    if isempty(zeroIdx)
+        labelIdx = 1:2:numel(ticks);
+    else
+        labelIdx = mod(1:numel(ticks), 2) == mod(zeroIdx, 2);
+    end
+    labels(labelIdx) = compose('%g', ticks(labelIdx));
+    set(ax, 'YLim', limits, 'YTick', ticks, 'YTickLabel', labels);
 end
 
 function [limits, interval] = chronologyLimits(values, integerAxis)
@@ -100,8 +130,8 @@ function [limits, interval] = chronologyLimits(values, integerAxis)
         ceil(max(values) ./ interval)] .* interval;
     if integerAxis
         interval = max(1, ceil(interval));
-        limits = [floor(min(values) ./ interval), ...
-            ceil(max(values) ./ interval)] .* interval;
+        limits = [max(1, min(values)), ...
+            ceil(max(values) ./ interval) .* interval];
     end
 end
 
