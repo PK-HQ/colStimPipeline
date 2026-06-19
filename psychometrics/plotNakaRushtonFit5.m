@@ -1,12 +1,31 @@
-function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysisBlockID,...
+function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysisBlockID,...
     mdl, fitParams, x, monkeyName, clusterBlocks, plotAverageFlag, plotLine,...
-    saveFlag, cluster, modelTypeStr, savefilename)
+    saveFlag, cluster, modelTypeStr, savefilename, clusterLabel, reportState, plotOpts)
+    if nargin < 16
+        clusterLabel = '';
+    end
+    if nargin < 17
+        reportState = [];
+    end
+    if nargin < 18 || isempty(plotOpts)
+        plotOpts = struct();
+    end
+    plotOpts = applyDeltaPermutationPlotDefaults(plotOpts);
     endIdx=size(mdl.headers,2);
     % Number of blocks and conditions
-    [nConditions, ~, nBlocks] = size(behavioralData.gaborContrasts(:, :, clusterBlocks));
+    nConditions = size(behavioralData.gaborContrasts, 1);
+    nBlocks = numel(clusterBlocks);
     if plotAverageFlag==1
         nBlocks=1;
     end
+    if ~plotAverageFlag && ~isempty(clusterLabel) && ...
+            numel(clusterLabel) ~= nBlocks
+        error('plotNakaRushtonFit5:ClusterLabelCountMismatch', ...
+            ['clusterLabel has %d entries, but %d render blocks were ' ...
+            'requested.'], numel(clusterLabel), nBlocks);
+    end
+    fprintf('plotNakaRushtonFit5 render setup: nRenderBlocks=%d | numel(clusterLabel)=%d | plotAverageFlag=%d\n', ...
+        nBlocks, numel(clusterLabel), logical(plotAverageFlag));
     mdl.cluster=cluster;
     mdl.clusterBlocksIdx=clusterBlocks;
     
@@ -18,9 +37,13 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
     tickCfg.mergedMajor = 100 / 8;
     tickCfg.mergedSkip = tickCfg.mergedMajor;
     meanBar.rightEdgeRange = [95 100];
-    
+
     for block = 1:nBlocks
         blockInfo = getPlotBlockInfo(datastruct, analysisBlockID, clusterBlocks, block, plotAverageFlag);
+        pageClusterLabel = getClusterLabelForRenderBlock(clusterLabel, block);
+        appendPage = block > 1;
+        fprintf('plotNakaRushtonFit5 render page: renderIdx=%d | globalBlockIdx=%d | clusterLabel=%s | appendPage=%d\n', ...
+            block, blockInfo.blockIdx, char(pageClusterLabel), appendPage);
         [baselineModeThis, baselineSeparateThis, baselineSourceThis] = ...
             detectBaselineModeByBlock(datastruct, analysisBlockID, blockInfo.blockIdx);
         baselineModeThis = baselineModeThis(1);
@@ -320,8 +343,16 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                     bitmapSPDmean=nanmean(bitmapSPD,'all');
                     bitmapSPDstd=nanstd(bitmapSPD,[],'all');
                     if plotAverageFlag==1
+                        bitmapSPDhv1 = formatPowerMetricsForDisplay( ...
+                            bitmapSPDhv(1), NaN);
+                        bitmapSPDhv2 = formatPowerMetricsForDisplay( ...
+                            bitmapSPDhv(2), NaN);
                         title({[modelTypeStr ', cluster ' num2str(cluster) ' average'],...
-                            ['meanPowerDensityWithinROI_mWmm2: ' num2str(bitmapSPDhv(1),2) ' & ' num2str(bitmapSPDhv(2),2) ' mW (' num2str(bitmapSPDmean,2) ' \pm ' num2str(bitmapSPDstd,1) ' mW)',...
+                            ['meanPowerDensityWithinROI_mWmm2: ' ...
+                            bitmapSPDhv1.PDROI ' & ' bitmapSPDhv2.PDROI ...
+                            ' mW mm^{-2} (' sprintf('%.4f', bitmapSPDmean) ...
+                            ' \pm ' sprintf('%.4f', bitmapSPDstd) ...
+                            ' mW mm^{-2})',...
                             ', Columns: ' num2str(bitmapColumnhv(1),2) ' & ' num2str(bitmapColumnhv(2),2)]});
                     else
                         %{
@@ -377,26 +408,31 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                     meanTemporalDC = powerSummary.temporalDutyCycleFraction * 100;
                     meanROIPD = powerSummary.roiPowerDensityRecomputed;
                     meanTotalPower = powerSummary.totalPowerRecomputed;
+                    powerDisplay = formatPowerMetricsForDisplay( ...
+                        meanROIPD, meanTotalPower);
                     
                     title('Merged fitted', 'Interpreter', 'none');
 
+                    clusterLabelLine = formatClusterLabelLine(pageClusterLabel);
                     optoText = sprintf([ ...
                         'BL: %s\n' ...
+                        '%s' ...
                         '%.0f cols\n' ...
                         'PD_{DMD} %.2f mW mm^{-2}\n' ...
                         'Area_{ROI} %.2f mm^2\n' ...
                         'Area_{ON} %.2f mm^2\n' ...
                         'sDC %.1f%% | tDC %.1f%%\n' ...
-                        'PD_{ROI} %.2f mW mm^{-2}\n' ...
-                        'P_{total} %.2f mW'], ...
+                        'PD_{ROI} %s mW mm^{-2}\n' ...
+                        'P_{total} %s mW'], ...
                         char(baselineModeThis), ...
+                        clusterLabelLine, ...
                         meanColumns, ...
                         meanProjectorPD, ...
                         meanAreaROI, ...
                         meanAreaON, ...
                         meanSpatialDC, meanTemporalDC, ...
-                        meanROIPD, ...
-                        meanTotalPower);
+                        powerDisplay.PDROI, ...
+                        powerDisplay.Ptotal);
 
                     addOptoStatsText(axRow1Col1, optoText);
 
@@ -460,6 +496,23 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
                 addSkippedTicks(-75, 75, 15, 'y');
                 yline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
                 ylabel('\DeltaCorrect (%)')
+                if plotOpts.showDeltaPermutationStats
+                    permSeed = stableDeltaPermutationSeed(plotOpts.deltaPermutationBaseSeed, blockInfo.blockIdx, cluster);
+                    permResult = computeDeltaBiasPermutationFromEmpiricalPoints(...
+                        mdl.xBlock(2,:,block), mdl.yBlock(2,:,block), ...
+                        mdl.xBlock(3,:,block), mdl.yBlock(3,:,block), ...
+                        plotOpts.nDeltaPermutations, permSeed);
+                    assertPermutationMatchesDisplayedBias(permResult, ...
+                        mdl.xBlock(4,:,block), mdl.yBlock(4,:,block));
+                    context = struct('experimentID', string(blockInfo.label), ...
+                        'modelRow', block, 'powerClusterID', cluster, ...
+                        'type', 'experiment');
+                    permAudit = addDeltaBiasPermutationVisualization(gca, permResult, context);
+                    mdl = appendDeltaPermutationAudit(mdl, permAudit);
+                    printDeltaPermutationSummary('experiment', blockInfo.label, ...
+                        numel(permResult.contrast), permResult.observedMeanDeltaBias, ...
+                        permResult.rawOverallTwoSidedP, permResult.overallSignificant);
+                end
                 axis square
                 
             elseif cond==5
@@ -576,7 +629,11 @@ function mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysi
         %Saving
         if saveFlag
             forceFigureSansSerif(gcf);
-            saveCompressedPDFPage(savefilename, monkeyName, gcf, block > 1);
+            if isempty(reportState)
+                saveCompressedPDFPage(savefilename, monkeyName, gcf, appendPage);
+            else
+                reportState = stageReportPDFPage(reportState, gcf);
+            end
             close(gcf);
             % Png/SVG
             %{
@@ -1395,6 +1452,27 @@ function blockInfo = getPlotBlockInfo(datastruct, analysisBlockID, clusterBlocks
     blockInfo.label = [blockInfo.date 'R' blockInfo.run];
 end
 
+function label = getClusterLabelForRenderBlock(clusterLabel, block)
+    if isempty(clusterLabel)
+        label = '';
+    elseif iscell(clusterLabel)
+        label = clusterLabel{block};
+    elseif numel(clusterLabel) >= block
+        label = clusterLabel(block);
+    else
+        label = clusterLabel(1);
+    end
+end
+
+function labelLine = formatClusterLabelLine(clusterLabel)
+    if nargin < 1 || isempty(clusterLabel)
+        labelLine = '';
+        return;
+    end
+
+    labelLine = sprintf('%s\n', char(clusterLabel));
+end
+
 function str = valueToChar(value)
     if ischar(value)
         str = value;
@@ -1405,6 +1483,82 @@ function str = valueToChar(value)
     else
         str = char(string(value));
     end
+end
+
+
+function opts = applyDeltaPermutationPlotDefaults(opts)
+    if ~isfield(opts, 'showDeltaPermutationStats') || isempty(opts.showDeltaPermutationStats)
+        opts.showDeltaPermutationStats = false;
+    end
+    if ~isfield(opts, 'nDeltaPermutations') || isempty(opts.nDeltaPermutations)
+        opts.nDeltaPermutations = 500;
+    end
+    if ~isfield(opts, 'deltaPermutationBaseSeed') || isempty(opts.deltaPermutationBaseSeed)
+        opts.deltaPermutationBaseSeed = 99173;
+    end
+    opts.showDeltaPermutationStats = logical(opts.showDeltaPermutationStats);
+end
+
+function seed = stableDeltaPermutationSeed(baseSeed, primaryID, secondaryID)
+    values = double(char(string(primaryID)));
+    if isnumeric(primaryID)
+        values = [values, double(primaryID(:)')];
+    end
+    if nargin > 2 && ~isempty(secondaryID)
+        if isnumeric(secondaryID)
+            values = [values, double(secondaryID(:)')];
+        else
+            values = [values, double(char(string(secondaryID)))];
+        end
+    end
+    seed = mod(double(baseSeed) + sum((1:numel(values)) .* values), 2^31 - 1);
+    if seed <= 0
+        seed = double(baseSeed);
+    end
+end
+
+function assertPermutationMatchesDisplayedBias(permResult, displayedX, displayedY)
+    displayedX = displayedX(:);
+    displayedY = displayedY(:);
+    keep = isfinite(displayedX) & isfinite(displayedY);
+    displayedX = displayedX(keep);
+    displayedY = displayedY(keep);
+    [displayedX, order] = sort(displayedX);
+    displayedY = displayedY(order);
+    if numel(displayedX) ~= numel(permResult.contrast) || ...
+            any(abs(displayedX - permResult.contrast(:)) > 1e-10) || ...
+            any(abs(displayedY - permResult.observedDeltaBias(:)) > 1e-8)
+        error('plotNakaRushtonFit5:DeltaPermutationMismatch', ...
+            ['Permutation inputs do not reproduce the displayed merged ' ...
+            'purple deltaBias points.']);
+    end
+end
+
+function mdl = appendDeltaPermutationAudit(mdl, audit)
+    if ~isfield(mdl, 'deltaBiasPermutationExperimentContrasts') || ...
+            isempty(mdl.deltaBiasPermutationExperimentContrasts)
+        mdl.deltaBiasPermutationExperimentContrasts = audit.experimentContrasts;
+    else
+        mdl.deltaBiasPermutationExperimentContrasts = [ ...
+            mdl.deltaBiasPermutationExperimentContrasts; audit.experimentContrasts];
+    end
+    if ~isfield(mdl, 'deltaBiasPermutationExperimentSummary') || ...
+            isempty(mdl.deltaBiasPermutationExperimentSummary)
+        mdl.deltaBiasPermutationExperimentSummary = audit.experimentSummary;
+    else
+        mdl.deltaBiasPermutationExperimentSummary = [ ...
+            mdl.deltaBiasPermutationExperimentSummary; audit.experimentSummary];
+    end
+end
+
+function printDeltaPermutationSummary(labelType, label, nContrasts, meanDelta, pValue, significant)
+    if significant
+        sigLabel = '*';
+    else
+        sigLabel = 'n.s.';
+    end
+    fprintf('%s %s | n contrasts %d | mean DeltaBias %.3f | raw p2 %.4g | %s\n', ...
+        labelType, char(string(label)), nContrasts, meanDelta, pValue, sigLabel);
 end
 
 function [baseMean, conMean, inconMean] = computeMergedConditionMeans(mdl, block)
@@ -1991,3 +2145,5 @@ function h = plotMeanBarAtY(yMean, xRange, colorVal, lineWidth)
         'LineWidth', lineWidth, ...
         'HandleVisibility', 'off');
 end
+
+

@@ -1,68 +1,506 @@
 # AGENTS.md — colStimPipeline
 
+## Highest-priority operating contract
+
+This repository is an active MATLAB research codebase. Preserve scientific correctness while keeping routine maintenance fast.
+
+Unless PK explicitly requests broader execution, the default behavior is:
+
+**Inspect narrowly, make the smallest correct patch, self-review it, perform static checks, and stop.**
+
+Do not turn a local request into a full pipeline validation, architectural redesign, environment-debugging session, or broad audit.
+
+The user normally runs the final MATLAB analysis and visually checks generated outputs.
+
+A higher reasoning-effort setting permits more careful reasoning. It does not by itself grant permission to run broader analyses, edit more files, regenerate PDFs, or troubleshoot the MATLAB environment.
+
+User instructions in the current task override this file.
+
+---
+
+## Task classes and time budgets
+
+Classify the task silently before acting.
+
+### QUICK task
+
+Examples:
+
+* labels
+* colors
+* titles
+* line styles
+* mean ticks
+* annotations
+* display formatting
+* metadata printed on a figure
+* small plotting bugs
+* localized source-field corrections
+* a clearly bounded bug in one function
+
+Expected behavior:
+
+* target completion: approximately 5–10 minutes
+* inspect no more than the directly relevant implementation and immediate call sites
+* normally touch no more than 1–4 files
+* do not launch MATLAB
+* do not run the pipeline
+* do not regenerate PDFs
+* use static verification only
+* stop after the patch and concise report
+
+If a QUICK task cannot be safely completed within this scope, stop and state the exact dependency or blocker. Do not expand it into a larger task without permission.
+
+### STANDARD task
+
+Examples:
+
+* a contained new analysis
+* a multi-file behavioral change
+* adding a reusable export
+* a localized data-processing change
+* a targeted debugging task with a reproducible failure
+
+Expected behavior:
+
+* target completion: approximately 15–30 minutes
+* focused repository inspection
+* one targeted smoke test may be used when genuinely useful
+* do not run a full animal/chamber pipeline unless explicitly requested
+* do not troubleshoot unrelated environment problems
+* stop if the task grows into a substantial refactor or full validation campaign
+
+### DEEP task
+
+Examples:
+
+* a new multi-chamber analysis
+* a substantial statistical analysis
+* pipeline restructuring
+* a difficult data-integrity audit
+* a broad refactor
+* end-to-end validation requested by PK
+
+Expected behavior:
+
+* may take approximately 30–60 minutes
+* only enter this mode when the request is clearly substantial or PK explicitly asks for deep/full validation
+* remain within the requested scientific scope
+* do not retry indefinitely when execution fails
+
+### Budget overrun rule
+
+If the task exceeds its expected scope or time:
+
+1. Stop running commands.
+2. Preserve the working tree.
+3. Report what is complete.
+4. State the precise blocker.
+5. Do not keep troubleshooting autonomously.
+
+Do not spend most of a task on environment problems, broad searches, repeated validation attempts, or command retries.
+
+---
+
 ## Project identity
 
 This repository is `colStimPipeline`, a MATLAB research codebase for macaque V1 visual and optogenetic stimulation experiments.
 
-The project supports behavioral, psychometric, and neurometric analyses from experiments involving visual orientation discrimination and optogenetic stimulation of cortical orientation columns.
-
 Primary language: MATLAB.
 
-Primary project path on the lab server:
+Primary project path:
 
 `\\172.17.49.6\data\users\PK\colStimPipeline`
 
-A mapped Windows path may also exist:
+Mapped path:
 
 `Y:\users\PK\colStimPipeline`
 
-Prefer the UNC path if the mapped `Y:` drive is not visible.
+Prefer the UNC path only when the mapped drive is unavailable. Do not repeatedly switch between UNC and mapped paths while debugging an unrelated task.
 
-## Default local task permissions
+---
 
-For normal code-maintenance tasks, assume the following unless PK says otherwise:
+## Default task permissions
 
-Allowed without asking:
-- read files in this repository
-- search with `rg`
-- inspect MATLAB code
-- run `git status`
-- run `git diff`
-- edit files explicitly named in the task
-- run small no-save smoke tests when the task requires verification
+### Allowed without asking
 
-Not allowed without asking:
-- edit files not named in the task
-- edit raw data or generated data files
-- edit `.mat`, `.xlsx`, image, video, or binary files
-- run full-dataset analyses
-- commit, push, pull, merge, reset, or delete branches
-- change scientific definitions, fitting logic, condition labels, or trial inclusion criteria
-- write output files to data folders
+* read relevant repository files
+* use narrowly scoped `rg` searches
+* inspect immediate callers and callees
+* run `git status`
+* run `git diff`
+* run `git diff --check`
+* run `git diff --stat`
+* edit files explicitly named in the task
+* edit directly necessary immediate call sites
+* add one small helper file when clearly justified
+* perform a small, no-save, deterministic smoke test when the task is STANDARD and the test is expected to finish quickly
 
-When asking for permission, batch requests. Do not ask command-by-command for routine read/search/diff/test operations within the allowed scope.
+### Not allowed without explicit instruction
+
+* run `mainPipeline.m`
+* run `summary`, `psyclusterPre`, `psycluster`, or another full analysis mode
+* regenerate full PDFs
+* run all chambers or animals
+* launch long MATLAB batch jobs
+* modify raw or generated data
+* write output into data folders
+* commit
+* push
+* pull
+* merge
+* reset
+* rebase
+* create or delete branches
+* alter the active animal, chamber, model, analysis mode, or loop settings
+* change scientific definitions
+* change fitting logic
+* change statistical tests
+* change cluster definitions or membership
+* change condition labels
+* change trial inclusion rules
+* change contrast matching
+* perform broad refactors
+
+Do not ask command-by-command for routine allowed reads, searches, diffs, or edits.
+
+---
+
+## Default QUICK-task workflow
+
+For a QUICK task:
+
+1. Run `git status` once.
+2. Inspect the named function or file.
+3. Inspect only immediate call sites needed to understand the data flow.
+4. Identify the existing canonical source of the requested value.
+5. Make the smallest patch.
+6. Review the complete diff yourself.
+7. Check all call sites if a function signature changed.
+8. Run:
+
+   * `git diff --check`
+   * `git diff --stat`
+9. Stop and report.
+
+Do not:
+
+* write a long plan before editing
+* narrate every search command
+* repeatedly reread the same files
+* scan the whole repository
+* launch MATLAB
+* regenerate output
+* perform end-to-end validation
+* commit or push
+
+Only explain the plan before editing when the requested change affects numerical analysis, data inclusion, statistics, fitting, clustering, or saved outputs.
+
+---
+
+## Validation levels
+
+Never escalate validation levels without explicit permission.
+
+### Level 1 — Static verification
+
+This is the default.
+
+Includes:
+
+* review the complete diff
+* `git diff --check`
+* inspect changed function signatures
+* inspect all relevant call sites
+* verify variable dimensions and indexing logically
+* verify that canonical source fields are used
+* check for silent fallback behavior
+* check that unrelated run configuration was not changed
+
+For most plotting and metadata tasks, Level 1 is sufficient because PK performs final MATLAB and visual validation.
+
+### Level 2 — Targeted smoke test
+
+Use only when:
+
+* PK explicitly requests a test, or
+* the task is STANDARD and a narrow test is clearly valuable
+
+Requirements:
+
+* test only the changed function or a small synthetic example
+* no full dataset
+* no PDF regeneration unless explicitly requested
+* no raw-data writes
+* expected runtime should be short
+* one failed attempt is enough to stop if failure is environmental
+
+Do not turn a failed smoke test into MATLAB installation or path troubleshooting.
+
+### Level 3 — End-to-end validation
+
+Use only when PK explicitly asks for language such as:
+
+* run the full analysis
+* regenerate the PDFs
+* validate both chambers
+* perform end-to-end validation
+* run full `psycluster`
+* audit the complete output
+
+Level 3 is never implied merely because a code change affects a figure.
+
+---
+
+## MATLAB execution and environment rules
+
+For QUICK tasks, do not launch MATLAB.
+
+For STANDARD or DEEP tasks, launch MATLAB only when the requested validation requires it.
+
+Never autonomously:
+
+* run `restoredefaultpath`
+* run `rehash toolboxcache`
+* modify `startup.m`
+* modify MATLAB preferences
+* add the entire repository recursively with `addpath(genpath(...))`
+* create temporary modified copies of `mainPipeline.m`
+* alter run configuration to force another chamber or animal
+* kill MATLAB processes
+* troubleshoot MATLAB installation
+* troubleshoot licenses
+* repair toolbox paths
+* repeatedly retry failed batch launches
+
+If a MATLAB command fails because of path, toolbox, startup, mapped-drive, license, or environment problems:
+
+1. Stop.
+2. Report the exact error.
+3. Leave the repository unchanged beyond the requested patch.
+4. Let PK run the code in the normal configured MATLAB session.
+
+A clear typo in the command may be corrected once. Environment failures should not be retried autonomously.
+
+---
+
+## Network-drive rules
+
+This repository resides on a network drive.
+
+Avoid expensive recursive operations.
+
+For QUICK tasks:
+
+* search specific files or narrow directories
+* use exact symbols and function names
+* avoid repository-wide `Get-ChildItem -Recurse`
+* avoid repeated whole-tree `rg`
+* avoid repeatedly reading large files in full
+* do not scan raw-data directories
+
+If a narrow search does not locate the implementation, report that rather than launching a broad multi-minute crawl.
+
+---
+
+## Scientific source-mapping rules
+
+Scientific metadata and plotted values must come from the canonical analysis source already used by the pipeline.
+
+### Prefer direct indexing
+
+When the plotting loop already has a stable block or experiment index and the source vector is block-indexed, use direct indexing.
+
+Example principle:
+
+```matlab
+value = canonicalVector(blockIdx);
+```
+
+Do not invent string-based date/run matching when a direct canonical index exists.
+
+Do not create alternate mappings merely because field names differ across helper functions.
+
+### No silent fallback
+
+Never silently substitute:
+
+* `N/A`
+* zero
+* empty text
+* the previous experiment’s value
+* the first matching row
+* a guessed default
+* a reconstructed label
+
+when an expected scientific value cannot be mapped.
+
+For eligible experiments with a missing canonical value:
+
+* render or report `UNASSIGNED` only when that is explicitly useful
+* emit a clear warning
+* preserve the missing state
+* do not misclassify it as intentionally excluded
+
+Use `N/A` only when the canonical inclusion/exclusion mask explicitly says that the experiment is not applicable.
+
+Never default an experiment to ineligible because optional metadata is absent.
+
+### Canonical mapping checks
+
+Before adding a scientific metadata label:
+
+1. Identify the exact canonical source.
+2. Identify its indexing convention.
+3. Trace one representative experiment through the current loop.
+4. Confirm that aggregate/distribution code uses the same assignment.
+5. Check expected counts where possible.
+
+For cluster labels, verify that the number of experiments assigned to each cluster matches the number used by the corresponding aggregate or distribution analysis.
+
+### Pipeline-order dependency
+
+If the requested value does not exist at the current plotting stage:
+
+1. First look for an existing finalized saved field or context already passed downstream.
+2. Prefer passing the canonical value forward with minimal changes.
+3. Do not redesign pipeline order.
+4. Do not add a second full rendering pass.
+5. Do not regenerate or append PDFs differently without first telling PK why that is necessary.
+
+If a local display request truly requires pipeline restructuring, stop and explain the dependency before implementing it.
+
+---
+
+## Current trusted scientific invariants
+
+Do not change these unless PK explicitly requests a scientific change.
+
+### Behavioral workflow
+
+Current sequence:
+
+`summary -> psyclusterPre -> psycluster`
+
+Run separately for each animal and chamber.
+
+### Power quantities
+
+Spatial duty cycle:
+
+```matlab
+sDC = AreaON / AreaROI;
+```
+
+ROI-averaged power density:
+
+```matlab
+PDROI = PDDMD * sDC * tDC;
+```
+
+Units: `mW/mm^2`
+
+Total delivered power:
+
+```matlab
+Ptotal = PDDMD * AreaON * tDC;
+```
+
+Units: `mW`
+
+Current power clustering uses:
+
+```matlab
+Ptotal
+```
+
+It does not use `PDROI` as the clustering variable.
+
+All calculations use full-precision numeric values. Rounding is display-only.
+
+### Baseline mode
+
+The current baseline-mode source is `baselineTS`.
+
+* filled/nonempty `baselineTS` means separate baseline file
+* empty/missing baseline file means combined baseline/opto block
+
+### Delta definitions
+
+Merged, horizontal, and vertical delta values use:
+
+```matlab
+deltaBias = con - incon;
+```
+
+```matlab
+deltaMask = baseline - mean([con, incon]);
+```
+
+Zero contrast only matches exact zero.
+
+Nonzero contrast matching uses a maximum discrepancy/spread of 5 contrast percentage points unless explicitly changed.
+
+### Power-cluster assignment
+
+For current power-cluster analyses, use the finalized assignment already produced by the clustering workflow.
+
+When `powerEffectClusterByBlock` is the finalized block-indexed assignment in the active code path, map using the exact `blockIdx` for the plotted experiment.
+
+Do not recompute cluster membership inside plotting functions.
+
+Do not infer membership from rounded power boundaries.
+
+---
+
+## Working-tree and Git safety
+
+Run `git status` once before editing.
+
+Assume the working tree may already contain important uncommitted changes.
+
+Never:
+
+* reset
+* restore unrelated files
+* checkout over user changes
+* stash without instruction
+* rewrite run configuration
+* overwrite unrelated edits
+* clean untracked files
+* commit or push without instruction
+
+Directly relevant immediate call-site edits are allowed even when they were not explicitly named, but keep scope narrow.
+
+Review the diff yourself after editing. PK generally does not manually inspect diffs, so the responsibility for checking the patch remains with Codex.
+
+Do not dump a large diff into the final response unless requested.
+
+If pre-existing changes are mixed into a touched file:
+
+* preserve them
+* distinguish them from the new patch in the summary
+* do not attempt to clean them up
+
+---
 
 ## Main entry point
 
-The main entry point for current work is:
+The active entry point is:
 
 `mainPipeline.m`
 
-Do not assume `mainColStimPipeline.m` is the current entry point. It may still contain useful historical information, especially about light-pattern design and data structure, but current analysis work should be understood through `mainPipeline.m` unless instructed otherwise.
+Do not assume `mainColStimPipeline.m` is current.
 
-## Project documentation to consult
+Older entry points and deprecated modes may be consulted for historical context, but do not copy old behavior into the current path without verifying it.
 
-Before making behavioral-analysis changes, read:
+Do not change the top-level run configuration in `mainPipeline.m` unless the task explicitly asks for it.
 
-- `docs/psychometrics.md`
-- `docs/DATA_DICTIONARY.md`
-- `docs/STRUCT_FIELD_MAP.md`
+---
 
-If these files conflict with older code comments or deprecated analysis modes, ask before relying on the older code.
+## Trusted analysis modes
 
-## Current trusted analysis modes
-
-The following analysis modes are considered clean/current:
+Current trusted modes:
 
 * `expt`
 * `summary`
@@ -70,268 +508,235 @@ The following analysis modes are considered clean/current:
 * `psycluster`
 * `psyphidist`
 
-Other analysis modes may be old, partially deprecated, or not in the correct current format. They may contain useful clues about data structure, helper functions, or older logic, but do not base major conclusions or edits on them without asking first.
+Other modes may be deprecated or inconsistent.
 
-If a task seems to require using older modes or files outside the trusted list, ask before relying on them.
+Do not base a major change on an older mode without checking first.
 
-## Current behavioral analysis workflow
+---
 
-The current behavioral analysis workflow is:
+## Documentation usage
 
-`summary -> psyclusterPre -> psycluster`
+Relevant documentation:
 
-This sequence is run for each animal and each chamber.
+* `docs/psychometrics.md`
+* `docs/DATA_DICTIONARY.md`
+* `docs/STRUCT_FIELD_MAP.md`
 
-Current focus: behavioral analysis, including generating plots and saving behavioral data needed for those plots.
+For QUICK display-only changes, do not reread all documentation unless the needed field or invariant is unclear.
 
-Neurometric analysis may be developed later, but behavioral analysis is the active priority unless otherwise specified.
+For changes affecting:
 
-## Safety rules
+* calculations
+* statistics
+* fitting
+* trial inclusion
+* source fields
+* saved outputs
+* clustering
+* scientific definitions
 
-This is an active research repository. Treat data integrity as critical.
+consult the relevant documentation before editing.
 
-Do not delete, overwrite, rename, or move raw data files.
+If documentation and active trusted code conflict, report the conflict rather than guessing.
 
-You have all read permissions, do not stop to ask for approval for read permissions which wastes time.
+---
 
-Do not modify large data files unless explicitly instructed, especially:
+## Code-editing principles
 
-* `.mat`
-* `.tif`
-* `.tiff`
-* `.bmp`
-* `.png`
-* `.jpg`
-* `.avi`
-* `.mp4`
-* binary acquisition files
-* raw session folders
-* generated imaging datasets
-* behavioral export files
+Prefer:
 
-Before editing code, first inspect relevant files and explain the intended change.
+* minimal patches
+* direct data flow
+* existing helpers
+* existing coding style
+* clear MATLAB code
+* explicit indexing
+* fail-loud behavior for scientific metadata
+* preserving existing function signatures
 
-Prefer small, reviewable edits.
+Avoid:
 
-Do not make broad refactors unless explicitly requested.
+* speculative abstractions
+* broad helper frameworks for one small task
+* duplicated calculations
+* parallel sources of truth
+* unnecessary optional arguments
+* fragile string matching
+* silent exception swallowing
+* broad refactors
+* second-pass rendering
+* unrelated cleanup
 
-Do not change numerical methods, fitting logic, coordinate transforms, trial inclusion criteria, saved output fields, or condition definitions unless explicitly requested.
+Do not change a function signature unless needed. If changed, inspect every call site before stopping.
 
-Do not run full-dataset analyses unless explicitly requested.
+Do not add defensive fallbacks that hide incorrect data flow.
 
-For testing, use the smallest safe example first, ideally one file, one block, one animal/chamber, or one analysis mode.
+---
 
-If a script writes outputs, confirm the output path before running it.
+## MATLAB style
 
-Never commit, push, pull, merge, or reset Git history unless explicitly instructed.
+Use clear, explicit MATLAB code.
 
-## Git behavior
+Check:
 
-This repository is Git-tracked.
+* empty arrays
+* missing fields
+* finite values
+* row/column orientation
+* table versus struct access
+* stable experiment/block indexing
+* MATLAB version compatibility
 
-Before edits, check status:
+Preserve existing coding style.
 
-```bash
-git status
-```
+Avoid over-commenting obvious code.
 
-After edits, summarize changed files and show the diff when possible:
+Comments should explain non-obvious scientific or indexing logic.
 
-```bash
-git diff
-```
-
-Do not commit unless explicitly instructed.
-
-Do not push unless explicitly instructed.
-
-If Git is not available in the current shell environment, say so and do not pretend a diff was checked.
-
-## Expected workflow for Codex
-
-For every task:
-
-1. Inspect relevant files first.
-2. Summarize what the existing code appears to do.
-3. Identify the smallest safe change.
-4. Explain the plan before editing if the change could affect analysis outputs.
-5. Make focused edits only in files relevant to the task.
-6. Summarize exact files changed.
-7. Provide a minimal verification step.
-
-For read-only tasks:
-
-1. Do not modify files.
-2. Do not create files.
-3. Do not run MATLAB unless explicitly asked.
-4. Do not process raw data.
-5. Report uncertainty clearly.
-
-## Documentation and code style
-
-Write documentation and comments in a normal human research-code style.
-
-Do not add comments, commit messages, or documentation that sound like they were generated by an AI assistant.
-
-Avoid phrases such as:
-
-* “This function has been updated to...”
-* “The assistant changed...”
-* “Codex added...”
-* “Generated by AI”
-* “As requested...”
-* overly polished tutorial-style explanations inside code
-
-Prefer concise technical comments that explain why something is done, especially when the logic is non-obvious.
-
-Good comment style:
+Good:
 
 ```matlab
-% Keep congruent and incongruent summaries separate for signed contrasts.
+% Use the finalized block-indexed cluster assignment.
 ```
 
-Avoid comment style:
+Avoid:
 
 ```matlab
-% This section was added to improve clarity and robustness for the user.
+% This code was added by Codex to improve robustness.
 ```
 
-Do not over-comment obvious MATLAB operations.
+Never add comments referring to Codex, AI, prompts, or the user’s request.
 
-Preserve the existing coding style unless there is a strong reason to change it.
-
-## MATLAB conventions
-
-Prefer clear, explicit MATLAB code over clever compact code.
-
-Avoid changing function signatures unless asked.
-
-Avoid changing output struct field names unless asked.
-
-Use robust checks for missing fields, empty arrays, and different MATLAB object classes.
-
-When dealing with transforms, do not assume only one class. Possible transform classes may include:
-
-* `affine2d`
-* `affinetform2d`
-* `images.geotrans.PolynomialTransformation2D`
-
-## Scientific context
-
-The project supports macaque V1 experiments involving visual stimulation and optogenetic stimulation of cortical orientation columns.
-
-Core scientific concepts include:
-
-* visual orientation discrimination
-* V1 orientation columns
-* optogenetic stimulation
-* congruent vs incongruent optostim
-* behavioral bias
-* psychometric curves
-* neurometric/imaging responses
-* widefield calcium imaging
-* light-pattern design
-* projector/camera coordinate transforms
-* stimulation power and power density
-* number of stimulated columns
-* task-axis vs off-axis signals
-
-## Common analysis concepts
-
-Important behavioral analysis outputs may include:
-
-* behavioral performance by condition
-* congruent vs incongruent psychometric curves
-* Naka-Rushton or related psychometric fits
-* signed contrast plots
-* condition-averaged response summaries
-* saved behavioral summary structs
-* saved plotted values
-* animal/chamber-specific summaries
-
-Important optostim/imaging analysis outputs may include:
-
-* optostim power and power density summaries
-* column counts
-* bitmap/projector/camera masks
-* condition-level summaries
-* imaging response maps
-* trial-by-trial metadata tables
-
-## Data structure notes
-
-Common structures may include:
-
-* `behavioralData`
-* `behavioralData.optoTS(blockID).Header.ConditionParams.Stimulus`
-* `bitmapData`
-* `bitmapData.gridSize`
-* `bitmapData.gammaCorrFactor`
-* `bitmapData.sensitivity`
-* `bitmapData.adaptthresh`
-* `bitmapData.orts`
-* `bitmapData.transformParams`
-
-Expected visual metadata may include:
-
-* `vis.contrast`
-* `vis.ort`
-* `vis.size`
-* `vis.sf`
-* `vis.pos`
-
-Expected optostim metadata may include:
-
-* `opto.480LED`
-* `opto.480ND`
-* `opto.580LED`
-* `opto.580ND`
-* `opto.PD`
-* `opto.gridsize`
-* `opto.gamma`
-* `opto.threshSens`
-* `opto.threshAdapt`
-* `opto.ort`
-* `opto.gausscond`
-* `opto.gausslevel`
-* `opto.gaussmax`
-* `opto.ortmaskarea`
-* `opto.gaussmaskarea`
-* `opto.transformParams`
-* `opto.bitmapProj`
-* `opto.bitmapCam`
-* `opto.nColumns`
-* `opto.pixON`
-* `opto.timeON`
-* `opto.energy`
+---
 
 ## Debugging rules
 
 When debugging:
 
-1. Find the smallest reproducible script/function.
-2. Identify the exact error line.
-3. Explain the likely cause.
-4. Patch minimally.
-5. Suggest a minimal test.
-6. Avoid full-dataset execution unless asked.
+1. Locate the exact failing output or line.
+2. Trace the value back to its canonical source.
+3. Reproduce with the smallest available example.
+4. Patch the root cause minimally.
+5. Perform static verification.
+6. Suggest one focused runtime check for PK.
 
-## Output rules
+Do not begin with a full-dataset rerun.
 
-When producing explanations, include:
+Do not infer that an audit passed merely because a mathematical identity is internally consistent. Confirm that the correct source fields and display formatting are used when those are part of the reported problem.
 
-* exact file names,
-* relevant function names,
-* relevant line numbers when available,
-* assumptions,
-* what was not verified.
+---
 
-When editing code, include:
+## Progress-reporting rules
 
-* files changed,
-* reason for change,
-* expected behavior,
-* how to verify,
-* possible risks.
+Do not narrate routine work command by command.
 
-Keep summaries direct and technical. Do not write in a style that advertises use of Codex, GPT, or AI-generated assistance.
+For QUICK tasks, remain quiet until:
+
+* the patch is complete, or
+* a genuine blocker requires PK’s decision
+
+Do not send repeated messages such as:
+
+* “I am now locating…”
+* “Next I will inspect…”
+* “I found another file…”
+* “I am going to retry…”
+
+For longer STANDARD or DEEP tasks, give a brief update only when there is meaningful progress or a blocker.
+
+---
+
+## Stop conditions
+
+Stop immediately and report rather than continuing when:
+
+* a QUICK task requires a pipeline redesign
+* more than four files require meaningful edits for a supposedly local change
+* the canonical scientific source cannot be identified
+* direct indexing and current mappings disagree
+* a MATLAB environment command fails
+* validation requires changing run configuration
+* a test would write unexpected generated output
+* the task requires raw-data modification
+* an unrelated bug is discovered
+* a command is taking substantially longer than expected
+* repeated searches are not narrowing the problem
+* the requested change cannot be verified statically and runtime validation was not authorized
+
+Do not autonomously turn the blocker into a new task.
+
+---
+
+## Expected final response
+
+### QUICK task response
+
+Keep it concise:
+
+* files changed
+* exact behavior changed
+* self-review/static checks performed
+* whether MATLAB was run
+* one short manual verification step, if useful
+
+Example structure:
+
+```text
+Changed:
+- fileA.m: ...
+- fileB.m: ...
+
+Checks:
+- reviewed full diff
+- git diff --check passed
+- MATLAB/full pipeline not run
+
+Verify:
+- run the normal analysis and inspect ...
+```
+
+### STANDARD or DEEP task response
+
+Include:
+
+* files changed
+* scientific logic implemented
+* tests actually run
+* outputs actually generated
+* unresolved risks or assumptions
+* what was not verified
+
+Never claim a run, test, visual check, or source validation occurred when it did not.
+
+Do not instruct PK to inspect the diff as the primary verification. Codex must self-review the diff; PK performs the final scientific/output check.
+
+---
+
+## Project scientific context
+
+The project supports macaque V1 experiments involving:
+
+* visual orientation discrimination
+* orientation columns
+* optogenetic stimulation
+* congruent and incongruent optostimulation
+* psychometric curves
+* behavioral biasing and masking
+* widefield calcium imaging
+* stimulation power
+* power density
+* stimulated-column counts
+* projector/camera coordinate transforms
+
+Common active data and metadata structures may include:
+
+* `behavioralData`
+* `behavioralData.optoTS`
+* `baselineTS`
+* `bitmapData`
+* `mdlStruct`
+* final experiment/block index arrays
+* chamber-specific summary tables
+* power-cluster assignments
+
+Do not assume a field’s semantics solely from its name. Verify how the active trusted pipeline consumes it.

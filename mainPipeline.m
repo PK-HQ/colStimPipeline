@@ -18,7 +18,7 @@ monkeyName='Chip';%Pepper or Chip
 currentSessID=81;%for biasing expt
 
 % Saving and plotting flags
-saveFlag=1;
+saveFlag=0;
 saveFlagBMP=0;
 plotFlag=1;
 skipImaging=1;
@@ -26,7 +26,7 @@ skipImaging=1;
 %% Load dataStruct for the desired chamber
 [mainPath, datastruct]=setupEnv(['users/PK/colStimPipeline/exptListBiasingFull' monkeyName '.m']);
 chambers={'R', 'L'};
-for chamberID=1:2
+for chamberID=2
     nColumnsWanted=[]; chamberWanted=chambers{chamberID};
     analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted);
     nBlockStr=num2str(numel(analysisBlockID));
@@ -212,7 +212,7 @@ for chamberID=1:2
             % available for the ordered power-band segmentation below.
             clusterIdx=ones(nBlocks,1);
             validBlocks=analysisBlockID(1:nBlocks);
-            %save([mainPath '/' monkeyName '/Meta/psychometrics/powercluster_' method monkeyName chamberWanted '_' analysisParams.columnMean '±' analysisParams.columnRange '.mat'],'bitmapData','behavioralData','analysisBlockID','datastruct','dataTag')
+            %save([mainPath '/' monkeyName '/Meta/psychometrics/powercluster_' method monkeyName chamberWanted '_' analysisParams.columnMean '??' analysisParams.columnRange '.mat'],'bitmapData','behavioralData','analysisBlockID','datastruct','dataTag')
 
             %savePDF(['psychometrics/' chamberWanted '-chamber/' num2str(numel(bins)) 'clusters'], 'Chip', 1, 1, 1)
             monkeyName=datastruct(analysisBlockID(1)).monkey;
@@ -225,7 +225,7 @@ for chamberID=1:2
                        
             validBlocks=analysisBlockID(1:nBlocks);
             mdlStruct=analyzePsychometricModels(monkeyName, chamberWanted, modelTypes, mainPath, ...
-                behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, saveFlag);
+                behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, false);
 
             if plotFlag
                 aggregateOpts = struct('binWidth', 5, ...
@@ -239,8 +239,10 @@ for chamberID=1:2
                 [baselineModeByBlock, ~, baselineSourceByBlock] = ...
                     detectBaselineModeByBlock(datastruct, analysisBlockID, ...
                     1:nBlocks);
+                powerAuditExperimentLabels = makeExperimentLabels( ...
+                    datastruct, analysisBlockID(1:nBlocks));
                 powerMetricsAudit = auditPowerMetrics(bitmapData, 1:nBlocks, ...
-                    analysisBlockID(1:nBlocks), [], baselineModeByBlock);
+                    powerAuditExperimentLabels, [], baselineModeByBlock);
                 totalPowerByBlock = powerMetricsAudit.Ptotal_recomputed;
                 storedTotalPowerByBlock = mean( ...
                     squeeze(bitmapData.totalPowerToOnPixelsWithinROI_mW)', ...
@@ -285,8 +287,6 @@ for chamberID=1:2
                         error('No 0/90-degree optostim sessions are available to define power-cluster boundaries.');
                     end
 
-                    powerBiasFigure = plotDeltaBiasByPower( ...
-                        sessionPower, sessionBias);
                     experimentalRows = find(experimentalSessionMask);
                     [experimentalCluster, clusterSummary, clusterDiagnostics] = ...
                         clusterOrderedPowerEffect( ...
@@ -308,16 +308,6 @@ for chamberID=1:2
                     powerEffectClusterByBlock(clusterBlocks) = powerEffectCluster;
                     powerMetricsAudit.powerClusterAssignment = ...
                         powerEffectClusterByBlock;
-                    diagnosticOpts = struct('controlMask', controlSessionMask);
-                    clusterDiagnosticFigure = plotOrderedPowerEffectClusters( ...
-                        sessionPower, sessionBias, powerEffectCluster, ...
-                        clusterDiagnostics, diagnosticOpts);
-                    experimentNumber = analysisBlockID(clusterBlocks);
-                    chronologyOpts = struct('controlMask', controlSessionMask);
-                    chronologyFigure = plotDeltaBiasChronology( ...
-                        experimentNumber, sessionBias, powerEffectCluster, ...
-                        chronologyOpts);
-
                     groupMasks = {experimentalSessionMask, controlSessionMask};
                     groupCodes = {'experimental', 'control'};
                     groupLabels = {'0^{\circ}/90^{\circ}', ...
@@ -387,8 +377,87 @@ for chamberID=1:2
                             analysisBlockID(clusterBlocks(localBlocks));
                     end
 
+                    reportFilename = ['psychometrics/' chamberWanted ...
+                        '-chamber/' aggregateModelType '/psychfit-' ...
+                        chamberWanted '-' aggregateModelType '-C1'];
+                    deltaPermutationInspection = strcmpi(monkeyName, 'Pepper') && ...
+                        strcmpi(chamberWanted, 'R');
+                    deltaPermutationPlotOpts = struct(...
+                        'showDeltaPermutationStats', deltaPermutationInspection, ...
+                        'nDeltaPermutations', 500, ...
+                        'deltaPermutationBaseSeed', 99173);
+                    if deltaPermutationInspection
+                        reportFilename = [reportFilename '_permStatsInspection'];
+                    end
+                    reportState = [];
+                    if saveFlag
+                        reportState = initializeReportPDFAssembly( ...
+                            reportFilename, monkeyName);
+                        if size(clusterMdl.fittedParams, 1) ~= numel(clusterBlocks)
+                            error('mainPipeline:ClusterMdlRowMismatch', ...
+                                ['clusterMdl has %d fitted rows, but ' ...
+                                'clusterBlocks has %d entries.'], ...
+                                size(clusterMdl.fittedParams, 1), ...
+                                numel(clusterBlocks));
+                        end
+                        clusterLabelsForBlocks = ...
+                            prepareClusterLabelsForIndividualPages( ...
+                            datastruct, analysisBlockID, clusterBlocks, ...
+                            powerEffectClusterByBlock);
+                        fprintf('Post-clustering individual render: nRenderBlocks=%d | numel(clusterLabelsForBlocks)=%d | plotAverageFlag=%d\n', ...
+                            numel(clusterBlocks), ...
+                            numel(clusterLabelsForBlocks), false);
+                        individualXFit = sort(nlinspace(0, 100, 100, ...
+                            'linear'));
+                        [clusterMdl, reportState] = plotNakaRushtonFit5(behavioralData, bitmapData, ...
+                            datastruct, analysisBlockID, clusterMdl, ...
+                            clusterMdl.fittedParams(:, :, 1), ...
+                            individualXFit, monkeyName, clusterBlocks, ...
+                            0, plotLine, saveFlag, 1, ...
+                            aggregateModelType, reportFilename, ...
+                            clusterLabelsForBlocks, reportState, deltaPermutationPlotOpts);
+                    end
+
+                    powerBiasFigure = plotDeltaBiasByPower( ...
+                        sessionPower, sessionBias);
+                    if saveFlag
+                        reportState = stageAndCloseReportFigure( ...
+                            powerBiasFigure, reportState);
+                    end
+
+                    diagnosticOpts = struct('controlMask', controlSessionMask);
+                    clusterDiagnosticFigure = plotOrderedPowerEffectClusters( ...
+                        sessionPower, sessionBias, powerEffectCluster, ...
+                        clusterDiagnostics, diagnosticOpts);
+                    if saveFlag
+                        reportState = stageAndCloseReportFigure( ...
+                            clusterDiagnosticFigure, reportState);
+                    end
+
+                    experimentNumber = analysisBlockID(clusterBlocks);
+                    chronologyOpts = struct('controlMask', controlSessionMask);
+                    chronologyFigure = plotDeltaBiasChronology( ...
+                        experimentNumber, sessionBias, powerEffectCluster, ...
+                        chronologyOpts);
+                    if saveFlag
+                        reportState = stageAndCloseReportFigure( ...
+                            chronologyFigure, reportState);
+                    end
+
+                    aggregatePlotOpts = deltaPermutationPlotOpts;
                     [aggregatePsychometricFits, aggregateFigures] = ...
-                        plotAggregatedPowerClusterPsychometrics(aggregatePsychometrics);
+                        plotAggregatedPowerClusterPsychometrics(...
+                        aggregatePsychometrics, aggregatePlotOpts);
+                    if deltaPermutationInspection
+                        saveDeltaBiasPermutationInspectionAudit(...
+                            monkeyName, chamberWanted, aggregateModelType, ...
+                            clusterMdl, aggregatePsychometricFits);
+                    end
+                    if saveFlag
+                        reportState = stageAndCloseReportFigures( ...
+                            aggregateFigures, reportState);
+                    end
+
                     distributionOpts = struct( ...
                         'experimentIDsByBlock', analysisBlockID(1:nBlocks), ...
                         'baselineModeByBlock', baselineModeByBlock, ...
@@ -398,6 +467,11 @@ for chamberID=1:2
                         plotPowerClusterMeanDistributions( ...
                         clusterMdl, aggregatePsychometricFits, ...
                         distributionOpts);
+                    if saveFlag
+                        reportState = stageAndCloseReportFigures( ...
+                            meanDistributionFigures, reportState);
+                    end
+
                     parameterDistributionOpts = distributionOpts;
                     parameterDistributionOpts.modelFieldName = sourceMdlField;
                     [parameterFigures, parameterDistributionData, ...
@@ -406,6 +480,12 @@ for chamberID=1:2
                         plotPowerClusterFitParameters( ...
                         clusterMdl, aggregatePsychometricFits, ...
                         parameterDistributionOpts);
+                    if saveFlag
+                        reportState = stageAndCloseReportFigures( ...
+                            parameterFigures, reportState);
+                        finalizeReportPDFAssembly(reportState);
+                    end
+
                     distributionSourceAudit = [ ...
                         meanDistributionAudit; parameterDistributionAudit];
                     distributionStatsAudit = [ ...
@@ -455,19 +535,6 @@ for chamberID=1:2
                                 'Meta', 'summary', deltaAuditBaseName);
                             deltaPointAuditPaths = saveDeltaPointAudit( ...
                                 clusterMdl.deltaPointAudit, deltaAuditOutputBase);
-                        end
-                        reportFilename = ['psychometrics/' chamberWanted ...
-                            '-chamber/' aggregateModelType '/psychfit-' ...
-                            chamberWanted '-' aggregateModelType '-C1'];
-                        reportFigures = [powerBiasFigure; ...
-                            clusterDiagnosticFigure; chronologyFigure; ...
-                            aggregateFigures(:); ...
-                            meanDistributionFigures(:); ...
-                            parameterFigures(:)];
-                        for reportFigureIdx = 1:numel(reportFigures)
-                            saveCompressedPDFPage(reportFilename, monkeyName, ...
-                                reportFigures(reportFigureIdx), true);
-                            close(reportFigures(reportFigureIdx));
                         end
                     end
                     aggregateField = [chamberWanted, aggregateModelType, ...
@@ -547,7 +614,7 @@ for chamberID=1:2
             save([mainPath '/' monkeyName '/Meta/psychometrics/psychfit' chamberWanted '-' modelTypes{2} '.mat'], 'mdlStruct', 'bitmapEnergy',...
                 'behavioralData','analysisBlockID','datastruct','dataTag');
             
-            title({'Power x Δcon-incon (M2-R)', sprintf('%.0f ± %.0f columns',columnsDesired,round(std(columns)))})
+            title({'Power x ??con-incon (M2-R)', sprintf('%.0f ?? %.0f columns',columnsDesired,round(std(columns)))})
             axis square
             xlim([0 5])
             ylim([-10 20])
@@ -555,7 +622,7 @@ for chamberID=1:2
             addSkippedTicks(-10,20,5,'y')
             %[p,h,stats] = ranksum(actualY(actualX>=3.5), [controlY(controlX>=3.5)' 2 -1 -3], 'tail','both')
             xlabel('Total energy (mW)')
-            ylabel('Δ correct %')
+            ylabel('?? correct %')
             upFontSize(20,.02)
             export_fig(['Y:\users\PK\colStimPipeline\figures\powerxdeltaY-' monkeyName '-' chamberWanted],'-svg','-png','-nocrop','-r600');
 
@@ -619,7 +686,7 @@ for chamberID=1:2
                 'MarkerEdgeColor', 'k', 'LineWidth', 2, 'MarkerFaceColor', 'flat');
             hold on;
             yline(50,'LineStyle','--','color',[.5 .5 .5],'LineWidth',2,'HandleVisibility','off')
-            title({'Effect of biasing across sessions', sprintf('(%.0f ± %.0f columns)',columnsDesired,columnSpread)})
+            title({'Effect of biasing across sessions', sprintf('(%.0f ?? %.0f columns)',columnsDesired,columnSpread)})
             xlim([0 16])
             ylim([0 100])
             addSkippedTicks(0,20,2,'x')
@@ -651,8 +718,8 @@ for chamberID=1:2
                                 ['statistics' chamberWanted 'tag.mat']);
             
             % Load only when needed:
-            %   – `dataTag` is missing,  OR
-            %   – `dataTag` refers to a different chamber
+            %   ??? `dataTag` is missing,  OR
+            %   ??? `dataTag` refers to a different chamber
             if ( ~exist('dataTag','var') || ~strcmp(dataTag, chamberWanted) ) && isfile(fileName)
                 load(fileName, 'behavioralData', 'bitmapData', 'imagingData', 'dataTag');
             end
@@ -707,6 +774,9 @@ for chamberID=1:2
         case {'psyphidist'}
                 chamberIDs=chamberID; saveFlag=1; filterColumns=1;
                 plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, filterColumns, saveFlag)
+
+        case {'psydeltahist'}
+                plotMultiChamberDeltaBiasHistogram();
 
         case {'PRF'}
             fitPRFv2
@@ -793,4 +863,176 @@ function label = formatNumericVectorForLog(values)
     label = ['[', char(strjoin(parts, ', ')), ']'];
 end
 
+function labels = makeExperimentLabels(datastruct, blockIndices)
+    blockIndices = blockIndices(:);
+    labels = strings(size(blockIndices));
+    for idx = 1:numel(blockIndices)
+        dataIdx = blockIndices(idx);
+        if ~isfinite(dataIdx) || dataIdx < 1 || dataIdx > numel(datastruct)
+            labels(idx) = "";
+            continue;
+        end
+        labels(idx) = string(datastruct(dataIdx).date) + "R" + ...
+            string(datastruct(dataIdx).run);
+    end
+end
+
+function clusterLabels = prepareClusterLabelsForIndividualPages( ...
+        datastruct, analysisBlockID, clusterBlocks, ...
+        powerEffectClusterByBlock)
+    validClusterIDs = powerEffectClusterByBlock( ...
+        isfinite(powerEffectClusterByBlock) & powerEffectClusterByBlock > 0);
+    if isempty(validClusterIDs)
+        error('mainPipeline:NoPowerClusterAssignments', ...
+            'No finalized finite positive power-cluster assignments exist.');
+    end
+
+    nClusters = max(validClusterIDs);
+    expectedCount = zeros(1, nClusters);
+    renderedCount = zeros(1, nClusters);
+    for clusterID = 1:nClusters
+        expectedCount(clusterID) = sum( ...
+            powerEffectClusterByBlock(clusterBlocks) == clusterID);
+    end
+
+    clusterLabels = cell(numel(clusterBlocks), 1);
+    renderClusterIDs = nan(numel(clusterBlocks), 1);
+
+    fprintf(['Cluster label audit before individual-page rendering:\n' ...
+        'renderIdx | experimentID | globalBlockIdx | clusterID | label\n']);
+
+    for rowIdx = 1:numel(clusterBlocks)
+        globalBlockIdx = clusterBlocks(rowIdx);
+        experimentID = experimentLabelFromBlock( ...
+            datastruct, analysisBlockID, globalBlockIdx);
+        clusterID = NaN;
+        if globalBlockIdx >= 1 && ...
+                globalBlockIdx <= numel(powerEffectClusterByBlock)
+            clusterID = powerEffectClusterByBlock(globalBlockIdx);
+        end
+
+        if ~isfinite(clusterID) || clusterID < 1
+            error('mainPipeline:IncludedBlockMissingCluster', ...
+                ['Included block %d has no finalized power-cluster ' ...
+                'assignment.'], globalBlockIdx);
+        end
+
+        clusterLabels{rowIdx} = sprintf( ...
+            'Cluster: %d/%d', round(clusterID), nClusters);
+        renderClusterIDs(rowIdx) = round(clusterID);
+        renderedCount(round(clusterID)) = ...
+            renderedCount(round(clusterID)) + 1;
+
+        fprintf('%d | %s | %d | %s | %s\n', ...
+            rowIdx, experimentID, globalBlockIdx, ...
+            formatClusterValueForAudit(clusterID), ...
+            clusterLabels{rowIdx});
+    end
+
+    for clusterID = 1:nClusters
+        prepared = sum(renderClusterIDs == clusterID);
+        if prepared ~= expectedCount(clusterID) || ...
+                renderedCount(clusterID) ~= expectedCount(clusterID)
+            error('mainPipeline:ClusterLabelCountMismatch', ...
+                ['Cluster %d individual-page labels (%d) do not match ' ...
+                'finalized assignment count (%d).'], clusterID, ...
+                prepared, expectedCount(clusterID));
+        end
+    end
+    fprintf('Prepared %d post-clustering individual-page cluster labels.\n', ...
+        numel(clusterLabels));
+end
+
+function label = experimentLabelFromBlock(datastruct, analysisBlockID, blockIdx)
+    if blockIdx < 1 || blockIdx > numel(analysisBlockID)
+        label = sprintf('block%d', blockIdx);
+        return;
+    end
+
+    dataIdx = analysisBlockID(blockIdx);
+    if dataIdx < 1 || dataIdx > numel(datastruct)
+        label = sprintf('block%d', blockIdx);
+        return;
+    end
+
+    label = char(string(datastruct(dataIdx).date) + "R" + ...
+        string(datastruct(dataIdx).run));
+end
+
+function label = formatClusterValueForAudit(value)
+    if isfinite(value)
+        label = sprintf('%d', round(value));
+    else
+        label = 'NaN';
+    end
+end
+
+
+function saveDeltaBiasPermutationInspectionAudit(monkeyName, chamberWanted, modelType, clusterMdl, aggregateFits)
+    outputDir = fullfile('Y:\users\PK\colStimPipeline', 'outputs', 'deltaBiasPermutation');
+    if ~exist(outputDir, 'dir')
+        mkdir(outputDir);
+    end
+    tag = sprintf('%s_%s_%s', monkeyName, chamberWanted, modelType);
+
+    experimentContrasts = table();
+    experimentSummary = table();
+    clusterContrasts = table();
+    clusterSummary = table();
+
+    if isfield(clusterMdl, 'deltaBiasPermutationExperimentContrasts')
+        experimentContrasts = clusterMdl.deltaBiasPermutationExperimentContrasts;
+    end
+    if isfield(clusterMdl, 'deltaBiasPermutationExperimentSummary')
+        experimentSummary = clusterMdl.deltaBiasPermutationExperimentSummary;
+    end
+    for idx = 1:numel(aggregateFits)
+        if isfield(aggregateFits(idx), 'merged') && ...
+                isfield(aggregateFits(idx).merged, 'deltaBiasPermutationClusterContrasts')
+            clusterContrasts = [clusterContrasts; ...
+                aggregateFits(idx).merged.deltaBiasPermutationClusterContrasts]; %#ok<AGROW>
+        end
+        if isfield(aggregateFits(idx), 'merged') && ...
+                isfield(aggregateFits(idx).merged, 'deltaBiasPermutationClusterSummary')
+            clusterSummary = [clusterSummary; ...
+                aggregateFits(idx).merged.deltaBiasPermutationClusterSummary]; %#ok<AGROW>
+        end
+    end
+
+    matPath = fullfile(outputDir, sprintf('deltaBiasPermutationAudit_%s.mat', tag));
+    expContrastPath = fullfile(outputDir, sprintf('deltaBiasPermutationExperimentContrasts_%s.csv', tag));
+    expSummaryPath = fullfile(outputDir, sprintf('deltaBiasPermutationExperimentSummary_%s.csv', tag));
+    clusterContrastPath = fullfile(outputDir, sprintf('deltaBiasPermutationClusterContrasts_%s.csv', tag));
+    clusterSummaryPath = fullfile(outputDir, sprintf('deltaBiasPermutationClusterSummary_%s.csv', tag));
+
+    save(matPath, 'experimentContrasts', 'experimentSummary', ...
+        'clusterContrasts', 'clusterSummary');
+    writetable(experimentContrasts, expContrastPath);
+    writetable(experimentSummary, expSummaryPath);
+    writetable(clusterContrasts, clusterContrastPath);
+    writetable(clusterSummary, clusterSummaryPath);
+
+    fprintf('Saved deltaBias permutation audit outputs:\n');
+    fprintf('  %s\n', matPath);
+    fprintf('  %s\n', expContrastPath);
+    fprintf('  %s\n', expSummaryPath);
+    fprintf('  %s\n', clusterContrastPath);
+    fprintf('  %s\n', clusterSummaryPath);
+endfunction reportState = stageAndCloseReportFigures(figureHandles, reportState)
+    for figureIdx = 1:numel(figureHandles)
+        reportState = stageAndCloseReportFigure( ...
+            figureHandles(figureIdx), reportState);
+    end
+end
+
+function reportState = stageAndCloseReportFigure(figHandle, reportState)
+    if isempty(figHandle) || ~isgraphics(figHandle)
+        error(['Plot producer did not return a live graphics handle. ' ...
+            'class=%s, size=%s'], class(figHandle), ...
+            mat2str(size(figHandle)));
+    end
+
+    reportState = stageReportPDFPage(reportState, figHandle);
+    close(figHandle);
+end
 

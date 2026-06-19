@@ -63,11 +63,30 @@ function [out, figureHandles] = plotAggregatedPowerClusterPsychometrics(agg, opt
             axTop = makeSubplot(viewIdx);
             topAxes(viewIdx) = axTop;
             plotPsychometricPanel(axTop, viewData, fitResult, ...
-                viewTitles{viewIdx}, style, opts);
+                conditionMeans, viewTitles{viewIdx}, style, opts);
 
             axBottom = makeSubplot(viewIdx + 3);
             bottomAxes(viewIdx) = axBottom;
-            plotDeltaPanel(axBottom, deltaData, fitResult, style, opts);
+            plotDeltaPanel(axBottom, deltaData, fitResult, ...
+                deltaSummary, style, opts);
+            if opts.showDeltaPermutationStats && strcmp(viewName, 'merged')
+                permSeed = stableAggregateDeltaPermutationSeed(...
+                    opts.deltaPermutationBaseSeed, agg(clusterIdx).clusterID);
+                permResult = computeAggregateDeltaBiasPermutation(...
+                    viewData, deltaData, opts.nDeltaPermutations, permSeed);
+                context = struct('type', 'cluster', ...
+                    'clusterID', agg(clusterIdx).clusterID);
+                permAudit = addDeltaBiasPermutationVisualization(...
+                    axBottom, permResult, context);
+                out(clusterIdx).merged.deltaBiasPermutation = permResult;
+                out(clusterIdx).merged.deltaBiasPermutationClusterContrasts = ...
+                    permAudit.clusterContrasts;
+                out(clusterIdx).merged.deltaBiasPermutationClusterSummary = ...
+                    permAudit.clusterSummary;
+                printAggregateDeltaPermutationSummary(agg(clusterIdx).clusterID, ...
+                    numel(permResult.contrast), permResult.observedMeanDeltaBias, ...
+                    permResult.rawOverallTwoSidedP, permResult.overallSignificant);
+            end
         end
 
         axes(bottomAxes(3));
@@ -100,6 +119,9 @@ function opts = applyDefaults(opts)
         'markerFaceAlpha', 0.72, ...
         'deltaMarkerFaceAlpha', 0.62, ...
         'fitGridPoints', 401, ...
+        'showDeltaPermutationStats', false, ...
+        'nDeltaPermutations', 500, ...
+        'deltaPermutationBaseSeed', 99173, ...
         'maxIterations', 5000, ...
         'tileSpacing', 'compact', ...
         'padding', 'compact');
@@ -131,6 +153,7 @@ function opts = applyDefaults(opts)
         {'scalar', 'real', 'finite', '>=', 0, '<=', 1});
 
     opts.showSEM = logical(opts.showSEM);
+    opts.showDeltaPermutationStats = logical(opts.showDeltaPermutationStats);
     opts.figureVisible = validatestring(opts.figureVisible, {'on', 'off'});
 end
 
@@ -444,7 +467,8 @@ function combined = combineSEM(firstSEM, secondSEM, firstScale, secondScale)
         (secondScale .* secondSEM) .^ 2);
 end
 
-function plotPsychometricPanel(ax, viewData, fitResult, titleText, style, opts)
+function plotPsychometricPanel(ax, viewData, fitResult, conditionMeans, ...
+        titleText, style, opts)
     hold(ax, 'on');
     yline(ax, 50, '--', 'Color', 0.4 .* [1 1 1], ...
         'LineWidth', style.referenceLineWidth, 'HandleVisibility', 'off');
@@ -474,6 +498,10 @@ function plotPsychometricPanel(ax, viewData, fitResult, titleText, style, opts)
     xLimits = chooseXLimits(viewData, opts);
     xlim(ax, xLimits);
     ylim(ax, opts.yLim);
+    plotRightEdgeMeanTicks(ax, ...
+        [conditionMeans.baseline, conditionMeans.con, conditionMeans.incon], ...
+        {style.baseline.color, style.con.color, style.incon.color}, ...
+        style.lineWidth);
     xlabel(ax, 'Gabor contrast (%)');
     ylabel(ax, 'Correct (%)');
     title(ax, titleText, 'FontWeight', 'normal');
@@ -517,7 +545,7 @@ function handle = plotAggregatePoints(ax, conditionData, conditionStyle, opts, s
         'DisplayName', conditionStyle.label);
 end
 
-function plotDeltaPanel(ax, deltaData, fitResult, style, opts)
+function plotDeltaPanel(ax, deltaData, fitResult, deltaSummary, style, opts)
     hold(ax, 'on');
     yline(ax, 0, '--', 'Color', 0.4 .* [1 1 1], ...
         'LineWidth', style.referenceLineWidth, 'HandleVisibility', 'off');
@@ -563,6 +591,9 @@ function plotDeltaPanel(ax, deltaData, fitResult, style, opts)
     xLimits = chooseDeltaXLimits(deltaData, fitResult, opts);
     xlim(ax, xLimits);
     ylim(ax, opts.deltaYLim);
+    plotRightEdgeMeanTicks(ax, ...
+        [deltaSummary.biasing, deltaSummary.masking], ...
+        {style.bias.color, style.mask.color}, style.lineWidth);
     xlabel(ax, 'Gabor contrast (%)');
     ylabel(ax, '\DeltaCorrect (%)');
     title(ax, '');
@@ -570,6 +601,129 @@ function plotDeltaPanel(ax, deltaData, fitResult, style, opts)
         'Location', 'southeast');
     box(ax, 'off');
     axis(ax, 'square');
+end
+
+
+function result = computeAggregateDeltaBiasPermutation(viewData, deltaData, nPermutations, randomSeed)
+    rng(double(randomSeed), 'twister');
+    contrasts = deltaData.biasX(:);
+    nContrasts = numel(contrasts);
+    nullDeltaByContrast = nan(nContrasts, nPermutations);
+    observedDelta = deltaData.biasing(:);
+    nContributing = zeros(nContrasts, 1);
+
+    for contrastIdx = 1:nContrasts
+        contrast = contrasts(contrastIdx);
+        conIdx = find(viewData.con.x == contrast, 1);
+        inconIdx = find(viewData.incon.x == contrast, 1);
+        if isempty(conIdx) || isempty(inconIdx)
+            continue;
+        end
+        conSessions = viewData.con.sessionIDs{conIdx};
+        inconSessions = viewData.incon.sessionIDs{inconIdx};
+        conValues = viewData.con.sessionValues{conIdx};
+        inconValues = viewData.incon.sessionValues{inconIdx};
+        commonSessions = intersect(conSessions, inconSessions, 'stable');
+        nContributing(contrastIdx) = numel(commonSessions);
+        if isempty(commonSessions)
+            continue;
+        end
+        sessionNull = nan(numel(commonSessions), nPermutations);
+        for sessionIdx = 1:numel(commonSessions)
+            sessionID = commonSessions(sessionIdx);
+            conSessionIdx = find(conSessions == sessionID, 1);
+            inconSessionIdx = find(inconSessions == sessionID, 1);
+            conPct = conValues(conSessionIdx);
+            inconPct = inconValues(inconSessionIdx);
+            [nCon, nIncon] = assumedAggregateDeltaTrialCounts(contrast);
+            conCorrect = round(conPct ./ 100 .* nCon);
+            inconCorrect = round(inconPct ./ 100 .* nIncon);
+            conCorrect = min(max(conCorrect, 0), nCon);
+            inconCorrect = min(max(inconCorrect, 0), nIncon);
+            totalCorrect = conCorrect + inconCorrect;
+            totalTrials = nCon + nIncon;
+            pooledOutcomes = [ones(totalCorrect, 1); zeros(totalTrials - totalCorrect, 1)];
+            for permIdx = 1:nPermutations
+                permOrder = randperm(totalTrials);
+                permConCorrect = sum(pooledOutcomes(permOrder(1:nCon)));
+                permInconCorrect = totalCorrect - permConCorrect;
+                sessionNull(sessionIdx, permIdx) = ...
+                    100 .* permConCorrect ./ nCon - ...
+                    100 .* permInconCorrect ./ nIncon;
+            end
+        end
+        nullDeltaByContrast(contrastIdx, :) = mean(sessionNull, 1, 'omitnan');
+    end
+
+    nullMedian = nan(nContrasts, 1);
+    nullLower95 = nan(nContrasts, 1);
+    nullUpper95 = nan(nContrasts, 1);
+    rawTwoSidedP = nan(nContrasts, 1);
+    for contrastIdx = 1:nContrasts
+        nullVals = nullDeltaByContrast(contrastIdx, :);
+        nullMedian(contrastIdx) = median(nullVals, 'omitnan');
+        nullLower95(contrastIdx) = prctile(nullVals, 2.5);
+        nullUpper95(contrastIdx) = prctile(nullVals, 97.5);
+        pUpper = (1 + sum(nullVals >= observedDelta(contrastIdx))) ./ (nPermutations + 1);
+        pLower = (1 + sum(nullVals <= observedDelta(contrastIdx))) ./ (nPermutations + 1);
+        rawTwoSidedP(contrastIdx) = min(1, 2 .* min(pUpper, pLower));
+    end
+
+    observedMean = mean(observedDelta, 'omitnan');
+    nullMean = mean(nullDeltaByContrast, 1, 'omitnan');
+    pUpperOverall = (1 + sum(nullMean >= observedMean)) ./ (nPermutations + 1);
+    pLowerOverall = (1 + sum(nullMean <= observedMean)) ./ (nPermutations + 1);
+
+    result = struct();
+    result.contrast = contrasts;
+    result.observedDeltaBias = observedDelta;
+    result.nullDeltaByContrast = nullDeltaByContrast;
+    result.nullMedian = nullMedian;
+    result.nullLower95 = nullLower95;
+    result.nullUpper95 = nullUpper95;
+    result.rawTwoSidedP = rawTwoSidedP;
+    result.significantUncorrected = rawTwoSidedP < 0.05;
+    result.nContributingExperiments = nContributing;
+    result.observedMeanDeltaBias = observedMean;
+    result.nullMeanDelta = nullMean(:);
+    result.nullMeanMedian = median(nullMean, 'omitnan');
+    result.nullMeanLower95 = prctile(nullMean, 2.5);
+    result.nullMeanUpper95 = prctile(nullMean, 97.5);
+    result.rawOverallTwoSidedP = min(1, 2 .* min(pUpperOverall, pLowerOverall));
+    result.overallSignificant = result.rawOverallTwoSidedP < 0.05;
+    result.nPermutations = nPermutations;
+    result.multipleComparisonCorrection = 'none';
+end
+
+function [nCon, nIncon] = assumedAggregateDeltaTrialCounts(contrast)
+    if abs(contrast) < eps
+        nCon = 40;
+        nIncon = 40;
+    else
+        nCon = 20;
+        nIncon = 20;
+    end
+end
+
+function seed = stableAggregateDeltaPermutationSeed(baseSeed, clusterID)
+    values = double(char(string(clusterID)));
+    if isnumeric(clusterID)
+        values = [values, double(clusterID(:)')];
+    end
+    seed = mod(double(baseSeed) + sum((1:numel(values)) .* values), 2^31 - 1);
+    if seed <= 0
+        seed = double(baseSeed);
+    end
+end
+
+function printAggregateDeltaPermutationSummary(clusterID, nContrasts, meanDelta, pValue, significant)
+    if significant
+        sigLabel = '*';
+    else
+        sigLabel = 'n.s.';
+    end
+    fprintf('cluster C%s | n contrasts %d | mean DeltaBias %.3f | raw p2 %.4g | %s\n', ...
+        char(string(clusterID)), nContrasts, meanDelta, pValue, sigLabel);
 end
 
 function xLimits = chooseXLimits(viewData, opts)
@@ -598,6 +752,29 @@ function xLimits = chooseDeltaXLimits(deltaData, fitResult, opts)
         else
             xLimits = [0, max(100, ceil(max(allX) ./ 5) .* 5)];
         end
+    end
+end
+
+function plotRightEdgeMeanTicks(ax, meanValues, colors, lineWidth)
+    xLimits = xlim(ax);
+    xRange = diff(xLimits);
+    if ~isfinite(xRange) || xRange <= 0
+        return;
+    end
+
+    tickX = [xLimits(2) - 0.050 .* xRange, ...
+        xLimits(2) - 0.005 .* xRange];
+    for valueIdx = 1:numel(meanValues)
+        yValue = meanValues(valueIdx);
+        if ~isfinite(yValue)
+            continue;
+        end
+
+        plot(ax, tickX, [yValue, yValue], '-', ...
+            'Color', colors{valueIdx}, ...
+            'LineWidth', lineWidth, ...
+            'Clipping', 'off', ...
+            'HandleVisibility', 'off');
     end
 end
 
@@ -651,11 +828,8 @@ function titleText = buildClusterTitle(clusterData)
 end
 
 function valueText = formatPowerValue(value)
-    if abs(value) >= 10
-        valueText = sprintf('%.1f', value);
-    else
-        valueText = sprintf('%.2f', value);
-    end
+    display = formatPowerMetricsForDisplay(NaN, value);
+    valueText = display.Ptotal;
 end
 
 function styleAggregateAxes(topAxes, bottomAxes)
@@ -771,6 +945,8 @@ function addStimulationStatsText(ax, stats, clusterData)
     elseif isfield(clusterData, 'baselineModes')
         baselineText = summarizeBaselineModesForText(clusterData.baselineModes);
     end
+    powerDisplay = formatPowerMetricsForDisplay(stats.roiPowerDensity, ...
+        stats.totalPower);
     statsText = sprintf([ ...
         'Cluster: %s/%d\n' ...
         'BL: %s\n' ...
@@ -790,8 +966,8 @@ function addStimulationStatsText(ax, stats, clusterData)
         formatRange(stats.areaON, 2), ...
         formatRange(stats.spatialDutyCycle, 1), ...
         formatRange(stats.temporalDutyCycle, 1), ...
-        formatRange(stats.roiPowerDensity, 2), ...
-        formatRange(stats.totalPower, 2));
+        powerDisplay.PDROI, ...
+        powerDisplay.Ptotal);
 
     annotation(gcf, 'textbox', [statsX, statsY, statsWidth, statsHeight], ...
         'String', statsText, ...
@@ -912,3 +1088,5 @@ function addTableCell(xPosition, yPosition, width, height, textValue, ...
         'BackgroundColor', 'none', ...
         'FitBoxToText', 'off');
 end
+
+
