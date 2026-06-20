@@ -14,11 +14,11 @@
 
 %% Change these for experiment runs
 analysisMode='psycluster';%psyphidist
-monkeyName='Chip';%Pepper or Chip
+monkeyName='Pepper';%Pepper or Chip
 currentSessID=81;%for biasing expt
 
 % Saving and plotting flags
-saveFlag=0;
+saveFlag=1;
 saveFlagBMP=0;
 plotFlag=1;
 skipImaging=1;
@@ -26,7 +26,7 @@ skipImaging=1;
 %% Load dataStruct for the desired chamber
 [mainPath, datastruct]=setupEnv(['users/PK/colStimPipeline/exptListBiasingFull' monkeyName '.m']);
 chambers={'R', 'L'};
-for chamberID=2
+for chamberID=1
     nColumnsWanted=[]; chamberWanted=chambers{chamberID};
     analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted);
     nBlockStr=num2str(numel(analysisBlockID));
@@ -224,8 +224,21 @@ for chamberID=2
             plotLine=1;
                        
             validBlocks=analysisBlockID(1:nBlocks);
+            deltaPermutationInspection = strcmpi(monkeyName, 'Pepper') && ...
+                strcmpi(chamberWanted, 'R');
+            nDeltaPermutations = 5000;
+            deltaPlotOpts = struct( ...
+                'showDeltaPermutationStats', deltaPermutationInspection, ...
+                'nDeltaPermutations', nDeltaPermutations, ...
+                'deltaPermutationBaseSeed', 99173, ...
+                'saveDeltaPermutationExamples', deltaPermutationInspection, ...
+                'deltaPermutationExampleDir', fullfile('Y:\users\PK\colStimPipeline', 'outputs', 'deltaBiasPermutation'));
+            if deltaPermutationInspection
+                fprintf('Delta permutation inspection enabled for %s %s psycluster (%d permutations).\n', ...
+                    monkeyName, chamberWanted, nDeltaPermutations);
+            end
             mdlStruct=analyzePsychometricModels(monkeyName, chamberWanted, modelTypes, mainPath, ...
-                behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, false);
+                behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, false, deltaPlotOpts);
 
             if plotFlag
                 aggregateOpts = struct('binWidth', 5, ...
@@ -380,14 +393,14 @@ for chamberID=2
                     reportFilename = ['psychometrics/' chamberWanted ...
                         '-chamber/' aggregateModelType '/psychfit-' ...
                         chamberWanted '-' aggregateModelType '-C1'];
-                    deltaPermutationInspection = strcmpi(monkeyName, 'Pepper') && ...
-                        strcmpi(chamberWanted, 'R');
-                    deltaPermutationPlotOpts = struct(...
-                        'showDeltaPermutationStats', deltaPermutationInspection, ...
-                        'nDeltaPermutations', 500, ...
-                        'deltaPermutationBaseSeed', 99173);
+                    deltaPermutationPlotOpts = deltaPlotOpts;
                     if deltaPermutationInspection
-                        reportFilename = [reportFilename '_permStatsInspection'];
+                        permutationOutputDir = fullfile('Y:\users\PK\colStimPipeline', 'outputs', 'deltaBiasPermutation');
+                        if ~exist(permutationOutputDir, 'dir')
+                            mkdir(permutationOutputDir);
+                        end
+                        reportFilename = fullfile(permutationOutputDir, ...
+                            ['psychfit-' chamberWanted '-' aggregateModelType '-C1_permStats.pdf']);
                     end
                     reportState = [];
                     if saveFlag
@@ -483,7 +496,16 @@ for chamberID=2
                     if saveFlag
                         reportState = stageAndCloseReportFigures( ...
                             parameterFigures, reportState);
-                        finalizeReportPDFAssembly(reportState);
+                        finalPdfPath = reportState.outputFilename;
+                        fprintf('Saving final psychometric PDF to:\n%s\n', finalPdfPath);
+                        finalPdfPath = finalizeReportPDFAssembly(reportState);
+                        assert(isfile(finalPdfPath), ...
+                            'Final psychometric PDF was not created: %s', finalPdfPath);
+                        pdfInfo = dir(finalPdfPath);
+                        assert(pdfInfo.bytes > 0, ...
+                            'Final psychometric PDF is empty: %s', finalPdfPath);
+                        fprintf('Saved final psychometric PDF: %s | %d bytes\n', ...
+                            finalPdfPath, pdfInfo.bytes);
                     end
 
                     distributionSourceAudit = [ ...
@@ -897,9 +919,8 @@ function clusterLabels = prepareClusterLabelsForIndividualPages( ...
 
     clusterLabels = cell(numel(clusterBlocks), 1);
     renderClusterIDs = nan(numel(clusterBlocks), 1);
-
-    fprintf(['Cluster label audit before individual-page rendering:\n' ...
-        'renderIdx | experimentID | globalBlockIdx | clusterID | label\n']);
+    fprintf('Cluster mapping ready | render pages %d | assignments %d | clusters %d\n', ...
+        numel(clusterBlocks), numel(clusterBlocks), nClusters);
 
     for rowIdx = 1:numel(clusterBlocks)
         globalBlockIdx = clusterBlocks(rowIdx);
@@ -918,15 +939,14 @@ function clusterLabels = prepareClusterLabelsForIndividualPages( ...
         end
 
         clusterLabels{rowIdx} = sprintf( ...
-            'Cluster: %d/%d', round(clusterID), nClusters);
+            'Cluster:\n%d/%d', round(clusterID), nClusters);
         renderClusterIDs(rowIdx) = round(clusterID);
         renderedCount(round(clusterID)) = ...
             renderedCount(round(clusterID)) + 1;
-
-        fprintf('%d | %s | %d | %s | %s\n', ...
-            rowIdx, experimentID, globalBlockIdx, ...
-            formatClusterValueForAudit(clusterID), ...
-            clusterLabels{rowIdx});
+        if rowIdx <= 3
+            fprintf('render page %d | experiment %s | cluster %d/%d | source row %d\n', ...
+                rowIdx, experimentID, round(clusterID), nClusters, globalBlockIdx);
+        end
     end
 
     for clusterID = 1:nClusters
@@ -1018,7 +1038,9 @@ function saveDeltaBiasPermutationInspectionAudit(monkeyName, chamberWanted, mode
     fprintf('  %s\n', expSummaryPath);
     fprintf('  %s\n', clusterContrastPath);
     fprintf('  %s\n', clusterSummaryPath);
-endfunction reportState = stageAndCloseReportFigures(figureHandles, reportState)
+end
+
+function reportState = stageAndCloseReportFigures(figureHandles, reportState)
     for figureIdx = 1:numel(figureHandles)
         reportState = stageAndCloseReportFigure( ...
             figureHandles(figureIdx), reportState);

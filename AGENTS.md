@@ -18,6 +18,71 @@ User instructions in the current task override this file.
 
 ---
 
+## Network-share preflight and failure behavior
+
+The repository is stored on a mounted Windows network share.
+
+Repository paths:
+
+* Interactive mapped path: `Y:\users\PK\colStimPipeline`
+* Canonical UNC path: `\\172.17.49.6\data\users\PK\colStimPipeline`
+
+Before editing files or launching MATLAB, perform one lightweight access check:
+
+1. Test whether the mapped repository path is readable.
+2. If `Y:` is unavailable, test the UNC repository path once.
+3. If either path is accessible, use the accessible path and continue.
+4. If both paths are inaccessible, stop immediately and report that the server/network share appears disconnected.
+
+Do not keep retrying unavailable paths.
+
+### Distinguish failure types
+
+If the error indicates a missing or disconnected share, including messages such as:
+
+* path not found;
+* drive not found;
+* network path not found;
+* network name no longer available;
+* specified network name is no longer available;
+* device unavailable;
+* connection reset;
+* too many open files after failed network operations;
+
+then:
+
+* stop all work immediately;
+* do not edit files;
+* do not launch MATLAB;
+* do not try alternate shells or repeated reconnect commands;
+* tell the user the exact path and error so they can restore the server connection.
+
+If the repository is reachable but access is denied by the sandbox or permissions:
+
+* request one narrowly scoped approval for read/write access only beneath:
+  `Y:\users\PK\colStimPipeline`
+  or its UNC equivalent;
+* do not request write access to animal-data directories;
+* if approval is denied, stop and report the exact blocked operation.
+
+### Data-directory protection
+
+Treat these locations as strictly read-only:
+
+* `Y:\Chip`
+* `Y:\Pepper`
+* `\\172.17.49.6\data\Chip`
+* `\\172.17.49.6\data\Pepper`
+
+Never create, modify, overwrite, rename, move, or delete files beneath those directories.
+
+### Process behavior
+
+* Do not launch MATLAB until repository access has passed the preflight check.
+* Do not launch multiple MATLAB processes.
+* If network access disappears during a task, stop immediately rather than continuing with partial files or repeated retries.
+* Never claim completion when the network share became inaccessible before validation.
+
 ## Task classes and time budgets
 
 Classify the task silently before acting.

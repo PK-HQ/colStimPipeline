@@ -68,6 +68,7 @@ function result = computeDeltaBiasPermutationFromEmpiricalPoints(conContrast, co
     nullLower95 = nan(nContrasts, 1);
     nullUpper95 = nan(nContrasts, 1);
     rawTwoSidedP = nan(nContrasts, 1);
+    rawPositiveOneSidedP = nan(nContrasts, 1);
     for contrastIdx = 1:nContrasts
         nullVals = nullDeltaByContrast(contrastIdx, :);
         nullMedian(contrastIdx) = median(nullVals, 'omitnan');
@@ -76,6 +77,7 @@ function result = computeDeltaBiasPermutationFromEmpiricalPoints(conContrast, co
         pUpper = (1 + sum(nullVals >= observedDelta(contrastIdx))) ./ (nPermutations + 1);
         pLower = (1 + sum(nullVals <= observedDelta(contrastIdx))) ./ (nPermutations + 1);
         rawTwoSidedP(contrastIdx) = min(1, 2 .* min(pUpper, pLower));
+        rawPositiveOneSidedP(contrastIdx) = pUpper;
     end
 
     if nContrasts > 0
@@ -84,6 +86,7 @@ function result = computeDeltaBiasPermutationFromEmpiricalPoints(conContrast, co
         pUpperOverall = (1 + sum(nullMeanDelta >= observedMeanDelta)) ./ (nPermutations + 1);
         pLowerOverall = (1 + sum(nullMeanDelta <= observedMeanDelta)) ./ (nPermutations + 1);
         rawOverallTwoSidedP = min(1, 2 .* min(pUpperOverall, pLowerOverall));
+        rawOverallPositiveOneSidedP = pUpperOverall;
         nullMeanMedian = median(nullMeanDelta, 'omitnan');
         nullMeanLower95 = prctile(nullMeanDelta, 2.5);
         nullMeanUpper95 = prctile(nullMeanDelta, 97.5);
@@ -91,6 +94,7 @@ function result = computeDeltaBiasPermutationFromEmpiricalPoints(conContrast, co
         observedMeanDelta = NaN;
         nullMeanDelta = nan(nPermutations, 1);
         rawOverallTwoSidedP = NaN;
+        rawOverallPositiveOneSidedP = NaN;
         nullMeanMedian = NaN;
         nullMeanLower95 = NaN;
         nullMeanUpper95 = NaN;
@@ -106,6 +110,7 @@ function result = computeDeltaBiasPermutationFromEmpiricalPoints(conContrast, co
     result.nullLower95 = nullLower95;
     result.nullUpper95 = nullUpper95;
     result.rawTwoSidedP = rawTwoSidedP;
+    result.rawPositiveOneSidedP = rawPositiveOneSidedP;
     result.significantUncorrected = rawTwoSidedP < 0.05;
     result.nCon = nCon;
     result.nIncon = nIncon;
@@ -119,6 +124,7 @@ function result = computeDeltaBiasPermutationFromEmpiricalPoints(conContrast, co
     result.nullMeanLower95 = nullMeanLower95;
     result.nullMeanUpper95 = nullMeanUpper95;
     result.rawOverallTwoSidedP = rawOverallTwoSidedP;
+    result.rawOverallPositiveOneSidedP = rawOverallPositiveOneSidedP;
     result.overallSignificant = rawOverallTwoSidedP < 0.05;
     result.nPermutations = nPermutations;
     result.multipleComparisonCorrection = 'none';

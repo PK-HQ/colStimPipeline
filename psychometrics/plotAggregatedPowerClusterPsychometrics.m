@@ -28,7 +28,6 @@ function [out, figureHandles] = plotAggregatedPowerClusterPsychometrics(agg, opt
 
     out = agg;
     figureHandles = gobjects(numel(agg), 1);
-
     for clusterIdx = 1:numel(agg)
         clusterTitle = buildClusterTitle(agg(clusterIdx));
         figureHandles(clusterIdx) = figure( ...
@@ -43,6 +42,8 @@ function [out, figureHandles] = plotAggregatedPowerClusterPsychometrics(agg, opt
         topAxes = gobjects(1, 3);
         bottomAxes = gobjects(1, 3);
         deltaSummaries = repmat(struct('biasing', NaN, 'masking', NaN), 1, 3);
+        mergedViewData = struct();
+        mergedDeltaData = struct();
 
         for viewIdx = 1:numel(viewNames)
             viewName = viewNames{viewIdx};
@@ -69,23 +70,10 @@ function [out, figureHandles] = plotAggregatedPowerClusterPsychometrics(agg, opt
             bottomAxes(viewIdx) = axBottom;
             plotDeltaPanel(axBottom, deltaData, fitResult, ...
                 deltaSummary, style, opts);
-            if opts.showDeltaPermutationStats && strcmp(viewName, 'merged')
-                permSeed = stableAggregateDeltaPermutationSeed(...
-                    opts.deltaPermutationBaseSeed, agg(clusterIdx).clusterID);
-                permResult = computeAggregateDeltaBiasPermutation(...
-                    viewData, deltaData, opts.nDeltaPermutations, permSeed);
-                context = struct('type', 'cluster', ...
-                    'clusterID', agg(clusterIdx).clusterID);
-                permAudit = addDeltaBiasPermutationVisualization(...
-                    axBottom, permResult, context);
-                out(clusterIdx).merged.deltaBiasPermutation = permResult;
-                out(clusterIdx).merged.deltaBiasPermutationClusterContrasts = ...
-                    permAudit.clusterContrasts;
-                out(clusterIdx).merged.deltaBiasPermutationClusterSummary = ...
-                    permAudit.clusterSummary;
-                printAggregateDeltaPermutationSummary(agg(clusterIdx).clusterID, ...
-                    numel(permResult.contrast), permResult.observedMeanDeltaBias, ...
-                    permResult.rawOverallTwoSidedP, permResult.overallSignificant);
+
+            if strcmp(viewName, 'merged')
+                mergedViewData = viewData;
+                mergedDeltaData = deltaData;
             end
         end
 
@@ -102,6 +90,39 @@ function [out, figureHandles] = plotAggregatedPowerClusterPsychometrics(agg, opt
         end
         addFitParameterTable(topAxes(3), out(clusterIdx).merged.fit);
         addFigureTitle(clusterTitle);
+
+        if opts.showDeltaPermutationStats
+            axMergedDelta = bottomAxes(3);
+            permSeed = stableAggregateDeltaPermutationSeed(...
+                opts.deltaPermutationBaseSeed, agg(clusterIdx).clusterID);
+            permResult = computeAggregateDeltaBiasPermutation(...
+                mergedViewData, mergedDeltaData, opts.nDeltaPermutations, permSeed);
+            if isempty(permResult.contrast)
+                error('plotAggregatedPowerClusterPsychometrics:NoDeltaPermutationContrasts', ...
+                    'No aggregate exact con/incon contrasts for C%d.', agg(clusterIdx).clusterID);
+            end
+            assertAggregatePermutationMatchesDisplayed(permResult, mergedDeltaData, ...
+                agg(clusterIdx).clusterID);
+            context = struct('type', 'cluster', ...
+                'clusterID', agg(clusterIdx).clusterID);
+            fprintf('Aggregate permutation ON | cluster C%d | contrasts %d\n', ...
+                agg(clusterIdx).clusterID, numel(permResult.contrast));
+            permAudit = addDeltaBiasPermutationVisualization(...
+                axMergedDelta, permResult, context);
+            assertAggregateDeltaPermutationVisualizationAudit(permAudit, ...
+                permResult, agg(clusterIdx).clusterID);
+            validateAggregateDeltaPermutationLegend(axMergedDelta, agg(clusterIdx).clusterID);
+            saveAggregateDeltaPermutationExampleFigure(figureHandles(clusterIdx), opts);
+            out(clusterIdx).merged.deltaBiasPermutation = permResult;
+            out(clusterIdx).merged.deltaBiasPermutationClusterContrasts = ...
+                permAudit.clusterContrasts;
+            out(clusterIdx).merged.deltaBiasPermutationClusterSummary = ...
+                permAudit.clusterSummary;
+            printAggregateDeltaPermutationSummary(agg(clusterIdx).clusterID, ...
+                numel(permResult.contrast), permResult.observedMeanDeltaBias, ...
+                permResult.rawOverallTwoSidedP, permResult.overallSignificant, ...
+                permResult.rawOverallPositiveOneSidedP);
+        end
     end
 end
 
@@ -659,6 +680,7 @@ function result = computeAggregateDeltaBiasPermutation(viewData, deltaData, nPer
     nullLower95 = nan(nContrasts, 1);
     nullUpper95 = nan(nContrasts, 1);
     rawTwoSidedP = nan(nContrasts, 1);
+    rawPositiveOneSidedP = nan(nContrasts, 1);
     for contrastIdx = 1:nContrasts
         nullVals = nullDeltaByContrast(contrastIdx, :);
         nullMedian(contrastIdx) = median(nullVals, 'omitnan');
@@ -667,6 +689,7 @@ function result = computeAggregateDeltaBiasPermutation(viewData, deltaData, nPer
         pUpper = (1 + sum(nullVals >= observedDelta(contrastIdx))) ./ (nPermutations + 1);
         pLower = (1 + sum(nullVals <= observedDelta(contrastIdx))) ./ (nPermutations + 1);
         rawTwoSidedP(contrastIdx) = min(1, 2 .* min(pUpper, pLower));
+        rawPositiveOneSidedP(contrastIdx) = pUpper;
     end
 
     observedMean = mean(observedDelta, 'omitnan');
@@ -682,6 +705,7 @@ function result = computeAggregateDeltaBiasPermutation(viewData, deltaData, nPer
     result.nullLower95 = nullLower95;
     result.nullUpper95 = nullUpper95;
     result.rawTwoSidedP = rawTwoSidedP;
+    result.rawPositiveOneSidedP = rawPositiveOneSidedP;
     result.significantUncorrected = rawTwoSidedP < 0.05;
     result.nContributingExperiments = nContributing;
     result.observedMeanDeltaBias = observedMean;
@@ -690,6 +714,7 @@ function result = computeAggregateDeltaBiasPermutation(viewData, deltaData, nPer
     result.nullMeanLower95 = prctile(nullMean, 2.5);
     result.nullMeanUpper95 = prctile(nullMean, 97.5);
     result.rawOverallTwoSidedP = min(1, 2 .* min(pUpperOverall, pLowerOverall));
+    result.rawOverallPositiveOneSidedP = pUpperOverall;
     result.overallSignificant = result.rawOverallTwoSidedP < 0.05;
     result.nPermutations = nPermutations;
     result.multipleComparisonCorrection = 'none';
@@ -716,14 +741,104 @@ function seed = stableAggregateDeltaPermutationSeed(baseSeed, clusterID)
     end
 end
 
-function printAggregateDeltaPermutationSummary(clusterID, nContrasts, meanDelta, pValue, significant)
+function assertAggregatePermutationMatchesDisplayed(permResult, deltaData, clusterID)
+    displayedX = deltaData.biasX(:);
+    displayedY = deltaData.biasing(:);
+    keep = isfinite(displayedX) & isfinite(displayedY);
+    displayedX = displayedX(keep);
+    displayedY = displayedY(keep);
+    [displayedX, order] = sort(displayedX);
+    displayedY = displayedY(order);
+    if numel(displayedX) ~= numel(permResult.contrast) || ...
+            any(abs(displayedX(:) - permResult.contrast(:)) > 1e-9) || ...
+            any(abs(displayedY(:) - permResult.observedDeltaBias(:)) > 1e-9)
+        error('plotAggregatedPowerClusterPsychometrics:DeltaPermutationMismatch', ...
+            ['Aggregate permutation inputs do not reproduce displayed ' ...
+            'merged purple deltaBias points for C%d.'], clusterID);
+    end
+end
+
+function saveAggregateDeltaPermutationExampleFigure(fig, opts)
+    if ~isfield(opts, 'saveDeltaPermutationExamples') || ...
+            ~opts.saveDeltaPermutationExamples || ...
+            ~isfield(opts, 'deltaPermutationExampleDir') || ...
+            isempty(opts.deltaPermutationExampleDir)
+        return;
+    end
+    outputPath = fullfile(opts.deltaPermutationExampleDir, ...
+        'PepperR_regularAggregate_permStats.png');
+    if ~exist(fileparts(outputPath), 'dir')
+        mkdir(fileparts(outputPath));
+    end
+    if isfile(outputPath)
+        return;
+    end
+    exportgraphics(fig, outputPath, 'Resolution', 200);
+    info = dir(outputPath);
+    assert(isfile(outputPath) && info.bytes > 0, ...
+        'Failed to write aggregate delta permutation example PNG: %s', outputPath);
+end
+function assertAggregateDeltaPermutationVisualizationAudit(audit, permResult, clusterID)
+    if ~isfield(audit, 'visualization') || isempty(audit.visualization)
+        error('plotAggregatedPowerClusterPsychometrics:MissingDeltaPermutationVisualizationAudit', ...
+            'Missing permutation visualization audit for C%d.', clusterID);
+    end
+    nExpected = numel(permResult.contrast);
+    if audit.visualization.nNullIntervals ~= nExpected || ...
+            audit.visualization.nNullMedians ~= nExpected || ...
+            audit.visualization.nLabels ~= nExpected || ...
+            audit.visualization.nOverall < 1
+        error('plotAggregatedPowerClusterPsychometrics:DeltaPermutationVisualizationCountMismatch', ...
+            ['Permutation visualization count mismatch for C%d: expected %d, ' ...
+            'intervals %d, medians %d, labels %d, overall %d.'], ...
+            clusterID, nExpected, audit.visualization.nNullIntervals, ...
+            audit.visualization.nNullMedians, audit.visualization.nLabels, ...
+            audit.visualization.nOverall);
+    end
+    if ~audit.visualization.labelsShareY
+        error('plotAggregatedPowerClusterPsychometrics:DeltaPermutationLabelYMismatch', ...
+            'Permutation labels do not share one y-coordinate for C%d.', clusterID);
+    end
+    if isfield(audit.visualization, 'allHandlesHidden') && ~audit.visualization.allHandlesHidden
+        error('plotAggregatedPowerClusterPsychometrics:DeltaPermutationHandleVisibility', ...
+            'Permutation visualization handles are not hidden from legend for C%d.', clusterID);
+    end
+    fprintf('Added null intervals %d | labels %d | overall annotations %d\n', ...
+        audit.visualization.nNullIntervals, audit.visualization.nLabels, ...
+        audit.visualization.nOverall);
+end
+
+function validateAggregateDeltaPermutationLegend(ax, clusterID)
+    legends = findobj(ancestor(ax, 'figure'), 'Type', 'Legend');
+    expected = {'Biasing', 'Masking'};
+    legendStrings = {};
+    for ii = 1:numel(legends)
+        candidateStrings = cellstr(string(legends(ii).String));
+        if numel(candidateStrings) == 2 && isequal(candidateStrings(:)', expected)
+            legendStrings = candidateStrings;
+            break;
+        end
+    end
+    if isempty(legendStrings)
+        allStrings = cell(size(legends));
+        for ii = 1:numel(legends)
+            allStrings{ii} = strjoin(cellstr(string(legends(ii).String)), ', ');
+        end
+        error('plotAggregatedPowerClusterPsychometrics:DeltaPermutationLegendMismatch', ...
+            'Legend mismatch for C%d. Expected Biasing/Masking. Found legends: %s', ...
+            clusterID, strjoin(allStrings, ' | '));
+    end
+    fprintf('Aggregate legend validation passed for C%d: {%s, %s}\n', ...
+        clusterID, legendStrings{1}, legendStrings{2});
+end
+function printAggregateDeltaPermutationSummary(clusterID, nContrasts, meanDelta, pValue, significant, positiveOneSidedP)
     if significant
         sigLabel = '*';
     else
         sigLabel = 'n.s.';
     end
-    fprintf('cluster C%s | n contrasts %d | mean DeltaBias %.3f | raw p2 %.4g | %s\n', ...
-        char(string(clusterID)), nContrasts, meanDelta, pValue, sigLabel);
+    fprintf('cluster C%s | n contrasts %d | mean DeltaBias %.3f | raw two-sided p %.4g | raw positive one-sided p %.4g | %s\n', ...
+        char(string(clusterID)), nContrasts, meanDelta, pValue, positiveOneSidedP, sigLabel);
 end
 
 function xLimits = chooseXLimits(viewData, opts)

@@ -10,7 +10,15 @@ function reportState = stageReportPDFPage(reportState, figHandle)
         error('Report temporary directory is missing.');
     end
 
-    reportState.pageIdx = reportState.pageIdx + 1;
+    pageIndex = reportState.pageIdx + 1;
+    appendPage = pageIndex > 1;
+    if isfield(reportState, 'outputFilename')
+        fprintf('PDF save setup | saveFlag=%d | page=%d | append=%d\n', ...
+            1, pageIndex, appendPage);
+        fprintf('PDF target: %s\n', reportState.outputFilename);
+    end
+
+    reportState.pageIdx = pageIndex;
     pageFilename = fullfile(reportState.tempDir, ...
         sprintf('page_%04d.pdf', reportState.pageIdx));
     [~, ~, pageExt] = fileparts(pageFilename);

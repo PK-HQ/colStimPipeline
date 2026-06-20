@@ -1,5 +1,9 @@
 function mdlStruct=analyzePsychometricModels(monkeyName, chamberWanted, modelTypes, mainPath,...
-    behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, saveFlag)
+    behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, saveFlag, plotOpts)
+if nargin < 13 || isempty(plotOpts)
+    plotOpts = struct('showDeltaPermutationStats', false, ...
+        'nDeltaPermutations', 500);
+end
 %% Plot by cluster, and by model type
 nClusters=sort(clusterIdx,'descend');%unique(clusterIdx);
 % Initialize mdlStruct and other structures
@@ -59,7 +63,7 @@ for cluster=1:nClusters%1:nClusters
                     plotAverageFlag=0;
                     mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysisBlockID,...
                         mdl, mdl.fittedParams(:, :, 1), xFit, monkeyName, clusterBlocksIdx, plotAverageFlag, plotLine,...
-                        saveFlag, cluster, modelTypeStr, savefilenameBlock);
+                        saveFlag, cluster, modelTypeStr, savefilenameBlock, '', [], plotOpts);
                     
                     % Plot block average
                     %{
@@ -86,7 +90,7 @@ for cluster=1:nClusters%1:nClusters
                     plotAverageFlag=0;
                     mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysisBlockID,...
                         mdl, mdl.fittedParams(:, :, 1), xFit, monkeyName, clusterBlocksIdx, plotAverageFlag, plotLine,...
-                        saveFlag, cluster, modelTypeStr, savefilenameBlock);
+                        saveFlag, cluster, modelTypeStr, savefilenameBlock, '', [], plotOpts);
                 end
 
                     
@@ -137,7 +141,7 @@ binCenters = binEdges(1:end-1) + diff(binEdges)/2;
 bar(binCenters, counts, 'FaceColor', 'r');
 xlabel('Contrast (%)')
 ylabel('Counts');
-title(['threshold (' num2str(median(data),2) '±' num2str(mad(data),1) ')']);
+title(['threshold (' num2str(median(data),2) 'ï¿½' num2str(mad(data),1) ')']);
 xlim([0 50]); xticks([0:10:50])
 upFontSize(32,.01)
 axes(hAx(2));
@@ -151,7 +155,7 @@ binCenters = binEdges(1:end-1) + diff(binEdges)/2;
 % Plot the counts
 bar(binCenters, counts, 'FaceColor', 'k');
 xlabel('\beta');
-title(['\beta (' num2str(median(data),2) '±' num2str(mad(data),1) ')']);
+title(['\beta (' num2str(median(data),2) 'ï¿½' num2str(mad(data),1) ')']);
 xlim([0 100]); xticks([0:25:100])
 upFontSize(32,.01)
 axes(hAx(3));
@@ -165,7 +169,7 @@ binCenters = binEdges(1:end-1) + diff(binEdges)/2;
 % Plot the counts
 bar(binCenters, counts, 'FaceColor', 'k');
 xlabel('n');
-title(['exponent (' num2str(median(data),2) '±' num2str(mad(data),1) ')']);
+title(['exponent (' num2str(median(data),2) 'ï¿½' num2str(mad(data),1) ')']);
 xlim([0 7]); xticks([0:1:7])
 upFontSize(32,.01)
 axes(hAx(4));
@@ -179,7 +183,7 @@ binCenters = binEdges(1:end-1) + diff(binEdges)/2;
 % Plot the counts
 bar(binCenters, counts, 'FaceColor', 'k');
 xlabel('C50');
-title(['C50 (' num2str(median(data),2) '±' num2str(mad(data),1) ')']);
+title(['C50 (' num2str(median(data),2) 'ï¿½' num2str(mad(data),1) ')']);
 xlim([0 50]); xticks([0:10:50])
 upFontSize(32,.01)
 suplabel(['L-Chip'],'t',[.1 .1 .85 .85]);

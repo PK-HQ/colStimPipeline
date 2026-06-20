@@ -11,12 +11,21 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
         plotOpts = struct();
     end
     plotOpts = applyDeltaPermutationPlotDefaults(plotOpts);
+    if plotOpts.showDeltaPermutationStats
+        fprintf('plotNakaRushtonFit5 received showDeltaPermutationStats=true (%d permutations).\n', ...
+            plotOpts.nDeltaPermutations);
+    end
     endIdx=size(mdl.headers,2);
     % Number of blocks and conditions
     nConditions = size(behavioralData.gaborContrasts, 1);
     nBlocks = numel(clusterBlocks);
     if plotAverageFlag==1
         nBlocks=1;
+    end
+    if saveFlag && ~plotAverageFlag && isempty(clusterLabel)
+        error('plotNakaRushtonFit5:MissingClusterLabels', ...
+            ['Saved individual-page render requested without cluster labels. ' ...
+            'Expected one label per rendered block.']);
     end
     if ~plotAverageFlag && ~isempty(clusterLabel) && ...
             numel(clusterLabel) ~= nBlocks
@@ -87,6 +96,8 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
         
         % Row 1, column 3: merged fitted data
         axMergedPanel = subplot(2,3,3);
+        axMergedDeltaPanel = gobjects(1);
+        optoStatsTextHandle = gobjects(1);
         hold on;
         yline(50,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
 
@@ -434,7 +445,7 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
                         powerDisplay.PDROI, ...
                         powerDisplay.Ptotal);
 
-                    addOptoStatsText(axRow1Col1, optoText);
+                    optoStatsTextHandle = addOptoStatsText(axRow1Col1, optoText);
 
                     addFitParameterTable(axMergedPanel, mdl.headers, fitParams(block,:));
                     
@@ -442,6 +453,7 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
                 end
             elseif cond==4
                 subplot(2,3,6)
+                axMergedDeltaPanel = gca;
                 % Plot line fit
                 if plotLine==1
                     plot(mdl.xFitted(cond,:,block), mdl.yFitted(cond,:,block), 'Color', lineColor, 'LineWidth', 3, 'HandleVisibility', 'on'); hold on;
@@ -460,7 +472,7 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
 
                 % Add data points and shaded error bar
                 markerSize = 15;
-                patchSaturationVal=1;
+                patchSaturationVal=0.14;
                 % Data points
                 shadedErrorBar(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), semY', 'patchSaturation', patchSaturationVal, 'lineprops', ...
                                {'Color', lineColor, 'LineStyle', 'none', 'LineWidth', 3, 'Marker', markerType, ...
@@ -496,23 +508,6 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
                 addSkippedTicks(-75, 75, 15, 'y');
                 yline(0,'--','LineWidth',1.5,'Color',.4*[1 1 1],'HandleVisibility','off'); hold on;
                 ylabel('\DeltaCorrect (%)')
-                if plotOpts.showDeltaPermutationStats
-                    permSeed = stableDeltaPermutationSeed(plotOpts.deltaPermutationBaseSeed, blockInfo.blockIdx, cluster);
-                    permResult = computeDeltaBiasPermutationFromEmpiricalPoints(...
-                        mdl.xBlock(2,:,block), mdl.yBlock(2,:,block), ...
-                        mdl.xBlock(3,:,block), mdl.yBlock(3,:,block), ...
-                        plotOpts.nDeltaPermutations, permSeed);
-                    assertPermutationMatchesDisplayedBias(permResult, ...
-                        mdl.xBlock(4,:,block), mdl.yBlock(4,:,block));
-                    context = struct('experimentID', string(blockInfo.label), ...
-                        'modelRow', block, 'powerClusterID', cluster, ...
-                        'type', 'experiment');
-                    permAudit = addDeltaBiasPermutationVisualization(gca, permResult, context);
-                    mdl = appendDeltaPermutationAudit(mdl, permAudit);
-                    printDeltaPermutationSummary('experiment', blockInfo.label, ...
-                        numel(permResult.contrast), permResult.observedMeanDeltaBias, ...
-                        permResult.rawOverallTwoSidedP, permResult.overallSignificant);
-                end
                 axis square
                 
             elseif cond==5
@@ -534,7 +529,7 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
 
                 % Add data points and shaded error bar
                 markerSize = 15;
-                patchSaturationVal=1;
+                patchSaturationVal=0.14;
                 % Data points
                 shadedErrorBar(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), semY', 'patchSaturation', patchSaturationVal, 'lineprops', ...
                                {'Color', lineColor, 'LineStyle', 'none', 'LineWidth', 3, 'Marker', markerType, ...
@@ -626,6 +621,39 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
         upFontSize(21, .01);
         addBlockSuplabel(blockInfo.label);
         setPlotAnnotationFontSizes();
+        if plotOpts.showDeltaPermutationStats && isgraphics(axMergedDeltaPanel)
+            axes(axMergedDeltaPanel);
+            permSeed = stableDeltaPermutationSeed(plotOpts.deltaPermutationBaseSeed, blockInfo.blockIdx, cluster);
+            permResult = computeDeltaBiasPermutationFromEmpiricalPoints(...
+                mdl.xBlock(2,:,block), mdl.yBlock(2,:,block), ...
+                mdl.xBlock(3,:,block), mdl.yBlock(3,:,block), ...
+                plotOpts.nDeltaPermutations, permSeed);
+            if isempty(permResult.contrast)
+                error('plotNakaRushtonFit5:NoDeltaPermutationContrasts', ...
+                    'No exact con/incon contrasts for block %d.', blockInfo.blockIdx);
+            end
+            assertPermutationMatchesDisplayedBias(permResult, ...
+                mdl.xBlock(4,:,block), mdl.yBlock(4,:,block));
+            context = struct('experimentID', string(blockInfo.label), ...
+                'modelRow', block, 'powerClusterID', cluster, ...
+                'type', 'experiment');
+            fprintf('Individual permutation ON | block %d | contrasts %d\n', ...
+                blockInfo.blockIdx, numel(permResult.contrast));
+            permAudit = addDeltaBiasPermutationVisualization(axMergedDeltaPanel, permResult, context);
+            assertDeltaPermutationVisualizationAudit(permAudit, permResult, ...
+                sprintf('block %d', blockInfo.blockIdx));
+            validateDeltaPermutationLegend(axMergedDeltaPanel, sprintf('block %d', blockInfo.blockIdx));
+            saveDeltaPermutationExampleFigure(gcf, plotOpts, 'individual');
+            mdl = appendDeltaPermutationAudit(mdl, permAudit);
+            printDeltaPermutationSummary('experiment', blockInfo.label, ...
+                numel(permResult.contrast), permResult.observedMeanDeltaBias, ...
+                permResult.rawOverallTwoSidedP, permResult.overallSignificant, ...
+                permResult.rawOverallPositiveOneSidedP);
+            printDeltaPermutationContrastDiagnostics('experiment', blockInfo.label, permResult);
+        end
+        if saveFlag
+            assertClusterAnnotationPresent(optoStatsTextHandle, blockInfo, pageClusterLabel, block);
+        end
         %Saving
         if saveFlag
             forceFigureSansSerif(gcf);
@@ -657,6 +685,86 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
     end
 end
 
+
+function assertClusterAnnotationPresent(annotationHandle, blockInfo, expectedClusterLabel, renderIdx)
+    if nargin < 3 || isempty(expectedClusterLabel)
+        error('plotNakaRushtonFit5:MissingExpectedClusterLabel', ...
+            ['No expected cluster label was supplied for saved page %d ' ...
+            '(%s, source block %d).'], ...
+            renderIdx, char(string(blockInfo.label)), blockInfo.blockIdx);
+    end
+
+    expectedClusterText = char(string(expectedClusterLabel));
+    expectedNormalized = normalizeClusterAnnotationText(expectedClusterText);
+    actualString = '<unavailable>';
+    actualNormalized = '<unavailable>';
+    actualClass = class(annotationHandle);
+    actualVisible = '<unavailable>';
+
+    if isempty(annotationHandle) || ~isgraphics(annotationHandle)
+        error('plotNakaRushtonFit5:MissingClusterAnnotationHandle', ...
+            ['Cluster annotation handle is not a valid graphics object for ' ...
+            'page %d (%s, source block %d). Expected normalized text: %s. ' ...
+            'Actual class: %s. Actual string: %s'], ...
+            renderIdx, char(string(blockInfo.label)), blockInfo.blockIdx, ...
+            expectedNormalized, actualClass, actualString);
+    end
+
+    actualClass = class(annotationHandle);
+    if isprop(annotationHandle, 'String')
+        actualString = annotationStringToChar(get(annotationHandle, 'String'));
+        actualNormalized = normalizeClusterAnnotationText(actualString);
+    end
+    if isprop(annotationHandle, 'Visible')
+        actualVisible = char(string(get(annotationHandle, 'Visible')));
+    end
+    if ~strcmpi(actualVisible, 'on')
+        error('plotNakaRushtonFit5:ClusterAnnotationNotVisible', ...
+            ['Cluster annotation handle is not visible for page %d ' ...
+            '(%s, source block %d). Expected normalized text: %s. ' ...
+            'Visible: %s. Actual class: %s. Actual string: %s'], ...
+            renderIdx, char(string(blockInfo.label)), blockInfo.blockIdx, ...
+            expectedNormalized, actualVisible, actualClass, actualString);
+    end
+
+    if isempty(strfind(actualNormalized, expectedNormalized))
+        error('plotNakaRushtonFit5:MissingClusterAnnotation', ...
+            ['Missing expected visible cluster annotation for page %d ' ...
+            '(%s, source block %d). Expected normalized text: %s. ' ...
+            'Actual normalized string: %s. Actual class: %s. ' ...
+            'Actual string: %s'], ...
+            renderIdx, char(string(blockInfo.label)), blockInfo.blockIdx, ...
+            expectedNormalized, actualNormalized, actualClass, actualString);
+    end
+
+    if renderIdx == 1
+        clusterValue = regexprep(expectedNormalized, '^Cluster:\s*', '');
+        fprintf('Cluster annotation validated | experiment %s | cluster %s | class %s\n', ...
+            char(string(blockInfo.label)), clusterValue, actualClass);
+    end
+end
+
+function textString = annotationStringToChar(textString)
+    lineBreak = sprintf('\n');
+    if iscell(textString)
+        parts = cell(size(textString));
+        for ii = 1:numel(textString)
+            parts{ii} = char(string(textString{ii}));
+        end
+        textString = strjoin(parts(:)', lineBreak);
+    else
+        textString = char(string(textString));
+    end
+end
+
+function textString = normalizeClusterAnnotationText(textString)
+    lineBreak = sprintf('\n');
+    textString = annotationStringToChar(textString);
+    textString = strrep(textString, sprintf('\r\n'), lineBreak);
+    textString = strrep(textString, sprintf('\r'), lineBreak);
+    textString = regexprep(textString, '\s+', ' ');
+    textString = strtrim(textString);
+end
 function moveLines()
 % Get the current handles of all children
 h = get(gca, 'Children');
@@ -1250,7 +1358,7 @@ function addDeltaSummaryText(deltaBias, deltaMask)
         'Tag', 'PlotNakaDeltaText');
 end
 
-function addOptoStatsText(ax, optoText)
+function annotationHandle = addOptoStatsText(ax, optoText)
     axPos = get(ax, 'Position');
     statsRight = axPos(1) - 0.012;
     statsX = 0.002;
@@ -1258,7 +1366,7 @@ function addOptoStatsText(ax, optoText)
     statsHeight = 0.27;
     statsY = axPos(2) + 0.5 * axPos(4) - 0.5 * statsHeight;
 
-    annotation(gcf, 'textbox', [statsX, statsY, statsWidth, statsHeight], ...
+    annotationHandle = annotation(gcf, 'textbox', [statsX, statsY, statsWidth, statsHeight], ...
         'String', optoText, ...
         'Units', 'normalized', ...
         'HorizontalAlignment', 'left', ...
@@ -1534,6 +1642,83 @@ function assertPermutationMatchesDisplayedBias(permResult, displayedX, displayed
     end
 end
 
+function assertDeltaPermutationVisualizationAudit(audit, permResult, contextLabel)
+    if ~isfield(audit, 'visualization') || isempty(audit.visualization)
+        error('plotNakaRushtonFit5:MissingDeltaPermutationVisualizationAudit', ...
+            'Missing permutation visualization audit for %s.', contextLabel);
+    end
+    nExpected = numel(permResult.contrast);
+    if audit.visualization.nNullIntervals ~= nExpected || ...
+            audit.visualization.nNullMedians ~= nExpected || ...
+            audit.visualization.nLabels ~= nExpected || ...
+            audit.visualization.nOverall < 1
+        error('plotNakaRushtonFit5:DeltaPermutationVisualizationCountMismatch', ...
+            ['Permutation visualization count mismatch for %s: expected %d, ' ...
+            'intervals %d, medians %d, labels %d, overall %d.'], ...
+            contextLabel, nExpected, audit.visualization.nNullIntervals, ...
+            audit.visualization.nNullMedians, audit.visualization.nLabels, ...
+            audit.visualization.nOverall);
+    end
+    if ~audit.visualization.labelsShareY
+        error('plotNakaRushtonFit5:DeltaPermutationLabelYMismatch', ...
+            'Permutation labels do not share one y-coordinate for %s.', contextLabel);
+    end
+    if isfield(audit.visualization, 'allHandlesHidden') && ~audit.visualization.allHandlesHidden
+        error('DeltaPermutation:HandleVisibility', ...
+            'Permutation visualization handles are not hidden from legend for %s.', char(string(contextLabel)));
+    end
+    fprintf('Added null intervals %d | labels %d | overall annotations %d\n', ...
+        audit.visualization.nNullIntervals, audit.visualization.nLabels, ...
+        audit.visualization.nOverall);
+end
+function saveDeltaPermutationExampleFigure(fig, plotOpts, exampleType)
+    if ~isfield(plotOpts, 'saveDeltaPermutationExamples') || ...
+            ~plotOpts.saveDeltaPermutationExamples || ...
+            ~isfield(plotOpts, 'deltaPermutationExampleDir') || ...
+            isempty(plotOpts.deltaPermutationExampleDir)
+        return;
+    end
+    if strcmp(exampleType, 'individual')
+        fileName = 'PepperR_regularIndividual_permStats.png';
+    else
+        return;
+    end
+    outputPath = fullfile(plotOpts.deltaPermutationExampleDir, fileName);
+    if ~exist(fileparts(outputPath), 'dir')
+        mkdir(fileparts(outputPath));
+    end
+    if isfile(outputPath)
+        return;
+    end
+    exportgraphics(fig, outputPath, 'Resolution', 200);
+    info = dir(outputPath);
+    assert(isfile(outputPath) && info.bytes > 0, ...
+        'Failed to write delta permutation example PNG: %s', outputPath);
+end
+
+function validateDeltaPermutationLegend(ax, contextLabel)
+    legends = findobj(ancestor(ax, 'figure'), 'Type', 'Legend');
+    expected = {'Biasing', 'Masking'};
+    legendStrings = {};
+    for ii = 1:numel(legends)
+        candidateStrings = cellstr(string(legends(ii).String));
+        if numel(candidateStrings) == 2 && isequal(candidateStrings(:)', expected)
+            legendStrings = candidateStrings;
+            break;
+        end
+    end
+    if isempty(legendStrings)
+        allStrings = cell(size(legends));
+        for ii = 1:numel(legends)
+            allStrings{ii} = strjoin(cellstr(string(legends(ii).String)), ', ');
+        end
+        error('plotNakaRushtonFit5:DeltaPermutationLegendMismatch', ...
+            'Legend mismatch for %s. Expected Biasing/Masking. Found legends: %s', ...
+            contextLabel, strjoin(allStrings, ' | '));
+    end
+    fprintf('Legend validation passed for %s: {%s, %s}\n', ...
+        contextLabel, legendStrings{1}, legendStrings{2});
+end
 function mdl = appendDeltaPermutationAudit(mdl, audit)
     if ~isfield(mdl, 'deltaBiasPermutationExperimentContrasts') || ...
             isempty(mdl.deltaBiasPermutationExperimentContrasts)
@@ -1551,16 +1736,39 @@ function mdl = appendDeltaPermutationAudit(mdl, audit)
     end
 end
 
-function printDeltaPermutationSummary(labelType, label, nContrasts, meanDelta, pValue, significant)
+function printDeltaPermutationSummary(labelType, label, nContrasts, meanDelta, pValue, significant, positiveOneSidedP)
     if significant
         sigLabel = '*';
     else
         sigLabel = 'n.s.';
     end
-    fprintf('%s %s | n contrasts %d | mean DeltaBias %.3f | raw p2 %.4g | %s\n', ...
-        labelType, char(string(label)), nContrasts, meanDelta, pValue, sigLabel);
+    fprintf('%s %s | n contrasts %d | mean DeltaBias %.3f | raw two-sided p %.4g | raw positive one-sided p %.4g | %s\n', ...
+        labelType, char(string(label)), nContrasts, meanDelta, pValue, positiveOneSidedP, sigLabel);
 end
 
+
+function printDeltaPermutationContrastDiagnostics(labelType, label, permResult)
+    fprintf('%s %s permutation contrast diagnostics:\n', ...
+        labelType, char(string(label)));
+    for contrastIdx = 1:numel(permResult.contrast)
+        conErr = permResult.conReconstructionErrorPct(contrastIdx);
+        inconErr = permResult.inconReconstructionErrorPct(contrastIdx);
+        if abs(conErr) > 0.25 || abs(inconErr) > 0.25
+            flag = ' | RECONSTRUCTION ERROR > 0.25 pct-pt';
+        else
+            flag = '';
+        end
+        fprintf(['  x %.4g | con %.3f%% incon %.3f%% | nCon %d nIncon %d | ' ...
+            'conCorrect %d inconCorrect %d | conErr %.4f inconErr %.4f | ' ...
+            'raw two-sided p %.4g | raw positive one-sided p %.4g%s\n'], ...
+            permResult.contrast(contrastIdx), ...
+            permResult.conPct(contrastIdx), permResult.inconPct(contrastIdx), ...
+            permResult.nCon(contrastIdx), permResult.nIncon(contrastIdx), ...
+            permResult.conCorrect(contrastIdx), permResult.inconCorrect(contrastIdx), ...
+            conErr, inconErr, permResult.rawTwoSidedP(contrastIdx), ...
+            permResult.rawPositiveOneSidedP(contrastIdx), flag);
+    end
+end
 function [baseMean, conMean, inconMean] = computeMergedConditionMeans(mdl, block)
     baseMean = weightedMeanForPlot(mdl.xBlock(1,:,block), mdl.yBlock(1,:,block), 'merged');
     conMean = weightedMeanForPlot(mdl.xBlock(2,:,block), mdl.yBlock(2,:,block), 'merged');
