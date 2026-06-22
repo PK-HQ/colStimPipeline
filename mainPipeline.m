@@ -425,6 +425,19 @@ for chamberID=2
                         clusterSummary(summaryIdx).datastructIndices = ...
                             analysisBlockID(clusterBlocks(localBlocks));
                     end
+                    [clusterSummary, clusterMdl] = ...
+                        attachPowerClusterModelFields( ...
+                        clusterSummary, clusterMdl, sessionBias, ...
+                        experimentalSessionMask, powerEffectCluster, ...
+                        powerEffectClusterByBlock, analysisBlockID, ...
+                        clusterBlocks);
+                    mdlStruct.(sourceMdlField) = clusterMdl;
+                    modelSpecificMdlStructPath = ...
+                        savePsychometricModelStruct( ...
+                        mainPath, monkeyName, chamberWanted, ...
+                        aggregateModelType, mdlStruct);
+                    fprintf('Power-cluster model-specific mdlStruct saved: %s\n', ...
+                        modelSpecificMdlStructPath);
 
                     excludedAggregateContribution = countExcludedAggregateContribution(...
                         aggregatePsychometrics, excludedAnalysisRows);
@@ -1064,6 +1077,198 @@ function animalID = animalIDForPsychometricReport(monkeyName)
                 char(string(monkeyName)));
     end
 end
+function [clusterSummary, clusterMdl] = attachPowerClusterModelFields( ...
+        clusterSummary, clusterMdl, sessionBias, experimentalSessionMask, ...
+        powerEffectCluster, powerEffectClusterByBlock, analysisBlockID, ...
+        clusterBlocks)
+    positiveEffectTest = ...
+        'Wilcoxon signed-rank versus zero, right-tailed, raw p<0.05 and mean>0';
+    powerEffectCluster = powerEffectCluster(:);
+    powerEffectClusterByBlock = powerEffectClusterByBlock(:);
+    sessionBias = sessionBias(:);
+    experimentalSessionMask = experimentalSessionMask(:);
+    clusterBlocks = clusterBlocks(:);
+
+    nModelRows = size(clusterMdl.fittedParams, 1);
+    assert(numel(powerEffectCluster) == nModelRows, ...
+        'mainPipeline:PowerClusterRowMismatch', ...
+        'powerEffectCluster must align to clusterMdl.fittedParams rows.');
+    assert(numel(clusterBlocks) == nModelRows, ...
+        'mainPipeline:ClusterBlockRowMismatch', ...
+        'clusterBlocks must align to clusterMdl.fittedParams rows.');
+    assert(numel(sessionBias) == nModelRows, ...
+        'mainPipeline:SessionBiasRowMismatch', ...
+        'sessionBias must align to clusterMdl.fittedParams rows.');
+    assert(numel(experimentalSessionMask) == nModelRows, ...
+        'mainPipeline:ExperimentalMaskRowMismatch', ...
+        'experimentalSessionMask must align to clusterMdl.fittedParams rows.');
+
+    finiteCluster = powerEffectCluster(isfinite(powerEffectCluster));
+    assert(all(finiteCluster > 0 & finiteCluster == round(finiteCluster)), ...
+        'mainPipeline:InvalidPowerClusterID', ...
+        'Finite powerCluster assignments must be positive integers.');
+    finiteBlockCluster = powerEffectClusterByBlock(isfinite(powerEffectClusterByBlock));
+    assert(all(finiteBlockCluster > 0 & ...
+        finiteBlockCluster == round(finiteBlockCluster)), ...
+        'mainPipeline:InvalidPowerClusterByBlockID', ...
+        'Finite powerClusterByBlock assignments must be positive integers.');
+
+    for summaryIdx = 1:numel(clusterSummary)
+        clusterID = clusterSummary(summaryIdx).clusterID;
+        clusterValues = sessionBias( ...
+            experimentalSessionMask & powerEffectCluster == clusterID);
+        [clusterP, clusterSignificant, reason] = ...
+            classifyPositivePowerClusterEffect(clusterValues);
+        clusterSummary(summaryIdx).deltaBiasOneSidedP = clusterP;
+        clusterSummary(summaryIdx).positiveEffectSignificant = ...
+            double(clusterSignificant);
+        clusterSummary(summaryIdx).positiveEffectTest = positiveEffectTest;
+        clusterSummary(summaryIdx).positiveEffectReason = reason;
+    end
+
+    powerCluster = powerEffectCluster(:)';
+    powerClusterSig = nan(size(powerCluster));
+    powerClusterP = nan(size(powerCluster));
+    powerClusterMeanDeltaBias = nan(size(powerCluster));
+    powerClusterByBlock = powerEffectClusterByBlock(:)';
+    powerClusterByBlockSig = nan(size(powerClusterByBlock));
+    powerClusterByBlockP = nan(size(powerClusterByBlock));
+    powerClusterByBlockMeanDeltaBias = nan(size(powerClusterByBlock));
+
+    for summaryIdx = 1:numel(clusterSummary)
+        clusterID = clusterSummary(summaryIdx).clusterID;
+        rowMask = powerCluster == clusterID;
+        blockMask = powerClusterByBlock == clusterID;
+        clusterSig = clusterSummary(summaryIdx).positiveEffectSignificant;
+        clusterP = clusterSummary(summaryIdx).deltaBiasOneSidedP;
+        clusterMean = clusterSummary(summaryIdx).deltaBiasMean;
+        powerClusterSig(rowMask) = clusterSig;
+        powerClusterP(rowMask) = clusterP;
+        powerClusterMeanDeltaBias(rowMask) = clusterMean;
+        powerClusterByBlockSig(blockMask) = clusterSig;
+        powerClusterByBlockP(blockMask) = clusterP;
+        powerClusterByBlockMeanDeltaBias(blockMask) = clusterMean;
+    end
+
+    clusterMdl.powerCluster = powerCluster;
+    clusterMdl.powerClusterSig = powerClusterSig;
+    clusterMdl.powerClusterP = powerClusterP;
+    clusterMdl.powerClusterMeanDeltaBias = powerClusterMeanDeltaBias;
+    clusterMdl.powerClusterExperimentID = analysisBlockID(clusterBlocks)';
+    clusterMdl.powerClusterTest = positiveEffectTest;
+    clusterMdl.powerClusterByBlock = powerClusterByBlock;
+    clusterMdl.powerClusterByBlockSig = powerClusterByBlockSig;
+    clusterMdl.powerClusterByBlockP = powerClusterByBlockP;
+    clusterMdl.powerClusterByBlockMeanDeltaBias = ...
+        powerClusterByBlockMeanDeltaBias;
+
+    assert(numel(clusterMdl.powerCluster) == nModelRows, ...
+        'mainPipeline:PowerClusterLengthMismatch', ...
+        'powerCluster must align to fittedParams rows.');
+    assert(numel(clusterMdl.powerClusterSig) == nModelRows, ...
+        'mainPipeline:PowerClusterSigLengthMismatch', ...
+        'powerClusterSig must align to fittedParams rows.');
+    assert(numel(clusterMdl.powerClusterExperimentID) == nModelRows, ...
+        'mainPipeline:PowerClusterExperimentIDLengthMismatch', ...
+        'powerClusterExperimentID must align to fittedParams rows.');
+
+    finiteSig = clusterMdl.powerClusterSig(isfinite(clusterMdl.powerClusterSig));
+    assert(all(finiteSig == 0 | finiteSig == 1), ...
+        'mainPipeline:InvalidPowerClusterSig', ...
+        'Finite powerClusterSig values must be exactly 0 or 1.');
+    unassignedRows = ~isfinite(clusterMdl.powerCluster);
+    assert(all(isnan(clusterMdl.powerClusterSig(unassignedRows))) && ...
+        all(isnan(clusterMdl.powerClusterP(unassignedRows))) && ...
+        all(isnan(clusterMdl.powerClusterMeanDeltaBias(unassignedRows))), ...
+        'mainPipeline:UnassignedPowerClusterMetadata', ...
+        'Unassigned model rows must not receive cluster statistics.');
+
+    for rowIdx = 1:nModelRows
+        clusterID = clusterMdl.powerCluster(rowIdx);
+        if ~isfinite(clusterID)
+            continue;
+        end
+        summaryIdx = find([clusterSummary.clusterID] == clusterID, 1);
+        assert(~isempty(summaryIdx), ...
+            'mainPipeline:PowerClusterMissingSummary', ...
+            'Power-cluster row has no matching clusterSummary row.');
+        assert(isequaln(clusterMdl.powerClusterP(rowIdx), ...
+            clusterSummary(summaryIdx).deltaBiasOneSidedP), ...
+            'mainPipeline:PowerClusterPMismatch', ...
+            'powerClusterP does not match clusterSummary.');
+        assert(isequaln(clusterMdl.powerClusterMeanDeltaBias(rowIdx), ...
+            clusterSummary(summaryIdx).deltaBiasMean), ...
+            'mainPipeline:PowerClusterMeanMismatch', ...
+            'powerClusterMeanDeltaBias does not match clusterSummary.');
+        assert(isequaln(clusterMdl.powerClusterSig(rowIdx), ...
+            clusterSummary(summaryIdx).positiveEffectSignificant), ...
+            'mainPipeline:PowerClusterSigMismatch', ...
+            'powerClusterSig does not match clusterSummary.');
+    end
+
+    fprintf('Power-cluster model fields saved | experiments=%d | clusters=%d\n', ...
+        nModelRows, numel(clusterSummary));
+    for summaryIdx = 1:numel(clusterSummary)
+        fprintf('C%d: n=%d | mean DeltaBias=%0.6g | p(right)=%0.6g | significant=%d\n', ...
+            clusterSummary(summaryIdx).clusterID, ...
+            clusterSummary(summaryIdx).nSessions, ...
+            clusterSummary(summaryIdx).deltaBiasMean, ...
+            clusterSummary(summaryIdx).deltaBiasOneSidedP, ...
+            clusterSummary(summaryIdx).positiveEffectSignificant);
+    end
+end
+
+function [pValue, significant, reason, clusterMean] = ...
+        classifyPositivePowerClusterEffect(clusterValues)
+    finiteValues = clusterValues(isfinite(clusterValues));
+    clusterMean = mean(clusterValues, 'omitnan');
+    pValue = NaN;
+    significant = false;
+    if numel(finiteValues) < 2
+        reason = 'insufficient finite values';
+        return;
+    end
+    if numel(unique(finiteValues)) < 2
+        reason = 'nonvarying finite values';
+        return;
+    end
+    if exist('signrank', 'file') ~= 2
+        reason = 'signrank unavailable';
+        return;
+    end
+    try
+        pValue = signrank(finiteValues, 0, 'tail', 'right');
+    catch ME
+        reason = ME.message;
+        return;
+    end
+    if ~isfinite(pValue)
+        reason = 'signrank returned nonfinite p-value';
+        return;
+    end
+    significant = clusterMean > 0 && pValue < 0.05;
+    if significant
+        reason = 'significant positive effect';
+    elseif clusterMean <= 0
+        reason = 'mean deltaBias is not positive';
+    else
+        reason = 'raw one-sided p >= 0.05';
+    end
+end
+
+function mdlStructPath = savePsychometricModelStruct( ...
+        mainPath, monkeyName, chamberWanted, modelTypeStr, mdlStruct)
+    columnsDesired = 20;
+    mdlStructDir = fullfile(mainPath, monkeyName, 'Meta', ...
+        'psychometrics', [chamberWanted '-chamber'], modelTypeStr);
+    if ~exist(mdlStructDir, 'dir')
+        mkdir(mdlStructDir);
+    end
+    mdlStructPath = fullfile(mdlStructDir, ...
+        ['mdlStruct' chamberWanted num2str(columnsDesired) '.mat']);
+    save(mdlStructPath, 'mdlStruct');
+end
+
 function saveDeltaBiasPermutationInspectionAudit(monkeyName, chamberWanted, modelType, clusterMdl, aggregateFits)
     outputDir = fullfile('Y:\users\PK\colStimPipeline', 'outputs', 'deltaBiasPermutation');
     if ~exist(outputDir, 'dir')
