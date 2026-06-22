@@ -218,7 +218,7 @@ for chamberID=2
             monkeyName=datastruct(analysisBlockID(1)).monkey;
             
             objFunc='MLE';
-            modelTypes={'bill','weibullSignedX0'}; %'weibullfreeall'
+            modelTypes={'bill','weibullSignedBX0'}; %'weibullfreeall'
             fieldName='AICc';
             constrainedParamStr='';
             plotLine=1;
@@ -513,6 +513,7 @@ for chamberID=2
                     end
 
                     aggregatePlotOpts = deltaPermutationPlotOpts;
+                    aggregatePlotOpts.modelTypeStr = aggregateModelType;
                     [aggregatePsychometricFits, aggregateFigures] = ...
                         plotAggregatedPowerClusterPsychometrics(...
                         aggregatePsychometrics, aggregatePlotOpts);

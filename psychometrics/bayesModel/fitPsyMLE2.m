@@ -32,6 +32,23 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
         mdl.signedX0.X0Horizontal = nan(nBlocks, 1);
         mdl.signedX0.X0Vertical = nan(nBlocks, 1);
         mdl.signedX0.fitStatus = repmat({''}, nBlocks, 1);
+    elseif strcmp(modelType, 'weibullSignedBX0')
+        mdl.signedBX0.fitParams = nan(nBlocks, 11);
+        mdl.signedBX0.nLL = nan(nBlocks, 1);
+        mdl.signedBX0.AICc = nan(nBlocks, 1);
+        mdl.signedBX0.noX0FitParams = nan(nBlocks, 10);
+        mdl.signedBX0.noX0NLL = nan(nBlocks, 1);
+        mdl.signedBX0.noX0AICc = nan(nBlocks, 1);
+        mdl.signedBX0.deltaAICcX0 = nan(nBlocks, 1);
+        mdl.signedBX0.akaikeWeightBX0 = nan(nBlocks, 1);
+        mdl.signedBX0.akaikeWeightBOnly = nan(nBlocks, 1);
+        mdl.signedBX0.BHorizontal = nan(nBlocks, 1);
+        mdl.signedBX0.BVertical = nan(nBlocks, 1);
+        mdl.signedBX0.X0Horizontal = nan(nBlocks, 1);
+        mdl.signedBX0.X0Vertical = nan(nBlocks, 1);
+        mdl.signedBX0.deltaB = nan(nBlocks, 1);
+        mdl.signedBX0.deltaX0 = nan(nBlocks, 1);
+        mdl.signedBX0.fitStatus = repmat({''}, nBlocks, 1);
     end
     
     % Get averaged data
@@ -86,9 +103,14 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
                    'A^{HOpto}','\alpha^{HOpto}','\beta^{HOpto}', ...
                    'A^{VOpto}','\alpha^{VOpto}','\beta^{VOpto}', ...
                    '\DeltaX0','AICc^{X0}'};
+            case 'weibullSignedBX0'
+                mdl.headers={'A^{bl}','\alpha^{bl}','\beta^{bl}', ...
+                   'A^{con}','\alpha^{con}','\beta^{con}', ...
+                   'A^{incon}','\alpha^{incon}','\beta^{incon}', ...
+                   '\DeltaB','\DeltaX0','AICc^{BX0}'};
         end        
         % Adjust bounds
-        if ~strcmp(modelType, 'weibullSignedX0')
+        if ~ismember(modelType, {'weibullSignedX0', 'weibullSignedBX0'})
             lb = max(lb, eps);
         end
         ub(isinf(ub)) = 1e10;
@@ -131,7 +153,7 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
             'successInconOpto', successInconOpto,...
             'sumConOpto', sumConOpto, ...
             'successConOpto', successConOpto);
-        if strcmp(modelType, 'weibullSignedX0')
+        if ismember(modelType, {'weibullSignedX0', 'weibullSignedBX0'})
             signedData = buildSignedChoiceData(xBlocks, yBlocks, block);
             data = mergeStructs(data, signedData);
         end
@@ -146,7 +168,7 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
             % Use the modular optimization subfunction
             %nRestarts = 5;  % You can adjust the number of restarts here
             %[fittedParams, nLL] = globalSolvers(objectiveFunction, initialParams, lb, ub, opts, data, solverOption, nRestarts);            
-            if strcmp(modelType, 'weibullSignedX0')
+            if ismember(modelType, {'weibullSignedX0', 'weibullSignedBX0'})
                 [fittedParams, nLL] = fitParametersSimple(...
                     objectiveFunction, initialParams, lb, ub, opts, data);
             else
@@ -154,7 +176,7 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
             end
         end
         % Calculate metrics
-        if strcmp(modelType, 'weibullSignedX0')
+        if ismember(modelType, {'weibullSignedX0', 'weibullSignedBX0'})
             n = sum([data.sumBaselineChoice, ...
                 data.sumHorizontalOptoChoice, data.sumVerticalOptoChoice]);
         else
@@ -166,6 +188,10 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
         signedFitSummary = [];
         if strcmp(modelType, 'weibullSignedX0')
             signedFitSummary = fitSignedNoX0Comparison(...
+                objectiveFunction, initialParams, lb, ub, opts, data, ...
+                fittedParams, nLL, aicc, n);
+        elseif strcmp(modelType, 'weibullSignedBX0')
+            signedFitSummary = fitSignedBX0NoX0Comparison(...
                 objectiveFunction, initialParams, lb, ub, opts, data, ...
                 fittedParams, nLL, aicc, n);
         end
@@ -184,6 +210,9 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
         if strcmp(modelType, 'weibullSignedX0')
             mdl = saveSignedX0Results(mdl, block, signedFitSummary);
             mdl = saveSignedX0SourceData(mdl, block, data);
+        elseif strcmp(modelType, 'weibullSignedBX0')
+            mdl = saveSignedBX0Results(mdl, block, signedFitSummary);
+            mdl = saveSignedBX0SourceData(mdl, block, data);
         end
 
         if strcmp(modelType, 'weibullfreeAll')
@@ -431,6 +460,34 @@ function summary = fitSignedNoX0Comparison(objectiveFunction, initialParams, lb,
         'fitStatus', 'ok');
 end
 
+function summary = fitSignedBX0NoX0Comparison(objectiveFunction, initialParams, lb, ub, opts, data, fittedParams, nLL, aicc, nTrials)
+    objectiveM0 = @(q10, fitData) objectiveFunction([q10(:)', 0], fitData);
+    [noX0Params, noX0NLL] = fitParametersSimple(...
+        objectiveM0, initialParams(1:10), lb(1:10), ub(1:10), opts, data);
+    [~, noX0AICc] = calculateAIC(noX0NLL, 10, nTrials);
+
+    deltaAICc = noX0AICc - aicc;
+    weights = akaikeWeights([noX0AICc, aicc]);
+
+    summary = struct(...
+        'fitParams', fittedParams, ...
+        'nLL', nLL, ...
+        'AICc', aicc, ...
+        'noX0FitParams', noX0Params, ...
+        'noX0NLL', noX0NLL, ...
+        'noX0AICc', noX0AICc, ...
+        'deltaAICcX0', deltaAICc, ...
+        'akaikeWeightBOnly', weights(1), ...
+        'akaikeWeightBX0', weights(2), ...
+        'BHorizontal', 50 - fittedParams(10), ...
+        'BVertical', 50 + fittedParams(10), ...
+        'X0Horizontal', fittedParams(11), ...
+        'X0Vertical', -fittedParams(11), ...
+        'deltaB', fittedParams(10), ...
+        'deltaX0', fittedParams(11), ...
+        'fitStatus', 'ok');
+end
+
 function weights = akaikeWeights(aiccValues)
     finiteAICc = aiccValues(isfinite(aiccValues));
     if isempty(finiteAICc)
@@ -455,6 +512,65 @@ function mdl = saveSignedX0Results(mdl, block, summary)
     mdl.signedX0.X0Horizontal(block) = summary.X0Horizontal;
     mdl.signedX0.X0Vertical(block) = summary.X0Vertical;
     mdl.signedX0.fitStatus{block} = summary.fitStatus;
+end
+
+function mdl = saveSignedBX0Results(mdl, block, summary)
+    mdl.signedBX0.fitParams(block,:) = summary.fitParams;
+    mdl.signedBX0.nLL(block) = summary.nLL;
+    mdl.signedBX0.AICc(block) = summary.AICc;
+    mdl.signedBX0.noX0FitParams(block,:) = summary.noX0FitParams;
+    mdl.signedBX0.noX0NLL(block) = summary.noX0NLL;
+    mdl.signedBX0.noX0AICc(block) = summary.noX0AICc;
+    mdl.signedBX0.deltaAICcX0(block) = summary.deltaAICcX0;
+    mdl.signedBX0.akaikeWeightBX0(block) = summary.akaikeWeightBX0;
+    mdl.signedBX0.akaikeWeightBOnly(block) = summary.akaikeWeightBOnly;
+    mdl.signedBX0.BHorizontal(block) = summary.BHorizontal;
+    mdl.signedBX0.BVertical(block) = summary.BVertical;
+    mdl.signedBX0.X0Horizontal(block) = summary.X0Horizontal;
+    mdl.signedBX0.X0Vertical(block) = summary.X0Vertical;
+    mdl.signedBX0.deltaB(block) = summary.deltaB;
+    mdl.signedBX0.deltaX0(block) = summary.deltaX0;
+    mdl.signedBX0.fitStatus{block} = summary.fitStatus;
+
+    params = summary.fitParams;
+    mdl.signedBX0.ABaseline(block) = params(1);
+    mdl.signedBX0.alphaBaseline(block) = params(2);
+    mdl.signedBX0.betaBaseline(block) = params(3);
+    mdl.signedBX0.ACon(block) = params(4);
+    mdl.signedBX0.alphaCon(block) = params(5);
+    mdl.signedBX0.betaCon(block) = params(6);
+    mdl.signedBX0.AIncon(block) = params(7);
+    mdl.signedBX0.alphaIncon(block) = params(8);
+    mdl.signedBX0.betaIncon(block) = params(9);
+end
+
+function mdl = saveSignedBX0SourceData(mdl, block, data)
+    mdl.signedBX0.xBaselineChoice(block,:) = ...
+        padArray(data.xBaselineChoice, 24, 2, NaN);
+    mdl.signedBX0.yBaselineChoice(block,:) = ...
+        padArray(data.yBaselineChoice, 24, 2, NaN);
+    mdl.signedBX0.nBaselineChoice(block,:) = ...
+        padArray(data.sumBaselineChoice, 24, 2, NaN);
+    mdl.signedBX0.successBaselineChoice(block,:) = ...
+        padArray(data.successBaselineChoice, 24, 2, NaN);
+
+    mdl.signedBX0.xHorizontalOptoChoice(block,:) = ...
+        padArray(data.xHorizontalOptoChoice, 24, 2, NaN);
+    mdl.signedBX0.yHorizontalOptoChoice(block,:) = ...
+        padArray(data.yHorizontalOptoChoice, 24, 2, NaN);
+    mdl.signedBX0.nHorizontalOptoChoice(block,:) = ...
+        padArray(data.sumHorizontalOptoChoice, 24, 2, NaN);
+    mdl.signedBX0.successHorizontalOptoChoice(block,:) = ...
+        padArray(data.successHorizontalOptoChoice, 24, 2, NaN);
+
+    mdl.signedBX0.xVerticalOptoChoice(block,:) = ...
+        padArray(data.xVerticalOptoChoice, 24, 2, NaN);
+    mdl.signedBX0.yVerticalOptoChoice(block,:) = ...
+        padArray(data.yVerticalOptoChoice, 24, 2, NaN);
+    mdl.signedBX0.nVerticalOptoChoice(block,:) = ...
+        padArray(data.sumVerticalOptoChoice, 24, 2, NaN);
+    mdl.signedBX0.successVerticalOptoChoice(block,:) = ...
+        padArray(data.successVerticalOptoChoice, 24, 2, NaN);
 end
 
 function mdl = saveSignedX0SourceData(mdl, block, data)
@@ -783,7 +899,7 @@ function [xBaselineAll, yBaselineAll, xOptoAll, yOptoAll, ...
     congrVerticalOptoPreAll = NaN(nBlocks, maxSingleLen);
 
     switch modelType
-        case {'bill','weibullfreeAll','weibullSignedX0'}
+        case {'bill','weibullfreeAll','weibullSignedX0','weibullSignedBX0'}
 
             for block = 1:nBlocks
 
@@ -929,7 +1045,7 @@ function [xBaselineAll, yBaselineAll, xOptoAll, yOptoAll, ...
             end
 
         otherwise
-            error('This updated pre-merge/tag logic is currently implemented for bill, weibullfreeAll, and weibullSignedX0 only.');
+            error('This updated pre-merge/tag logic is currently implemented for bill, weibullfreeAll, weibullSignedX0, and weibullSignedBX0 only.');
     end
 end
 
@@ -1000,6 +1116,16 @@ function config = mdlConfig()
                    'A^{HOpto}','\alpha^{HOpto}','\beta^{HOpto}', ...
                    'A^{VOpto}','\alpha^{VOpto}','\beta^{VOpto}', ...
                    '\DeltaX0','AICc^{X0}'} ...
+    );
+
+    % Production signed Weibull with opponent B and signed decision boundary.
+    config.models.weibullSignedBX0 = struct(...
+        'getInitParams', @getWeibullSignedBX0InitParams, ...
+        'getModelFuncs', @getWeibullSignedBX0ModelFuncs, ...
+        'headers', {'A^{bl}','\alpha^{bl}','\beta^{bl}', ...
+                   'A^{con}','\alpha^{con}','\beta^{con}', ...
+                   'A^{incon}','\alpha^{incon}','\beta^{incon}', ...
+                   '\DeltaB','\DeltaX0','AICc^{BX0}'} ...
     );
     
 end

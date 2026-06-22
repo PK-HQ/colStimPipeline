@@ -7,6 +7,14 @@ function [figureHandles, distributionData, sourceAudit, statsAudit] = ...
     end
     opts = applyDefaults(opts);
 
+    if isfield(mdl, 'signedBX0') && ...
+            isfield(opts, 'modelFieldName') && ...
+            contains(char(opts.modelFieldName), 'weibullSignedBX0')
+        [figureHandles, distributionData, sourceAudit, statsAudit] = ...
+            plotSignedBX0ParameterDistribution(mdl, aggregateFits, opts);
+        return;
+    end
+
     if isfield(mdl, 'signedX0') && ...
             isfield(opts, 'modelFieldName') && ...
             contains(char(opts.modelFieldName), 'weibullSignedX0')
@@ -277,6 +285,98 @@ function opts = applyDefaults(opts)
     end
     opts.statsOpts.testDirection = validatestring( ...
         opts.statsOpts.testDirection, {'two-sided', 'one-sided'});
+end
+
+function [figureHandles, distributionData, sourceAudit, statsAudit] = plotSignedBX0ParameterDistribution(mdl, aggregateFits, opts)
+    figureHandles = gobjects(numel(aggregateFits), 1);
+    distributionData = repmat(struct(), numel(aggregateFits), 1);
+    sourceAudit = emptyDistributionSourceAuditTable();
+    statsAudit = emptyDistributionStatsAuditTable();
+
+    fieldNames = {'deltaB', 'deltaX0', 'BHorizontal', 'BVertical', ...
+        'X0Horizontal', 'X0Vertical', 'ACon', 'AIncon', ...
+        'alphaCon', 'alphaIncon', 'betaCon', 'betaIncon'};
+    fieldLabels = {'\DeltaB', '\DeltaX0', 'B_H', 'B_V', ...
+        'X0_H', 'X0_V', 'A_{con}', 'A_{incon}', ...
+        '\alpha_{con}', '\alpha_{incon}', '\beta_{con}', '\beta_{incon}'};
+    fieldColors = [ ...
+        0.35 0.10 0.65; 0.35 0.10 0.65; ...
+        0.55 0 0; 0 0.05 0.45; ...
+        0.55 0 0; 0 0.05 0.45; ...
+        0.9294 0.1098 0.1373; 0 0.0941 0.6627; ...
+        0.9294 0.1098 0.1373; 0 0.0941 0.6627; ...
+        0.9294 0.1098 0.1373; 0 0.0941 0.6627];
+    referenceValues = [0 0 50 50 0 0 nan nan nan nan nan nan];
+
+    fprintf('\n=== Signed-BX0 parameter distribution ===\n');
+    fprintf('  source field: mdl.signedBX0.* individual-session fitted parameters\n');
+    fprintf('  rows available: %d\n', numel(mdl.signedBX0.deltaB));
+
+    for aggregateIdx = 1:numel(aggregateFits)
+        rows = unique(aggregateFits(aggregateIdx).mdlRowIndices(:)', 'stable');
+        clusterTitle = parameterTitle(aggregateFits(aggregateIdx), numel(rows));
+        figureHandles(aggregateIdx) = figure(...
+            'Name', [clusterTitle ' signed-BX0 parameter distributions'], ...
+            'Color', 'w', ...
+            'Visible', opts.figureVisible);
+        makeSubplot = @(position) subtightplot(4, 3, position, ...
+            [0.08 0.055], [0.10 0.08], [0.09 0.04]);
+
+        distributionData(aggregateIdx).clusterID = aggregateFits(aggregateIdx).clusterID;
+        distributionData(aggregateIdx).mdlRowIndices = rows;
+        for fieldIdx = 1:numel(fieldNames)
+            ax = makeSubplot(fieldIdx);
+            hold(ax, 'on');
+            values = getSignedBX0FieldValues(mdl, fieldNames{fieldIdx}, rows);
+            validValues = values(isfinite(values));
+            if isfinite(referenceValues(fieldIdx))
+                yline(ax, referenceValues(fieldIdx), '--', ...
+                    'Color', 0.4 .* [1 1 1], 'LineWidth', 1.2, ...
+                    'HandleVisibility', 'off');
+            end
+            if ~isempty(validValues)
+                jitter = opts.jitterWidth .* (rand(size(validValues)) - 0.5);
+                scatter(ax, 1 + jitter, validValues, opts.pointSize, ...
+                    fieldColors(fieldIdx, :), 'filled', ...
+                    'MarkerFaceAlpha', opts.pointAlpha, ...
+                    'MarkerEdgeColor', 'k');
+                mu = mean(validValues, 'omitnan');
+                sem = std(validValues, 'omitnan') ./ sqrt(sum(isfinite(validValues)));
+                errorbar(ax, 1, mu, sem, 'ko', ...
+                    'MarkerFaceColor', 'w', 'MarkerSize', 8, ...
+                    'LineWidth', 1.5, 'HandleVisibility', 'off');
+            else
+                text(ax, 0.5, 0.5, 'No valid values', 'Units', 'normalized', ...
+                    'HorizontalAlignment', 'center', 'Color', [0.35 0.35 0.35]);
+            end
+            xlim(ax, [0.5 1.5]);
+            set(ax, 'XTick', 1, 'XTickLabel', {fieldLabels{fieldIdx}});
+            ylabel(ax, fieldLabels{fieldIdx}, 'Interpreter', 'tex');
+            box(ax, 'off');
+            axis(ax, 'square');
+            distributionData(aggregateIdx).(fieldNames{fieldIdx}) = values;
+            fprintf('  %s %s: n=%d mean=%0.4g SEM=%0.4g\n', ...
+                clusterTitle, fieldNames{fieldIdx}, numel(validValues), ...
+                mean(validValues, 'omitnan'), ...
+                std(validValues, 'omitnan') ./ sqrt(max(1, numel(validValues))));
+        end
+        addParameterTitle([clusterTitle ' | signed-BX0 individual parameters']);
+        upFontSize(16, 0.01);
+    end
+end
+
+function values = getSignedBX0FieldValues(mdl, fieldName, rows)
+    values = nan(size(rows));
+    if ~isfield(mdl.signedBX0, fieldName)
+        warning('plotPowerClusterFitParameters:MissingSignedBX0Field', ...
+            'mdl.signedBX0.%s is missing; leaving panel empty.', fieldName);
+        return;
+    end
+    sourceValues = mdl.signedBX0.(fieldName)(:);
+    validRows = rows(isfinite(rows) & rows == round(rows) & ...
+        rows >= 1 & rows <= numel(sourceValues));
+    [~, loc] = ismember(validRows, rows);
+    values(loc) = sourceValues(validRows);
 end
 
 function [figureHandles, distributionData, sourceAudit, statsAudit] = plotSignedX0HorizontalDistribution(mdl, aggregateFits, opts)
