@@ -19,6 +19,19 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
         mdl.fittedParamsVertical = nan(nBlocks, 13);
         mdl.fitStatusHorizontal = repmat({''}, nBlocks, 1);
         mdl.fitStatusVertical = repmat({''}, nBlocks, 1);
+    elseif strcmp(modelType, 'weibullSignedX0')
+        mdl.signedX0.fitParams = nan(nBlocks, 10);
+        mdl.signedX0.nLL = nan(nBlocks, 1);
+        mdl.signedX0.AICc = nan(nBlocks, 1);
+        mdl.signedX0.noX0FitParams = nan(nBlocks, 9);
+        mdl.signedX0.noX0NLL = nan(nBlocks, 1);
+        mdl.signedX0.noX0AICc = nan(nBlocks, 1);
+        mdl.signedX0.deltaAICcX0 = nan(nBlocks, 1);
+        mdl.signedX0.akaikeWeightX0 = nan(nBlocks, 1);
+        mdl.signedX0.akaikeWeightNoX0 = nan(nBlocks, 1);
+        mdl.signedX0.X0Horizontal = nan(nBlocks, 1);
+        mdl.signedX0.X0Vertical = nan(nBlocks, 1);
+        mdl.signedX0.fitStatus = repmat({''}, nBlocks, 1);
     end
     
     % Get averaged data
@@ -68,9 +81,16 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
                    'AICc^{total}','AUC^{bl}','AUC^{con-bl}','AUC^{incon-bl}','AUC^{con-incon}'};
                 mdl.headersHorizontal = mdl.headers;
                 mdl.headersVertical = mdl.headers;
+            case 'weibullSignedX0'
+                mdl.headers={'A^{bl}','\alpha^{bl}','\beta^{bl}', ...
+                   'A^{HOpto}','\alpha^{HOpto}','\beta^{HOpto}', ...
+                   'A^{VOpto}','\alpha^{VOpto}','\beta^{VOpto}', ...
+                   '\DeltaX0','AICc^{X0}'};
         end        
         % Adjust bounds
-        lb = max(lb, eps);
+        if ~strcmp(modelType, 'weibullSignedX0')
+            lb = max(lb, eps);
+        end
         ub(isinf(ub)) = 1e10;
         
         % Setup optimization options
@@ -111,6 +131,10 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
             'successInconOpto', successInconOpto,...
             'sumConOpto', sumConOpto, ...
             'successConOpto', successConOpto);
+        if strcmp(modelType, 'weibullSignedX0')
+            signedData = buildSignedChoiceData(xBlocks, yBlocks, block);
+            data = mergeStructs(data, signedData);
+        end
         
         % Fit model
         if manualFittingFlag
@@ -122,12 +146,29 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
             % Use the modular optimization subfunction
             %nRestarts = 5;  % You can adjust the number of restarts here
             %[fittedParams, nLL] = globalSolvers(objectiveFunction, initialParams, lb, ub, opts, data, solverOption, nRestarts);            
-            [fittedParams, nLL] = fitParameters(objectiveFunction, initialParams, lb, ub, opts, data);
+            if strcmp(modelType, 'weibullSignedX0')
+                [fittedParams, nLL] = fitParametersSimple(...
+                    objectiveFunction, initialParams, lb, ub, opts, data);
+            else
+                [fittedParams, nLL] = fitParameters(objectiveFunction, initialParams, lb, ub, opts, data);
+            end
         end
         % Calculate metrics
-        n = sum([sumBaseline sumInconOpto]);
+        if strcmp(modelType, 'weibullSignedX0')
+            n = sum([data.sumBaselineChoice, ...
+                data.sumHorizontalOptoChoice, data.sumVerticalOptoChoice]);
+        else
+            n = sum([sumBaseline sumInconOpto]);
+        end
         k = sum(~isnan(fittedParams));
         [~, aicc, ~] = calculateAIC(nLL, k, n);
+
+        signedFitSummary = [];
+        if strcmp(modelType, 'weibullSignedX0')
+            signedFitSummary = fitSignedNoX0Comparison(...
+                objectiveFunction, initialParams, lb, ub, opts, data, ...
+                fittedParams, nLL, aicc, n);
+        end
         
         % Save results
         mdl = saveModelResults(mdl, block, ...
@@ -139,6 +180,11 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
             xVerticalOptoPre, yVerticalOptoPre, tagVerticalOptoPre, congrVerticalOptoPre, ...
             mdlStruct, objectiveFunction, ub, lb, initialParams, ...
             opts, fittedParams, aicc, manualFittingFlag);
+
+        if strcmp(modelType, 'weibullSignedX0')
+            mdl = saveSignedX0Results(mdl, block, signedFitSummary);
+            mdl = saveSignedX0SourceData(mdl, block, data);
+        end
 
         if strcmp(modelType, 'weibullfreeAll')
             sideData = buildSideFitData( ...
@@ -285,6 +331,183 @@ function [sumY, successY] = convertSideCounts(x, y, conditionType)
     successY = (y ./ 100) .* sumY;
 end
 
+function data = buildSignedChoiceData(xBlocks, yBlocks, block)
+    xBaseline = rmnan(squeeze(xBlocks(1,:,block)));
+    yBaseline = rmnan(squeeze(yBlocks(1,:,block)));
+    xHorizontal = rmnan(squeeze(xBlocks(2,:,block)));
+    yHorizontal = rmnan(squeeze(yBlocks(2,:,block)));
+    xVertical = rmnan(squeeze(xBlocks(3,:,block)));
+    yVertical = rmnan(squeeze(yBlocks(3,:,block)));
+
+    validateSignedXY(xBaseline, yBaseline, 'baseline', block);
+    validateSignedXY(xHorizontal, yHorizontal, 'horizontal opto', block);
+    validateSignedXY(xVertical, yVertical, 'vertical opto', block);
+
+    [sumBaseline, successBaseline] = convertSignedChoiceCounts(...
+        xBaseline, yBaseline, 'baseline');
+    [sumHorizontal, successHorizontal] = convertSignedChoiceCounts(...
+        xHorizontal, yHorizontal, 'opto');
+    [sumVertical, successVertical] = convertSignedChoiceCounts(...
+        xVertical, yVertical, 'opto');
+
+    data = struct(...
+        'xBaselineChoice', xBaseline, ...
+        'yBaselineChoice', yBaseline, ...
+        'xHorizontalOptoChoice', xHorizontal, ...
+        'yHorizontalOptoChoice', yHorizontal, ...
+        'xVerticalOptoChoice', xVertical, ...
+        'yVerticalOptoChoice', yVertical, ...
+        'sumBaselineChoice', sumBaseline, ...
+        'successBaselineChoice', successBaseline, ...
+        'sumHorizontalOptoChoice', sumHorizontal, ...
+        'successHorizontalOptoChoice', successHorizontal, ...
+        'sumVerticalOptoChoice', sumVertical, ...
+        'successVerticalOptoChoice', successVertical);
+end
+
+function validateSignedXY(x, y, conditionName, block)
+    if numel(x) ~= numel(y)
+        error('fitPsyMLE2:SignedLengthMismatch', ...
+            'Block %d %s signed x/y lengths differ (%d vs %d).', ...
+            block, conditionName, numel(x), numel(y));
+    end
+    if any(y < 0 | y > 100)
+        error('fitPsyMLE2:SignedProbabilityRange', ...
+            'Block %d %s choice percentages must be within 0-100.', ...
+            block, conditionName);
+    end
+    if ~any(x < 0) || ~any(x > 0)
+        warning('fitPsyMLE2:SignedContrastCoverage', ...
+            'Block %d %s does not contain both negative and positive signed contrasts.', ...
+            block, conditionName);
+    end
+end
+
+function [sumY, successY] = convertSignedChoiceCounts(x, y, conditionType)
+    switch conditionType
+        case 'baseline'
+            % Signed baseline keeps the two zero points separate: 20 trials
+            % at each signed zero entry, 10 trials at each nonzero entry.
+            sumY = 10 .* ones(size(x));
+            sumY(x == 0) = 20;
+        case 'opto'
+            % Horizontal- and vertical-opto signed rows have 10 trials per
+            % signed contrast point, including zero.
+            sumY = 10 .* ones(size(x));
+        otherwise
+            error('Unknown signed condition type: %s', conditionType);
+    end
+    successY = round((y ./ 100) .* sumY);
+end
+
+function out = mergeStructs(out, extra)
+    names = fieldnames(extra);
+    for idx = 1:numel(names)
+        out.(names{idx}) = extra.(names{idx});
+    end
+end
+
+function summary = fitSignedNoX0Comparison(objectiveFunction, initialParams, lb, ub, opts, data, fittedParams, nLL, aicc, nTrials)
+    objectiveM0 = @(q9, fitData) objectiveFunction([q9(:)', 0], fitData);
+    [noX0Params, noX0NLL] = fitParametersSimple(...
+        objectiveM0, initialParams(1:9), lb(1:9), ub(1:9), opts, data);
+    [~, noX0AICc] = calculateAIC(noX0NLL, 9, nTrials);
+
+    deltaAICc = noX0AICc - aicc;
+    weights = akaikeWeights([noX0AICc, aicc]);
+
+    summary = struct(...
+        'fitParams', fittedParams, ...
+        'nLL', nLL, ...
+        'AICc', aicc, ...
+        'noX0FitParams', noX0Params, ...
+        'noX0NLL', noX0NLL, ...
+        'noX0AICc', noX0AICc, ...
+        'deltaAICcX0', deltaAICc, ...
+        'akaikeWeightNoX0', weights(1), ...
+        'akaikeWeightX0', weights(2), ...
+        'X0Horizontal', fittedParams(10), ...
+        'X0Vertical', -fittedParams(10), ...
+        'fitStatus', 'ok');
+end
+
+function weights = akaikeWeights(aiccValues)
+    finiteAICc = aiccValues(isfinite(aiccValues));
+    if isempty(finiteAICc)
+        weights = nan(size(aiccValues));
+        return;
+    end
+    delta = aiccValues - min(finiteAICc);
+    relLike = exp(-0.5 .* delta);
+    weights = relLike ./ sum(relLike(isfinite(relLike)));
+end
+
+function mdl = saveSignedX0Results(mdl, block, summary)
+    mdl.signedX0.fitParams(block,:) = summary.fitParams;
+    mdl.signedX0.nLL(block) = summary.nLL;
+    mdl.signedX0.AICc(block) = summary.AICc;
+    mdl.signedX0.noX0FitParams(block,:) = summary.noX0FitParams;
+    mdl.signedX0.noX0NLL(block) = summary.noX0NLL;
+    mdl.signedX0.noX0AICc(block) = summary.noX0AICc;
+    mdl.signedX0.deltaAICcX0(block) = summary.deltaAICcX0;
+    mdl.signedX0.akaikeWeightX0(block) = summary.akaikeWeightX0;
+    mdl.signedX0.akaikeWeightNoX0(block) = summary.akaikeWeightNoX0;
+    mdl.signedX0.X0Horizontal(block) = summary.X0Horizontal;
+    mdl.signedX0.X0Vertical(block) = summary.X0Vertical;
+    mdl.signedX0.fitStatus{block} = summary.fitStatus;
+end
+
+function mdl = saveSignedX0SourceData(mdl, block, data)
+    mdl.signedX0.xBaselineChoice(block,:) = ...
+        padArray(data.xBaselineChoice, 24, 2, NaN);
+    mdl.signedX0.yBaselineChoice(block,:) = ...
+        padArray(data.yBaselineChoice, 24, 2, NaN);
+    mdl.signedX0.nBaselineChoice(block,:) = ...
+        padArray(data.sumBaselineChoice, 24, 2, NaN);
+    mdl.signedX0.successBaselineChoice(block,:) = ...
+        padArray(data.successBaselineChoice, 24, 2, NaN);
+
+    mdl.signedX0.xHorizontalOptoChoice(block,:) = ...
+        padArray(data.xHorizontalOptoChoice, 24, 2, NaN);
+    mdl.signedX0.yHorizontalOptoChoice(block,:) = ...
+        padArray(data.yHorizontalOptoChoice, 24, 2, NaN);
+    mdl.signedX0.nHorizontalOptoChoice(block,:) = ...
+        padArray(data.sumHorizontalOptoChoice, 24, 2, NaN);
+    mdl.signedX0.successHorizontalOptoChoice(block,:) = ...
+        padArray(data.successHorizontalOptoChoice, 24, 2, NaN);
+
+    mdl.signedX0.xVerticalOptoChoice(block,:) = ...
+        padArray(data.xVerticalOptoChoice, 24, 2, NaN);
+    mdl.signedX0.yVerticalOptoChoice(block,:) = ...
+        padArray(data.yVerticalOptoChoice, 24, 2, NaN);
+    mdl.signedX0.nVerticalOptoChoice(block,:) = ...
+        padArray(data.sumVerticalOptoChoice, 24, 2, NaN);
+    mdl.signedX0.successVerticalOptoChoice(block,:) = ...
+        padArray(data.successVerticalOptoChoice, 24, 2, NaN);
+end
+function [fittedParams, nLL] = fitParametersSimple(objectiveFunction, params0, lb, ub, opts, data)
+    toParams = @(u) lb + u(:)' .* (ub - lb);
+    toUnit = @(p) (p(:)' - lb) ./ (ub - lb);
+    u0 = min(max(toUnit(params0), 0), 1);
+    obj = @(u) objectiveFunction(toParams(min(max(u, 0), 1)), data);
+
+    haveFMC = exist('fmincon','file') == 2;
+    if haveFMC
+        fopts = optimoptions('fmincon', ...
+            'Algorithm','interior-point', ...
+            'Display','off', ...
+            'MaxFunctionEvaluations', max(5000, 20 .* opts.MaxFunEvals), ...
+            'FiniteDifferenceType','central');
+        uFit = fmincon(obj, u0, [], [], [], [], zeros(size(u0)), ...
+            ones(size(u0)), [], fopts);
+    else
+        [uFit, ~] = fminsearchbnd(obj, u0, zeros(size(u0)), ...
+            ones(size(u0)), opts);
+    end
+
+    fittedParams = toParams(min(max(uFit, 0), 1));
+    nLL = objectiveFunction(fittedParams, data);
+end
 %% Helper Functions
 function [fittedParams, nLL] = fitParameters(objectiveFunction, params0, lb, ub, opts, data)
 
@@ -560,7 +783,7 @@ function [xBaselineAll, yBaselineAll, xOptoAll, yOptoAll, ...
     congrVerticalOptoPreAll = NaN(nBlocks, maxSingleLen);
 
     switch modelType
-        case {'bill','weibullfreeAll'}
+        case {'bill','weibullfreeAll','weibullSignedX0'}
 
             for block = 1:nBlocks
 
@@ -706,7 +929,7 @@ function [xBaselineAll, yBaselineAll, xOptoAll, yOptoAll, ...
             end
 
         otherwise
-            error('This updated pre-merge/tag logic is currently implemented for bill and weibullfreeAll only.');
+            error('This updated pre-merge/tag logic is currently implemented for bill, weibullfreeAll, and weibullSignedX0 only.');
     end
 end
 
@@ -767,6 +990,16 @@ function config = mdlConfig()
                    '\DeltaA^{con-bl}','\DeltaB^{con-bl}','\Delta\alpha^{con-bl}','\Delta\beta^{con-bl}', ...
                    '\DeltaA^{incon-bl}','\DeltaB^{incon-bl}','\Delta\alpha^{incon-bl}','\Delta\beta^{incon-bl}', ...
                    'AICc^{total}','AUC^{bl}','AUC^{con-bl}','AUC^{incon-bl}','AUC^{con-incon}'} ...
+    );
+
+    % Signed decision-boundary Weibull with fitted opponent X0
+    config.models.weibullSignedX0 = struct(...
+        'getInitParams', @getWeibullSignedX0InitParams, ...
+        'getModelFuncs', @getWeibullSignedX0ModelFuncs, ...
+        'headers', {'A^{bl}','\alpha^{bl}','\beta^{bl}', ...
+                   'A^{HOpto}','\alpha^{HOpto}','\beta^{HOpto}', ...
+                   'A^{VOpto}','\alpha^{VOpto}','\beta^{VOpto}', ...
+                   '\DeltaX0','AICc^{X0}'} ...
     );
     
 end

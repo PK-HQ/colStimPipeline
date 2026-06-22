@@ -14,7 +14,7 @@
 
 %% Change these for experiment runs
 analysisMode='psycluster';%psyphidist
-monkeyName='Pepper';%Pepper or Chip
+monkeyName='Chip';%Pepper or Chip
 currentSessID=81;%for biasing expt
 
 % Saving and plotting flags
@@ -26,7 +26,7 @@ skipImaging=1;
 %% Load dataStruct for the desired chamber
 [mainPath, datastruct]=setupEnv(['users/PK/colStimPipeline/exptListBiasingFull' monkeyName '.m']);
 chambers={'R', 'L'};
-for chamberID=1
+for chamberID=2
     nColumnsWanted=[]; chamberWanted=chambers{chamberID};
     analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted);
     nBlockStr=num2str(numel(analysisBlockID));
@@ -218,27 +218,59 @@ for chamberID=1
             monkeyName=datastruct(analysisBlockID(1)).monkey;
             
             objFunc='MLE';
-            modelTypes={'bill','weibullfreeAll'};
+            modelTypes={'bill','weibullSignedX0'}; %'weibullfreeall'
             fieldName='AICc';
             constrainedParamStr='';
             plotLine=1;
                        
             validBlocks=analysisBlockID(1:nBlocks);
-            deltaPermutationInspection = strcmpi(monkeyName, 'Pepper') && ...
-                strcmpi(chamberWanted, 'R');
+            experimentLabels = makeExperimentLabels( ...
+                datastruct, analysisBlockID(1:nBlocks));
+            excludeFromPsycluster = false(nBlocks, 1);
+            if strcmpi(monkeyName, 'Chip') && strcmpi(chamberWanted, 'L')
+                excludeFromPsycluster = ...
+                    strcmpi(string(experimentLabels(:)), "20230811R4");
+            end
+            if nnz(excludeFromPsycluster) > 1
+                error('mainPipeline:DuplicateExcludedExperiment', ...
+                    'Multiple Chip-L blocks matched 20230811R4.');
+            end
+            if strcmpi(monkeyName, 'Chip') && strcmpi(chamberWanted, 'L') && ...
+                    nnz(excludeFromPsycluster) == 0
+                warning('mainPipeline:ExcludedExperimentNotFound', ...
+                    'Chip-L exclusion target 20230811R4 was not found.');
+            end
+            clusterIdx(excludeFromPsycluster) = 0;
+            excludedAnalysisRows = find(excludeFromPsycluster);
+            if any(excludeFromPsycluster)
+                fprintf(['Excluding from psycluster | experiment=20230811R4 | ' ...
+                    'analysis row=%d | monkey=Chip | chamber=L\n'], ...
+                    excludedAnalysisRows(1));
+            end
+
+            supportedMonkey = any(strcmpi(monkeyName, {'Chip', 'Pepper'}));
+            supportedChamber = any(strcmpi(chamberWanted, {'L', 'R'}));
+            enableDeltaPermutationStats = supportedMonkey && supportedChamber;
             nDeltaPermutations = 5000;
             deltaPlotOpts = struct( ...
-                'showDeltaPermutationStats', deltaPermutationInspection, ...
+                'showDeltaPermutationStats', enableDeltaPermutationStats, ...
                 'nDeltaPermutations', nDeltaPermutations, ...
                 'deltaPermutationBaseSeed', 99173, ...
-                'saveDeltaPermutationExamples', deltaPermutationInspection, ...
-                'deltaPermutationExampleDir', fullfile('Y:\users\PK\colStimPipeline', 'outputs', 'deltaBiasPermutation'));
-            if deltaPermutationInspection
-                fprintf('Delta permutation inspection enabled for %s %s psycluster (%d permutations).\n', ...
+                'saveDeltaPermutationExamples', false);
+            if enableDeltaPermutationStats
+                fprintf(['Delta permutation statistics enabled | monkey=%s | ' ...
+                    'chamber=%s | permutations=%d\n'], ...
                     monkeyName, chamberWanted, nDeltaPermutations);
             end
+            fitPassPlotOpts = deltaPlotOpts;
+            fitPassPlotOpts.showDeltaPermutationStats = false;
+            fitPassPlotOpts.saveDeltaPermutationExamples = false;
+            fitPassPlotOpts.figureVisible = 'off';
+            fitPassPlotOpts.closeAfterRender = true;
+            fprintf(['Pre-clustering fit pass: hidden figures, no PDF, ' ...
+                'no permutation statistics.\n']);
             mdlStruct=analyzePsychometricModels(monkeyName, chamberWanted, modelTypes, mainPath, ...
-                behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, false, deltaPlotOpts);
+                behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, false, fitPassPlotOpts);
 
             if plotFlag
                 aggregateOpts = struct('binWidth', 5, ...
@@ -277,6 +309,10 @@ for chamberID=1
                 if isfield(mdlStruct, sourceMdlField)
                     clusterMdl = mdlStruct.(sourceMdlField);
                     clusterBlocks = clusterMdl.clusterBlocksIdx(:);
+                    if any(ismember(clusterBlocks, excludedAnalysisRows))
+                        error('mainPipeline:ExcludedExperimentEnteredModel', ...
+                            'Excluded experiment 20230811R4 entered clusterMdl.');
+                    end
                     clusterMdl.baselineMode = baselineModeByBlock(clusterBlocks);
                     clusterMdl.baselineModeSourceValue = ...
                         baselineSourceByBlock(clusterBlocks);
@@ -390,18 +426,29 @@ for chamberID=1
                             analysisBlockID(clusterBlocks(localBlocks));
                     end
 
-                    reportFilename = ['psychometrics/' chamberWanted ...
-                        '-chamber/' aggregateModelType '/psychfit-' ...
-                        chamberWanted '-' aggregateModelType '-C1'];
-                    deltaPermutationPlotOpts = deltaPlotOpts;
-                    if deltaPermutationInspection
-                        permutationOutputDir = fullfile('Y:\users\PK\colStimPipeline', 'outputs', 'deltaBiasPermutation');
-                        if ~exist(permutationOutputDir, 'dir')
-                            mkdir(permutationOutputDir);
-                        end
-                        reportFilename = fullfile(permutationOutputDir, ...
-                            ['psychfit-' chamberWanted '-' aggregateModelType '-C1_permStats.pdf']);
+                    excludedAggregateContribution = countExcludedAggregateContribution(...
+                        aggregatePsychometrics, excludedAnalysisRows);
+                    if excludedAggregateContribution > 0
+                        error('mainPipeline:ExcludedExperimentEnteredAggregates', ...
+                            'Excluded experiment 20230811R4 entered aggregate structures.');
                     end
+                    if strcmpi(monkeyName, 'Chip') && strcmpi(chamberWanted, 'L') && ...
+                            ~isempty(excludedAnalysisRows)
+                        fprintf(['Psycluster exclusion validated | excluded=20230811R4 | ' ...
+                            'individual pages=%d | aggregate contribution=%d\n'], ...
+                            numel(clusterBlocks), excludedAggregateContribution);
+                    end
+
+                    reportOutputDir = fullfile('Y:\users\PK\colStimPipeline', 'outputs');
+                    if ~exist(reportOutputDir, 'dir')
+                        mkdir(reportOutputDir);
+                    end
+                    animalID = animalIDForPsychometricReport(monkeyName);
+                    reportFilename = fullfile(reportOutputDir, ...
+                        sprintf('M%d-psychfit-%s-%s.pdf', ...
+                        animalID, chamberWanted, aggregateModelType));
+                    fprintf('Final psychometric PDF target: %s\n', reportFilename);
+                    deltaPermutationPlotOpts = deltaPlotOpts;
                     reportState = [];
                     if saveFlag
                         reportState = initializeReportPDFAssembly( ...
@@ -417,11 +464,19 @@ for chamberID=1
                             prepareClusterLabelsForIndividualPages( ...
                             datastruct, analysisBlockID, clusterBlocks, ...
                             powerEffectClusterByBlock);
+                        renderExperimentLabels = makeExperimentLabels(...
+                            datastruct, analysisBlockID(clusterBlocks));
+                        if any(strcmpi(string(renderExperimentLabels(:)), "20230811R4"))
+                            error('mainPipeline:ExcludedExperimentRendered', ...
+                                'Excluded experiment 20230811R4 reached individual-page rendering.');
+                        end
                         fprintf('Post-clustering individual render: nRenderBlocks=%d | numel(clusterLabelsForBlocks)=%d | plotAverageFlag=%d\n', ...
                             numel(clusterBlocks), ...
                             numel(clusterLabelsForBlocks), false);
                         individualXFit = sort(nlinspace(0, 100, 100, ...
                             'linear'));
+                        fprintf(['Post-clustering saved render: %d pages with real cluster ' ...
+                            'labels and permutation statistics.\n'], numel(clusterBlocks));
                         [clusterMdl, reportState] = plotNakaRushtonFit5(behavioralData, bitmapData, ...
                             datastruct, analysisBlockID, clusterMdl, ...
                             clusterMdl.fittedParams(:, :, 1), ...
@@ -461,11 +516,6 @@ for chamberID=1
                     [aggregatePsychometricFits, aggregateFigures] = ...
                         plotAggregatedPowerClusterPsychometrics(...
                         aggregatePsychometrics, aggregatePlotOpts);
-                    if deltaPermutationInspection
-                        saveDeltaBiasPermutationInspectionAudit(...
-                            monkeyName, chamberWanted, aggregateModelType, ...
-                            clusterMdl, aggregatePsychometricFits);
-                    end
                     if saveFlag
                         reportState = stageAndCloseReportFigures( ...
                             aggregateFigures, reportState);
@@ -527,7 +577,7 @@ for chamberID=1
                     distributionStatsAuditPaths = struct();
                     powerAuditPaths = struct();
                     deltaPointAuditPaths = struct();
-                    if saveFlag
+                    if false && saveFlag
                         auditOutputBase = fullfile(mainPath, monkeyName, ...
                             'Meta', 'summary', auditBaseName);
                         distributionAuditPaths = saveDistributionSourceAudit( ...
@@ -899,6 +949,20 @@ function labels = makeExperimentLabels(datastruct, blockIndices)
     end
 end
 
+
+function nMatches = countExcludedAggregateContribution(aggregatePsychometrics, excludedAnalysisRows)
+    nMatches = 0;
+    if isempty(excludedAnalysisRows) || isempty(aggregatePsychometrics)
+        return;
+    end
+    for aggregateIdx = 1:numel(aggregatePsychometrics)
+        if isfield(aggregatePsychometrics(aggregateIdx), 'sourceBlockIndices')
+            nMatches = nMatches + sum(ismember(...
+                aggregatePsychometrics(aggregateIdx).sourceBlockIndices(:), ...
+                excludedAnalysisRows(:)));
+        end
+    end
+end
 function clusterLabels = prepareClusterLabelsForIndividualPages( ...
         datastruct, analysisBlockID, clusterBlocks, ...
         powerEffectClusterByBlock)
@@ -939,7 +1003,7 @@ function clusterLabels = prepareClusterLabelsForIndividualPages( ...
         end
 
         clusterLabels{rowIdx} = sprintf( ...
-            'Cluster:\n%d/%d', round(clusterID), nClusters);
+            'Cluster: %d/%d', round(clusterID), nClusters);
         renderClusterIDs(rowIdx) = round(clusterID);
         renderedCount(round(clusterID)) = ...
             renderedCount(round(clusterID)) + 1;
@@ -988,6 +1052,17 @@ function label = formatClusterValueForAudit(value)
 end
 
 
+function animalID = animalIDForPsychometricReport(monkeyName)
+    switch lower(char(string(monkeyName)))
+        case 'chip'
+            animalID = 28;
+        case 'pepper'
+            animalID = 32;
+        otherwise
+            error('Unsupported monkey name for psychometric report filename: %s', ...
+                char(string(monkeyName)));
+    end
+end
 function saveDeltaBiasPermutationInspectionAudit(monkeyName, chamberWanted, modelType, clusterMdl, aggregateFits)
     outputDir = fullfile('Y:\users\PK\colStimPipeline', 'outputs', 'deltaBiasPermutation');
     if ~exist(outputDir, 'dir')

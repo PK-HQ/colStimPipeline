@@ -70,7 +70,8 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
         subplot = @(m,n,p) subtightplot(m, n, p, panelGap, [hmarg hmarg], wmarg);
         if ~make_it_tight,  clear subplot;  end
        
-        figure('Name', ['Block ', blockInfo.label]);
+        figure('Name', ['Block ', blockInfo.label], ...
+            'Visible', plotOpts.figureVisible);
         
         sideData = getPreMergedSideData(mdl, block);
 
@@ -120,7 +121,13 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
             switch cond
                 case 1 % Baseline
                     xPlot = x;
-                    predictedCurve = mdl.mdlBaseline(xPlot, fitParams(block, 1:end-1)).pcntrl; 
+                    if strcmp(modelTypeStr, 'weibullSignedX0')
+                        displayCurves = predictSignedX0DisplayCurves(...
+                            xPlot, fitParams(block, :));
+                        predictedCurve = displayCurves.merged.baseline;
+                    else
+                        predictedCurve = mdl.mdlBaseline(xPlot, fitParams(block, 1:end-1)).pcntrl;
+                    end
                     lineColor = [0 0 0]; % Black for baseline
                     markerFaceColor = [1 1 1]; 
                     edgeColor = 'k';
@@ -145,7 +152,13 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
                     %mdl.fittedParams(block,endIdx) = trapz(contr, curve) / (max(contr) - min(contr));
                 case 2 % Con-Opto
                     xPlot = x; % Positive contrasts for congruent condition
-                    predictedCurve = mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)).pc; 
+                    if strcmp(modelTypeStr, 'weibullSignedX0')
+                        displayCurves = predictSignedX0DisplayCurves(...
+                            xPlot, fitParams(block, :));
+                        predictedCurve = displayCurves.merged.con;
+                    else
+                        predictedCurve = mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)).pc;
+                    end
                     xPlot = x(x >= 0); % Positive contrasts for congruent condition
                     predictedCurve=predictedCurve(x >= 0);
                     lineColor = [0.9294, 0.1098, 0.1373] * 1.05; % Red for con-opto
@@ -171,7 +184,13 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
                     %mdl.fittedParams(block,endIdx+1) = trapz(contr, curve) / (max(contr) - min(contr));
                 case 3 % Incon-Opto
                     xPlot = x; % Positive contrasts for congruent condition
-                    predictedCurve = mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)).pic; 
+                    if strcmp(modelTypeStr, 'weibullSignedX0')
+                        displayCurves = predictSignedX0DisplayCurves(...
+                            xPlot, fitParams(block, :));
+                        predictedCurve = displayCurves.merged.incon;
+                    else
+                        predictedCurve = mdl.mdlOpto(xPlot, fitParams(block, 1:end-1)).pic;
+                    end
 
                     lineColor = [0, 0.0941, 0.6627] * 1.25; % Blue for incon-opto
                     markerFaceColor = lineColor;
@@ -426,8 +445,8 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
 
                     clusterLabelLine = formatClusterLabelLine(pageClusterLabel);
                     optoText = sprintf([ ...
-                        'BL: %s\n' ...
                         '%s' ...
+                        'BL: %s\n' ...
                         '%.0f cols\n' ...
                         'PD_{DMD} %.2f mW mm^{-2}\n' ...
                         'Area_{ROI} %.2f mm^2\n' ...
@@ -435,8 +454,8 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
                         'sDC %.1f%% | tDC %.1f%%\n' ...
                         'PD_{ROI} %s mW mm^{-2}\n' ...
                         'P_{total} %s mW'], ...
-                        char(baselineModeThis), ...
                         clusterLabelLine, ...
+                        char(baselineModeThis), ...
                         meanColumns, ...
                         meanProjectorPD, ...
                         meanAreaROI, ...
@@ -445,9 +464,13 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
                         powerDisplay.PDROI, ...
                         powerDisplay.Ptotal);
 
+                    if strcmp(modelTypeStr, 'weibullSignedX0')
+                        optoText = sprintf('%s\n%s', optoText, ...
+                            signedX0AnnotationText(mdl, block));
+                    end
                     optoStatsTextHandle = addOptoStatsText(axRow1Col1, optoText);
 
-                    addFitParameterTable(axMergedPanel, mdl.headers, fitParams(block,:));
+                    addFitParameterTable(axMergedPanel, mdl.headers, fitParams(block,:), modelTypeStr);
                     
                     1;
                 end
@@ -681,6 +704,8 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
             %savefig(gcf, [figPath '\fig' figName '.fig']);           % FIG
             %print(gcf, [figPath '\svg' figName '.svg'], '-dsvg');        % SVG
             %}
+        elseif plotOpts.closeAfterRender
+            close(gcf);
         end
     end
 end
@@ -1379,8 +1404,74 @@ function annotationHandle = addOptoStatsText(ax, optoText)
         'Tag', 'PlotNakaStatsText');
 end
 
-function addFitParameterTable(ax, headers, fitParamRow)
+function displayCurves = predictSignedX0DisplayCurves(xPlot, fitParamRow)
+    params = squeeze(fitParamRow);
+    params = params(:)';
+    if numel(params) < 10
+        error('plotNakaRushtonFit5:SignedX0ParamCount', ...
+            'weibullSignedX0 plotting requires 10 fitted parameters.');
+    end
+    params = params(1:10);
+    c = abs(xPlot);
+
+    pBLneg = weibullSignedX0Mdl(-c, params(1), params(2), params(3), 0);
+    pBLpos = weibullSignedX0Mdl(+c, params(1), params(2), params(3), 0);
+
+    pHneg = weibullSignedX0Mdl(-c, params(4), params(5), params(6), params(10));
+    pHpos = weibullSignedX0Mdl(+c, params(4), params(5), params(6), params(10));
+
+    pVneg = weibullSignedX0Mdl(-c, params(7), params(8), params(9), -params(10));
+    pVpos = weibullSignedX0Mdl(+c, params(7), params(8), params(9), -params(10));
+
+    displayCurves.horizontal.baseline = 100 - pBLneg;
+    displayCurves.horizontal.con = 100 - pHneg;
+    displayCurves.horizontal.incon = 100 - pVneg;
+
+    displayCurves.vertical.baseline = pBLpos;
+    displayCurves.vertical.con = pVpos;
+    displayCurves.vertical.incon = pHpos;
+
+    displayCurves.merged.baseline = 0.5 .* (...
+        displayCurves.horizontal.baseline + ...
+        displayCurves.vertical.baseline);
+    displayCurves.merged.con = 0.5 .* (...
+        displayCurves.horizontal.con + ...
+        displayCurves.vertical.con);
+    displayCurves.merged.incon = 0.5 .* (...
+        displayCurves.horizontal.incon + ...
+        displayCurves.vertical.incon);
+
+    validateSignedX0DisplayCurves(displayCurves, size(xPlot));
+end
+
+function validateSignedX0DisplayCurves(displayCurves, expectedSize)
+    viewNames = {'horizontal', 'vertical', 'merged'};
+    conditionNames = {'baseline', 'con', 'incon'};
+    for viewIdx = 1:numel(viewNames)
+        viewName = viewNames{viewIdx};
+        for conditionIdx = 1:numel(conditionNames)
+            conditionName = conditionNames{conditionIdx};
+            y = displayCurves.(viewName).(conditionName);
+            if ~isequal(size(y), expectedSize) || ~isreal(y) || ...
+                    any(~isfinite(y(:))) || any(y(:) < 0) || any(y(:) > 100)
+                error('plotNakaRushtonFit5:InvalidSignedX0DisplayCurve', ...
+                    ['Invalid weibullSignedX0 display curve for %s %s. ' ...
+                    'Expected size %s, got %s.'], ...
+                    viewName, conditionName, mat2str(expectedSize), ...
+                    mat2str(size(y)));
+            end
+        end
+    end
+end
+function addFitParameterTable(ax, headers, fitParamRow, modelTypeStr)
+    if nargin < 4 || isempty(modelTypeStr)
+        modelTypeStr = 'weibullfreeAll';
+    end
     if isempty(headers) || isempty(fitParamRow)
+        return;
+    end
+    if strcmp(modelTypeStr, 'weibullSignedX0')
+        addSignedX0FitParameterTable(ax, fitParamRow);
         return;
     end
 
@@ -1468,6 +1559,81 @@ function addFitParameterTable(ax, headers, fitParamRow)
     end
 end
 
+function addSignedX0FitParameterTable(ax, fitParamRow)
+    fitParamRow = squeeze(fitParamRow);
+    fitParamRow = fitParamRow(:)';
+    if numel(fitParamRow) < 10
+        return;
+    end
+
+    deltaX0 = fitParamRow(10);
+    tableValues = [ ...
+        fitParamRow(1), fitParamRow(2), fitParamRow(3), 0; ...
+        fitParamRow(4), fitParamRow(5), fitParamRow(6), deltaX0; ...
+        fitParamRow(7), fitParamRow(8), fitParamRow(9), -deltaX0];
+    paramHeaders = {'A', '\alpha', '\beta', 'X0'};
+    rowLabels = {'Baseline', 'H-Opto', 'V-Opto'};
+    rowColors = [0 0 0; 0.55 0 0; 0 0.05 0.45];
+
+    axPos = get(ax, 'Position');
+    tableGap = 0.010;
+    maxTableRight = 0.992;
+    tableX = axPos(1) + axPos(3) + tableGap;
+    availableWidth = maxTableRight - tableX;
+    tableWidth = min(0.22, availableWidth);
+    if tableWidth < 0.18
+        tableWidth = 0.18;
+        tableX = max(0.01, maxTableRight - tableWidth);
+    end
+
+    tableHeight = 0.44 * axPos(4);
+    tableY = axPos(2) + 0.5 * axPos(4) - 0.5 * tableHeight;
+    rowHeight = tableHeight / 4;
+    labelWidth = 0.060;
+    labelGap = 0.002;
+    paramGap = 0.010;
+    valueWidth = (tableWidth - labelWidth - labelGap - ...
+        (numel(paramHeaders) - 1) * paramGap) / numel(paramHeaders);
+    fontSize = 10.5;
+
+    addFitTableCell(tableX, tableY + 3 * rowHeight, labelWidth, ...
+        rowHeight, '', [0 0 0], fontSize, 'bold', 'left');
+    for col = 1:numel(paramHeaders)
+        addFitTableCell(tableX + labelWidth + labelGap + ...
+            (col - 1) * (valueWidth + paramGap), ...
+            tableY + 3 * rowHeight, valueWidth, rowHeight, ...
+            paramHeaders{col}, [0 0 0], fontSize, 'bold', 'center');
+    end
+
+    for row = 1:numel(rowLabels)
+        yPos = tableY + (3 - row) * rowHeight;
+        addFitTableCell(tableX, yPos, labelWidth, rowHeight, ...
+            rowLabels{row}, rowColors(row,:), fontSize, 'bold', 'left');
+        for col = 1:numel(paramHeaders)
+            valueStr = formatSignedX0ParameterValue(...
+                tableValues(row, col), paramHeaders{col});
+            addFitTableCell(tableX + labelWidth + labelGap + ...
+                (col - 1) * (valueWidth + paramGap), yPos, ...
+                valueWidth, rowHeight, valueStr, rowColors(row,:), ...
+                fontSize, 'normal', 'center');
+        end
+    end
+end
+
+function valueStr = formatSignedX0ParameterValue(value, paramName)
+    if isnan(value)
+        valueStr = '';
+        return;
+    end
+    if strcmp(paramName, 'A')
+        value = 100 .* value;
+        valueStr = sprintf('%.1f', value);
+    elseif strcmp(paramName, 'X0')
+        valueStr = sprintf('%+.1f', value);
+    else
+        valueStr = sprintf('%.1f', value);
+    end
+end
 function [rowIdx, paramIdx] = parseFitParameterHeader(header, paramHeaders)
     rowIdx = nan;
     paramIdx = nan;
@@ -1526,6 +1692,28 @@ function valueStr = formatFitParameterValue(value, paramName)
     valueStr = sprintf('%.1f', value);
 end
 
+function textOut = signedX0AnnotationText(mdl, block)
+    textOut = '';
+    if ~isfield(mdl, 'signedX0')
+        return;
+    end
+    requiredFields = {'X0Horizontal', 'X0Vertical', ...
+        'deltaAICcX0', 'akaikeWeightX0'};
+    for idx = 1:numel(requiredFields)
+        if ~isfield(mdl.signedX0, requiredFields{idx}) || ...
+                numel(mdl.signedX0.(requiredFields{idx})) < block
+            return;
+        end
+    end
+    textOut = sprintf(['X0H: %+.1f%%\n' ...
+        'X0V: %+.1f%%\n' ...
+        'DeltaAICc_X0: %.2g\n' ...
+        'w_X0: %.2f'], ...
+        mdl.signedX0.X0Horizontal(block), ...
+        mdl.signedX0.X0Vertical(block), ...
+        mdl.signedX0.deltaAICcX0(block), ...
+        mdl.signedX0.akaikeWeightX0(block));
+end
 function addBlockSuplabel(blockLabel)
     [~, hLabel] = suplabel(blockLabel, 't', [.1 .1 .82 .88]);
     set(hLabel, ...
@@ -1604,7 +1792,14 @@ function opts = applyDeltaPermutationPlotDefaults(opts)
     if ~isfield(opts, 'deltaPermutationBaseSeed') || isempty(opts.deltaPermutationBaseSeed)
         opts.deltaPermutationBaseSeed = 99173;
     end
+    if ~isfield(opts, 'figureVisible') || isempty(opts.figureVisible)
+        opts.figureVisible = 'on';
+    end
+    if ~isfield(opts, 'closeAfterRender') || isempty(opts.closeAfterRender)
+        opts.closeAfterRender = false;
+    end
     opts.showDeltaPermutationStats = logical(opts.showDeltaPermutationStats);
+    opts.closeAfterRender = logical(opts.closeAfterRender);
 end
 
 function seed = stableDeltaPermutationSeed(baseSeed, primaryID, secondaryID)

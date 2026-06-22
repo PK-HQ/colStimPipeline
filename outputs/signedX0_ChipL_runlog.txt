@@ -1,0 +1,592 @@
+mainPipeline
+Excluding from psycluster | experiment=20230811R4 | analysis row=3 | monkey=Chip | chamber=L
+Delta permutation statistics enabled | monkey=Chip | chamber=L | permutations=5000
+Pre-clustering fit pass: hidden figures, no PDF, no permutation statistics.
+Cluster 1
+Fitting model, independent parameters per session...Fitted block #1Fitted block #2Fitted block #3Fitted block #4Fitted block #5Fitted block #6Fitted block #7Fitted block #8Fitted block #9Fitted block #10Fitted block #11Fitted block #12Fitted block #13Fitted block #14Fitted block #15Fitted block #16Fitted block #17Fitted block #18Fitted block #19Fitted block #20Done!
+
+
+=========
+
+plotNakaRushtonFit5 render setup: nRenderBlocks=20 | numel(clusterLabel)=0 | plotAverageFlag=0
+plotNakaRushtonFit5 render page: renderIdx=1 | globalBlockIdx=4 | clusterLabel= | appendPage=0
+Delta point audit: 20230812R0 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[10 30 40 10 10]
+Delta point audit: 20230812R0 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[5 45 20 5 5]
+Delta point audit: 20230812R0 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[50 0 70 20 20]
+Delta point audit: 20230812R0 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[15 50 45 50 30]
+{Unrecognized field name "pcntrl".
+
+Error in <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 124)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',124,0)">line 124</a>)
+                    predictedCurve = mdl.mdlBaseline(xPlot, fitParams(block, 1:end-1)).pcntrl;
+
+Error in <a href="matlab:matlab.internal.language.introspective.errorDocCallback('analyzePsychometricModels', 'Y:\users\PK\colStimPipeline\analyzePsychometricModels.m', 95)" style="font-weight:bold">analyzePsychometricModels</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\analyzePsychometricModels.m',95,0)">line 95</a>)
+                    mdl=plotNakaRushtonFit5(behavioralData, bitmapData, datastruct, analysisBlockID,...
+
+Error in <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 272)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',272,0)">line 272</a>)
+            mdlStruct=analyzePsychometricModels(monkeyName, chamberWanted, modelTypes, mainPath, ...
+} 
+<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',124,1)">124 </a>                    predictedCurve = mdl.mdlBaseline(xPlot, fitParams(block, 1:end-1)).pcntrl; 
+if system_dependent('IsDebugMode')==1, dbquit; end
+mainPipeline
+Excluding from psycluster | experiment=20230811R4 | analysis row=3 | monkey=Chip | chamber=L
+Delta permutation statistics enabled | monkey=Chip | chamber=L | permutations=5000
+Pre-clustering fit pass: hidden figures, no PDF, no permutation statistics.
+Cluster 1
+Fitting model, independent parameters per session...Fitted block #1Fitted block #2Fitted block #3Fitted block #4Fitted block #5Fitted block #6Fitted block #7Fitted block #8Fitted block #9Fitted block #10Fitted block #11Fitted block #12Fitted block #13Fitted block #14Fitted block #15Fitted block #16Fitted block #17Fitted block #18Fitted block #19Fitted block #20Done!
+
+
+=========
+
+plotNakaRushtonFit5 render setup: nRenderBlocks=20 | numel(clusterLabel)=0 | plotAverageFlag=0
+plotNakaRushtonFit5 render page: renderIdx=1 | globalBlockIdx=4 | clusterLabel= | appendPage=0
+Delta point audit: 20230812R0 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[10 30 40 10 10]
+Delta point audit: 20230812R0 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[5 45 20 5 5]
+Delta point audit: 20230812R0 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[50 0 70 20 20]
+Delta point audit: 20230812R0 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[15 50 45 50 30]
+plotNakaRushtonFit5 render page: renderIdx=2 | globalBlockIdx=5 | clusterLabel= | appendPage=1
+Delta point audit: 20230812R2 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[11 15 20 35 80] | delta=[-10 0 -10 10 10]
+Delta point audit: 20230812R2 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[11 15 20 35 80] | delta=[-5 20 5 5 5]
+Delta point audit: 20230812R2 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[11 15 20 35 80] | delta=[10 20 10 0 10]
+Delta point audit: 20230812R2 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[11 15 20 35 80] | delta=[-5 -10 -15 0 5]
+plotNakaRushtonFit5 render page: renderIdx=3 | globalBlockIdx=12 | clusterLabel= | appendPage=1
+Delta point audit: 20230817R2 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[10 13 18 22 60] | delta=[66.7 52.4 -9.52 66.7 16.7]
+Delta point audit: 20230817R2 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[10 13 18 22 60] | delta=[-33.3 16.7 4.76 0 -8.33]
+Delta point audit: 20230817R2 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[10 13 18 22 60] | delta=[66.7 16.7 50 42.9 16.7]
+Delta point audit: 20230817R2 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[10 13 18 22 60] | delta=[16.7 -8.33 25 21.4 -8.33]
+plotNakaRushtonFit5 render page: renderIdx=4 | globalBlockIdx=13 | clusterLabel= | appendPage=1
+Delta point audit: 20230822R4 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 14 20 24 35 80] | delta=[30 40 20 -20 0 -10]
+Delta point audit: 20230822R4 | side=Horizontal | metric=deltaMask | plotted=4/4 | skipped=4 | method=nearest/tolerance,unmatched | max contrast diff=5 | x=[13.7 19.3 23.3 33.3] | delta=[50 0 -10 -20]
+[Warning: 20230822R4 Horizontal deltaMask plotted 4 of expected 4 delta
+points. Skipped reasons: baseline zero contrast unavailable; no one-to-one
+match within 5 contrast points] 
+[> In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>printDeltaPointAuditSummary', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1329)" style="font-weight:bold">plotNakaRushtonFit5>printDeltaPointAuditSummary</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1329,0)">line 1329</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>plotSideDeltaPanel', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1248)" style="font-weight:bold">plotNakaRushtonFit5>plotSideDeltaPanel</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1248,0)">line 1248</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 89)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',89,0)">line 89</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('analyzePsychometricModels', 'Y:\users\PK\colStimPipeline\analyzePsychometricModels.m', 95)" style="font-weight:bold">analyzePsychometricModels</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\analyzePsychometricModels.m',95,0)">line 95</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 272)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',272,0)">line 272</a>)] 
+Delta point audit: 20230822R4 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 14 20 24 35 80] | delta=[-10 0 20 20 50 30]
+Delta point audit: 20230822R4 | side=Vertical | metric=deltaMask | plotted=4/4 | skipped=4 | method=nearest/tolerance,unmatched | max contrast diff=5 | x=[13.7 19.3 23.3 33.3] | delta=[-20 10 30 25]
+[Warning: 20230822R4 Vertical deltaMask plotted 4 of expected 4 delta points.
+Skipped reasons: baseline zero contrast unavailable; no one-to-one match
+within 5 contrast points] 
+[> In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>printDeltaPointAuditSummary', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1329)" style="font-weight:bold">plotNakaRushtonFit5>printDeltaPointAuditSummary</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1329,0)">line 1329</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>plotSideDeltaPanel', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1248)" style="font-weight:bold">plotNakaRushtonFit5>plotSideDeltaPanel</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1248,0)">line 1248</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 94)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',94,0)">line 94</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('analyzePsychometricModels', 'Y:\users\PK\colStimPipeline\analyzePsychometricModels.m', 95)" style="font-weight:bold">analyzePsychometricModels</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\analyzePsychometricModels.m',95,0)">line 95</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 272)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',272,0)">line 272</a>)] 
+plotNakaRushtonFit5 render page: renderIdx=5 | globalBlockIdx=14 | clusterLabel= | appendPage=1
+Delta point audit: 20230823R2 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 15 18 25 80] | delta=[30 30 40 10 10 -10]
+Delta point audit: 20230823R2 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=1 | method=exact,nearest/tolerance,unmatched | max contrast diff=2 | x=[10 15 18.7 25 80] | delta=[-15 0 15 15 5]
+[Warning: 20230823R2 Horizontal deltaMask plotted 5 of expected 5 delta
+points. Skipped reasons: baseline zero contrast unavailable] 
+[> In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>printDeltaPointAuditSummary', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1329)" style="font-weight:bold">plotNakaRushtonFit5>printDeltaPointAuditSummary</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1329,0)">line 1329</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>plotSideDeltaPanel', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1248)" style="font-weight:bold">plotNakaRushtonFit5>plotSideDeltaPanel</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1248,0)">line 1248</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 89)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',89,0)">line 89</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('analyzePsychometricModels', 'Y:\users\PK\colStimPipeline\analyzePsychometricModels.m', 95)" style="font-weight:bold">analyzePsychometricModels</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\analyzePsychometricModels.m',95,0)">line 95</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 272)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',272,0)">line 272</a>)] 
+Delta point audit: 20230823R2 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 15 18 25 80] | delta=[50 0 40 80 80 10]
+Delta point audit: 20230823R2 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=1 | method=exact,nearest/tolerance,unmatched | max contrast diff=2 | x=[10 15 18.7 25 80] | delta=[40 -10 30 30 15]
+[Warning: 20230823R2 Vertical deltaMask plotted 5 of expected 5 delta points.
+Skipped reasons: baseline zero contrast unavailable] 
+[> In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>printDeltaPointAuditSummary', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1329)" style="font-weight:bold">plotNakaRushtonFit5>printDeltaPointAuditSummary</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1329,0)">line 1329</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>plotSideDeltaPanel', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1248)" style="font-weight:bold">plotNakaRushtonFit5>plotSideDeltaPanel</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1248,0)">line 1248</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 94)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',94,0)">line 94</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('analyzePsychometricModels', 'Y:\users\PK\colStimPipeline\analyzePsychometricModels.m', 95)" style="font-weight:bold">analyzePsychometricModels</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\analyzePsychometricModels.m',95,0)">line 95</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 272)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',272,0)">line 272</a>)] 
+plotNakaRushtonFit5 render page: renderIdx=6 | globalBlockIdx=21 | clusterLabel= | appendPage=1
+Delta point audit: 20230830R3 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 20 25 45 100] | delta=[0 40 30 10 -10 0]
+Delta point audit: 20230830R3 | side=Horizontal | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10.7 20.7 26.7 46.7 100] | delta=[20 -10 35 5 5 0]
+Delta point audit: 20230830R3 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 20 25 45 100] | delta=[20 50 20 30 60 20]
+Delta point audit: 20230830R3 | side=Vertical | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10.7 20.7 26.7 46.7 100] | delta=[-20 45 0 25 30 0]
+plotNakaRushtonFit5 render page: renderIdx=7 | globalBlockIdx=22 | clusterLabel= | appendPage=1
+Delta point audit: 20230830R4 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 20 25 45 100] | delta=[90 40 70 40 -10 0]
+Delta point audit: 20230830R4 | side=Horizontal | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10.7 20.7 26.7 46.7 100] | delta=[15 0 35 30 5 0]
+Delta point audit: 20230830R4 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 20 25 45 100] | delta=[20 60 80 20 20 10]
+Delta point audit: 20230830R4 | side=Vertical | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10.7 20.7 26.7 46.7 100] | delta=[-20 40 20 30 10 -5]
+plotNakaRushtonFit5 render page: renderIdx=8 | globalBlockIdx=25 | clusterLabel= | appendPage=1
+Delta point audit: 20230906R2 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 16 22 35 100] | delta=[30 60 30 0 0 -20]
+Delta point audit: 20230906R2 | side=Horizontal | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10 16.7 23 36.7 100] | delta=[0 -20 15 10 0 10]
+Delta point audit: 20230906R2 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 16 22 35 100] | delta=[20 30 20 20 40 0]
+Delta point audit: 20230906R2 | side=Vertical | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10 16.7 23 36.7 100] | delta=[-25 -25 20 20 10 0]
+plotNakaRushtonFit5 render page: renderIdx=9 | globalBlockIdx=26 | clusterLabel= | appendPage=1
+Delta point audit: 20230906R3 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 16 22 35 100] | delta=[10 40 50 20 0 0]
+Delta point audit: 20230906R3 | side=Horizontal | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10 16.7 23 36.7 100] | delta=[-10 -20 25 10 0 0]
+Delta point audit: 20230906R3 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 16 22 35 100] | delta=[30 40 80 10 40 10]
+Delta point audit: 20230906R3 | side=Vertical | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10 16.7 23 36.7 100] | delta=[10 0 30 45 10 5]
+plotNakaRushtonFit5 render page: renderIdx=10 | globalBlockIdx=33 | clusterLabel= | appendPage=1
+Delta point audit: 20240118R3 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 9 13 16 40] | delta=[60 80 70 10 10]
+Delta point audit: 20240118R3 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 9 12.7 16 40] | delta=[-8.33 8.33 18.3 15 5]
+Delta point audit: 20240118R3 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 9 13 16 40] | delta=[20 40 50 70 0]
+Delta point audit: 20240118R3 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 9 12.7 16 40] | delta=[11.7 10 -13.3 20 10]
+plotNakaRushtonFit5 render page: renderIdx=11 | globalBlockIdx=34 | clusterLabel= | appendPage=1
+Delta point audit: 20240118R10 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 9 13 16 40] | delta=[10 20 10 20 0]
+Delta point audit: 20240118R10 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 9 12.7 16 40] | delta=[-13.3 -11.7 -1.67 20 0]
+Delta point audit: 20240118R10 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 9 13 16 40] | delta=[10 30 20 20 0]
+Delta point audit: 20240118R10 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 9 12.7 16 40] | delta=[-3.33 -5 -18.3 15 10]
+plotNakaRushtonFit5 render page: renderIdx=12 | globalBlockIdx=35 | clusterLabel= | appendPage=1
+Delta point audit: 20240126R3 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 12 14 40] | delta=[60 50 10 10 10]
+Delta point audit: 20240126R3 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=3 | x=[0 7.33 11 13 40] | delta=[1.67 1.67 0 -28.3 5]
+Delta point audit: 20240126R3 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 12 14 40] | delta=[20 60 30 30 0]
+Delta point audit: 20240126R3 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=3 | x=[0 7.33 11 13 40] | delta=[1.67 -10 -33.3 -8.33 0]
+plotNakaRushtonFit5 render page: renderIdx=13 | globalBlockIdx=36 | clusterLabel= | appendPage=1
+Delta point audit: 20240126R4 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 12 14 40] | delta=[-30 -20 0 0 0]
+Delta point audit: 20240126R4 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=3 | x=[0 7.33 11 13 40] | delta=[-33.3 -13.3 -15 -23.3 0]
+Delta point audit: 20240126R4 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 12 14 40] | delta=[10 20 -10 -10 0]
+Delta point audit: 20240126R4 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=3 | x=[0 7.33 11 13 40] | delta=[26.7 0 -13.3 1.67 0]
+plotNakaRushtonFit5 render page: renderIdx=14 | globalBlockIdx=37 | clusterLabel= | appendPage=1
+Delta point audit: 20240126R11 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 12 14 40] | delta=[10 20 30 -10 0]
+Delta point audit: 20240126R11 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=3 | x=[0 7.33 11 13 40] | delta=[-13.3 6.67 -10 -28.3 0]
+Delta point audit: 20240126R11 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 12 14 40] | delta=[10 10 20 0 0]
+Delta point audit: 20240126R11 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=3 | x=[0 7.33 11 13 40] | delta=[16.7 -15 -8.33 16.7 0]
+plotNakaRushtonFit5 render page: renderIdx=15 | globalBlockIdx=38 | clusterLabel= | appendPage=1
+Delta point audit: 20240131R4 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 11 15 40] | delta=[50 50 20 0 10]
+Delta point audit: 20240131R4 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 11 15 40] | delta=[-20 -25 0 -10 5]
+Delta point audit: 20240131R4 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 11 15 40] | delta=[10 60 0 10 0]
+Delta point audit: 20240131R4 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 11 15 40] | delta=[20 -10 0 15 0]
+plotNakaRushtonFit5 render page: renderIdx=16 | globalBlockIdx=39 | clusterLabel= | appendPage=1
+Delta point audit: 20240131R5 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[60 40 30 0 0]
+Delta point audit: 20240131R5 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[15 -10 15 -10 0]
+Delta point audit: 20240131R5 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[-10 10 10 10 0]
+Delta point audit: 20240131R5 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[-10 -25 -5 5 0]
+plotNakaRushtonFit5 render page: renderIdx=17 | globalBlockIdx=40 | clusterLabel= | appendPage=1
+Delta point audit: 20240131R6 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[20 10 20 0 0]
+Delta point audit: 20240131R6 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[-5 -15 20 -10 0]
+Delta point audit: 20240131R6 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[-10 30 20 10 0]
+Delta point audit: 20240131R6 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[30 -25 10 15 0]
+plotNakaRushtonFit5 render page: renderIdx=18 | globalBlockIdx=41 | clusterLabel= | appendPage=1
+Delta point audit: 20240202R4 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[20 30 0 0 10]
+Delta point audit: 20240202R4 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[-5 -25 30 0 5]
+Delta point audit: 20240202R4 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[40 30 20 10 0]
+Delta point audit: 20240202R4 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[15 -5 30 25 0]
+plotNakaRushtonFit5 render page: renderIdx=19 | globalBlockIdx=42 | clusterLabel= | appendPage=1
+Delta point audit: 20240202R5 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[10 -20 10 0 0]
+Delta point audit: 20240202R5 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[-10 -30 5 -10 0]
+Delta point audit: 20240202R5 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[30 -40 0 -20 0]
+Delta point audit: 20240202R5 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[30 0 10 20 0]
+plotNakaRushtonFit5 render page: renderIdx=20 | globalBlockIdx=43 | clusterLabel= | appendPage=1
+Delta point audit: 20240202R6 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 11 14 40] | delta=[-20 20 30 50 0]
+Delta point audit: 20240202R6 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 8 11 14.3 40] | delta=[-5 -10 5 15 0]
+Delta point audit: 20240202R6 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 11 14 40] | delta=[20 -10 30 -30 0]
+Delta point audit: 20240202R6 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 8 11 14.3 40] | delta=[5 -25 15 15 0]
+{Error using <a href="matlab:matlab.internal.language.introspective.errorDocCallback('save')" style="font-weight:bold">save</a>
+Cannot create 'mdlStructL20.mat' because
+'Y:\Chip\Meta\psychometrics\L-chamber\weibullSignedX0' does not exist.
+
+Error in <a href="matlab:matlab.internal.language.introspective.errorDocCallback('analyzePsychometricModels', 'Y:\users\PK\colStimPipeline\analyzePsychometricModels.m', 128)" style="font-weight:bold">analyzePsychometricModels</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\analyzePsychometricModels.m',128,0)">line 128</a>)
+save([mainPath monkeyName '/Meta/psychometrics/' chamberWanted '-chamber/' modelTypeStr '/mdlStruct' chamberWanted num2str(columnsDesired) '.mat'], 'mdlStruct');
+
+Error in <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 272)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',272,0)">line 272</a>)
+            mdlStruct=analyzePsychometricModels(monkeyName, chamberWanted, modelTypes, mainPath, ...
+} 
+<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\analyzePsychometricModels.m',128,1)">128 </a>save([mainPath monkeyName '/Meta/psychometrics/' chamberWanted '-chamber/' modelTypeStr '/mdlStruct' chamberWanted num2str(columnsDesired) '.mat'], 'mdlStruct');
+if system_dependent('IsDebugMode')==1, dbquit; end
+mainPipeline
+Excluding from psycluster | experiment=20230811R4 | analysis row=3 | monkey=Chip | chamber=L
+Delta permutation statistics enabled | monkey=Chip | chamber=L | permutations=5000
+Pre-clustering fit pass: hidden figures, no PDF, no permutation statistics.
+Cluster 1
+Fitting model, independent parameters per session...Fitted block #1Fitted block #2Fitted block #3Fitted block #4Fitted block #5Fitted block #6Fitted block #7Fitted block #8Fitted block #9Fitted block #10Fitted block #11Fitted block #12Fitted block #13Fitted block #14Fitted block #15Fitted block #16Fitted block #17Fitted block #18Fitted block #19Fitted block #20Done!
+
+
+=========
+
+plotNakaRushtonFit5 render setup: nRenderBlocks=20 | numel(clusterLabel)=0 | plotAverageFlag=0
+plotNakaRushtonFit5 render page: renderIdx=1 | globalBlockIdx=4 | clusterLabel= | appendPage=0
+Delta point audit: 20230812R0 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[10 30 40 10 10]
+Delta point audit: 20230812R0 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[5 45 20 5 5]
+Delta point audit: 20230812R0 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[50 0 70 20 20]
+Delta point audit: 20230812R0 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[15 50 45 50 30]
+plotNakaRushtonFit5 render page: renderIdx=2 | globalBlockIdx=5 | clusterLabel= | appendPage=1
+Delta point audit: 20230812R2 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[11 15 20 35 80] | delta=[-10 0 -10 10 10]
+Delta point audit: 20230812R2 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[11 15 20 35 80] | delta=[-5 20 5 5 5]
+Delta point audit: 20230812R2 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[11 15 20 35 80] | delta=[10 20 10 0 10]
+Delta point audit: 20230812R2 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[11 15 20 35 80] | delta=[-5 -10 -15 0 5]
+plotNakaRushtonFit5 render page: renderIdx=3 | globalBlockIdx=12 | clusterLabel= | appendPage=1
+Delta point audit: 20230817R2 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[10 13 18 22 60] | delta=[66.7 52.4 -9.52 66.7 16.7]
+Delta point audit: 20230817R2 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[10 13 18 22 60] | delta=[-33.3 16.7 4.76 0 -8.33]
+Delta point audit: 20230817R2 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[10 13 18 22 60] | delta=[66.7 16.7 50 42.9 16.7]
+Delta point audit: 20230817R2 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[10 13 18 22 60] | delta=[16.7 -8.33 25 21.4 -8.33]
+plotNakaRushtonFit5 render page: renderIdx=4 | globalBlockIdx=13 | clusterLabel= | appendPage=1
+Delta point audit: 20230822R4 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 14 20 24 35 80] | delta=[30 40 20 -20 0 -10]
+Delta point audit: 20230822R4 | side=Horizontal | metric=deltaMask | plotted=4/4 | skipped=4 | method=nearest/tolerance,unmatched | max contrast diff=5 | x=[13.7 19.3 23.3 33.3] | delta=[50 0 -10 -20]
+[Warning: 20230822R4 Horizontal deltaMask plotted 4 of expected 4 delta
+points. Skipped reasons: baseline zero contrast unavailable; no one-to-one
+match within 5 contrast points] 
+[> In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>printDeltaPointAuditSummary', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1329)" style="font-weight:bold">plotNakaRushtonFit5>printDeltaPointAuditSummary</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1329,0)">line 1329</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>plotSideDeltaPanel', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1248)" style="font-weight:bold">plotNakaRushtonFit5>plotSideDeltaPanel</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1248,0)">line 1248</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 89)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',89,0)">line 89</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('analyzePsychometricModels', 'Y:\users\PK\colStimPipeline\analyzePsychometricModels.m', 95)" style="font-weight:bold">analyzePsychometricModels</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\analyzePsychometricModels.m',95,0)">line 95</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 272)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',272,0)">line 272</a>)] 
+Delta point audit: 20230822R4 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 14 20 24 35 80] | delta=[-10 0 20 20 50 30]
+Delta point audit: 20230822R4 | side=Vertical | metric=deltaMask | plotted=4/4 | skipped=4 | method=nearest/tolerance,unmatched | max contrast diff=5 | x=[13.7 19.3 23.3 33.3] | delta=[-20 10 30 25]
+[Warning: 20230822R4 Vertical deltaMask plotted 4 of expected 4 delta points.
+Skipped reasons: baseline zero contrast unavailable; no one-to-one match
+within 5 contrast points] 
+[> In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>printDeltaPointAuditSummary', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1329)" style="font-weight:bold">plotNakaRushtonFit5>printDeltaPointAuditSummary</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1329,0)">line 1329</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>plotSideDeltaPanel', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1248)" style="font-weight:bold">plotNakaRushtonFit5>plotSideDeltaPanel</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1248,0)">line 1248</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 94)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',94,0)">line 94</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('analyzePsychometricModels', 'Y:\users\PK\colStimPipeline\analyzePsychometricModels.m', 95)" style="font-weight:bold">analyzePsychometricModels</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\analyzePsychometricModels.m',95,0)">line 95</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 272)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',272,0)">line 272</a>)] 
+plotNakaRushtonFit5 render page: renderIdx=5 | globalBlockIdx=14 | clusterLabel= | appendPage=1
+Delta point audit: 20230823R2 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 15 18 25 80] | delta=[30 30 40 10 10 -10]
+Delta point audit: 20230823R2 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=1 | method=exact,nearest/tolerance,unmatched | max contrast diff=2 | x=[10 15 18.7 25 80] | delta=[-15 0 15 15 5]
+[Warning: 20230823R2 Horizontal deltaMask plotted 5 of expected 5 delta
+points. Skipped reasons: baseline zero contrast unavailable] 
+[> In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>printDeltaPointAuditSummary', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1329)" style="font-weight:bold">plotNakaRushtonFit5>printDeltaPointAuditSummary</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1329,0)">line 1329</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>plotSideDeltaPanel', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1248)" style="font-weight:bold">plotNakaRushtonFit5>plotSideDeltaPanel</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1248,0)">line 1248</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 89)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',89,0)">line 89</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('analyzePsychometricModels', 'Y:\users\PK\colStimPipeline\analyzePsychometricModels.m', 95)" style="font-weight:bold">analyzePsychometricModels</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\analyzePsychometricModels.m',95,0)">line 95</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 272)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',272,0)">line 272</a>)] 
+Delta point audit: 20230823R2 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 15 18 25 80] | delta=[50 0 40 80 80 10]
+Delta point audit: 20230823R2 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=1 | method=exact,nearest/tolerance,unmatched | max contrast diff=2 | x=[10 15 18.7 25 80] | delta=[40 -10 30 30 15]
+[Warning: 20230823R2 Vertical deltaMask plotted 5 of expected 5 delta points.
+Skipped reasons: baseline zero contrast unavailable] 
+[> In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>printDeltaPointAuditSummary', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1329)" style="font-weight:bold">plotNakaRushtonFit5>printDeltaPointAuditSummary</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1329,0)">line 1329</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>plotSideDeltaPanel', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1248)" style="font-weight:bold">plotNakaRushtonFit5>plotSideDeltaPanel</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1248,0)">line 1248</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 94)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',94,0)">line 94</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('analyzePsychometricModels', 'Y:\users\PK\colStimPipeline\analyzePsychometricModels.m', 95)" style="font-weight:bold">analyzePsychometricModels</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\analyzePsychometricModels.m',95,0)">line 95</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 272)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',272,0)">line 272</a>)] 
+plotNakaRushtonFit5 render page: renderIdx=6 | globalBlockIdx=21 | clusterLabel= | appendPage=1
+Delta point audit: 20230830R3 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 20 25 45 100] | delta=[0 40 30 10 -10 0]
+Delta point audit: 20230830R3 | side=Horizontal | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10.7 20.7 26.7 46.7 100] | delta=[20 -10 35 5 5 0]
+Delta point audit: 20230830R3 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 20 25 45 100] | delta=[20 50 20 30 60 20]
+Delta point audit: 20230830R3 | side=Vertical | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10.7 20.7 26.7 46.7 100] | delta=[-20 45 0 25 30 0]
+plotNakaRushtonFit5 render page: renderIdx=7 | globalBlockIdx=22 | clusterLabel= | appendPage=1
+Delta point audit: 20230830R4 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 20 25 45 100] | delta=[90 40 70 40 -10 0]
+Delta point audit: 20230830R4 | side=Horizontal | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10.7 20.7 26.7 46.7 100] | delta=[15 0 35 30 5 0]
+Delta point audit: 20230830R4 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 20 25 45 100] | delta=[20 60 80 20 20 10]
+Delta point audit: 20230830R4 | side=Vertical | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10.7 20.7 26.7 46.7 100] | delta=[-20 40 20 30 10 -5]
+plotNakaRushtonFit5 render page: renderIdx=8 | globalBlockIdx=25 | clusterLabel= | appendPage=1
+Delta point audit: 20230906R2 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 16 22 35 100] | delta=[30 60 30 0 0 -20]
+Delta point audit: 20230906R2 | side=Horizontal | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10 16.7 23 36.7 100] | delta=[0 -20 15 10 0 10]
+Delta point audit: 20230906R2 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 16 22 35 100] | delta=[20 30 20 20 40 0]
+Delta point audit: 20230906R2 | side=Vertical | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10 16.7 23 36.7 100] | delta=[-25 -25 20 20 10 0]
+plotNakaRushtonFit5 render page: renderIdx=9 | globalBlockIdx=26 | clusterLabel= | appendPage=1
+Delta point audit: 20230906R3 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 16 22 35 100] | delta=[10 40 50 20 0 0]
+Delta point audit: 20230906R3 | side=Horizontal | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10 16.7 23 36.7 100] | delta=[-10 -20 25 10 0 0]
+Delta point audit: 20230906R3 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 16 22 35 100] | delta=[30 40 80 10 40 10]
+Delta point audit: 20230906R3 | side=Vertical | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10 16.7 23 36.7 100] | delta=[10 0 30 45 10 5]
+plotNakaRushtonFit5 render page: renderIdx=10 | globalBlockIdx=33 | clusterLabel= | appendPage=1
+Delta point audit: 20240118R3 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 9 13 16 40] | delta=[60 80 70 10 10]
+Delta point audit: 20240118R3 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 9 12.7 16 40] | delta=[-8.33 8.33 18.3 15 5]
+Delta point audit: 20240118R3 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 9 13 16 40] | delta=[20 40 50 70 0]
+Delta point audit: 20240118R3 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 9 12.7 16 40] | delta=[11.7 10 -13.3 20 10]
+plotNakaRushtonFit5 render page: renderIdx=11 | globalBlockIdx=34 | clusterLabel= | appendPage=1
+Delta point audit: 20240118R10 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 9 13 16 40] | delta=[10 20 10 20 0]
+Delta point audit: 20240118R10 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 9 12.7 16 40] | delta=[-13.3 -11.7 -1.67 20 0]
+Delta point audit: 20240118R10 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 9 13 16 40] | delta=[10 30 20 20 0]
+Delta point audit: 20240118R10 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 9 12.7 16 40] | delta=[-3.33 -5 -18.3 15 10]
+plotNakaRushtonFit5 render page: renderIdx=12 | globalBlockIdx=35 | clusterLabel= | appendPage=1
+Delta point audit: 20240126R3 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 12 14 40] | delta=[60 50 10 10 10]
+Delta point audit: 20240126R3 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=3 | x=[0 7.33 11 13 40] | delta=[1.67 1.67 0 -28.3 5]
+Delta point audit: 20240126R3 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 12 14 40] | delta=[20 60 30 30 0]
+Delta point audit: 20240126R3 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=3 | x=[0 7.33 11 13 40] | delta=[1.67 -10 -33.3 -8.33 0]
+plotNakaRushtonFit5 render page: renderIdx=13 | globalBlockIdx=36 | clusterLabel= | appendPage=1
+Delta point audit: 20240126R4 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 12 14 40] | delta=[-30 -20 0 0 0]
+Delta point audit: 20240126R4 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=3 | x=[0 7.33 11 13 40] | delta=[-33.3 -13.3 -15 -23.3 0]
+Delta point audit: 20240126R4 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 12 14 40] | delta=[10 20 -10 -10 0]
+Delta point audit: 20240126R4 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=3 | x=[0 7.33 11 13 40] | delta=[26.7 0 -13.3 1.67 0]
+plotNakaRushtonFit5 render page: renderIdx=14 | globalBlockIdx=37 | clusterLabel= | appendPage=1
+Delta point audit: 20240126R11 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 12 14 40] | delta=[10 20 30 -10 0]
+Delta point audit: 20240126R11 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=3 | x=[0 7.33 11 13 40] | delta=[-13.3 6.67 -10 -28.3 0]
+Delta point audit: 20240126R11 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 12 14 40] | delta=[10 10 20 0 0]
+Delta point audit: 20240126R11 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=3 | x=[0 7.33 11 13 40] | delta=[16.7 -15 -8.33 16.7 0]
+plotNakaRushtonFit5 render page: renderIdx=15 | globalBlockIdx=38 | clusterLabel= | appendPage=1
+Delta point audit: 20240131R4 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 11 15 40] | delta=[50 50 20 0 10]
+Delta point audit: 20240131R4 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 11 15 40] | delta=[-20 -25 0 -10 5]
+Delta point audit: 20240131R4 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 11 15 40] | delta=[10 60 0 10 0]
+Delta point audit: 20240131R4 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 11 15 40] | delta=[20 -10 0 15 0]
+plotNakaRushtonFit5 render page: renderIdx=16 | globalBlockIdx=39 | clusterLabel= | appendPage=1
+Delta point audit: 20240131R5 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[60 40 30 0 0]
+Delta point audit: 20240131R5 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[15 -10 15 -10 0]
+Delta point audit: 20240131R5 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[-10 10 10 10 0]
+Delta point audit: 20240131R5 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[-10 -25 -5 5 0]
+plotNakaRushtonFit5 render page: renderIdx=17 | globalBlockIdx=40 | clusterLabel= | appendPage=1
+Delta point audit: 20240131R6 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[20 10 20 0 0]
+Delta point audit: 20240131R6 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[-5 -15 20 -10 0]
+Delta point audit: 20240131R6 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[-10 30 20 10 0]
+Delta point audit: 20240131R6 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[30 -25 10 15 0]
+plotNakaRushtonFit5 render page: renderIdx=18 | globalBlockIdx=41 | clusterLabel= | appendPage=1
+Delta point audit: 20240202R4 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[20 30 0 0 10]
+Delta point audit: 20240202R4 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[-5 -25 30 0 5]
+Delta point audit: 20240202R4 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[40 30 20 10 0]
+Delta point audit: 20240202R4 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[15 -5 30 25 0]
+plotNakaRushtonFit5 render page: renderIdx=19 | globalBlockIdx=42 | clusterLabel= | appendPage=1
+Delta point audit: 20240202R5 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[10 -20 10 0 0]
+Delta point audit: 20240202R5 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[-10 -30 5 -10 0]
+Delta point audit: 20240202R5 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 7 10 13 40] | delta=[30 -40 0 -20 0]
+Delta point audit: 20240202R5 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=2 | x=[0 7.33 10.3 13.7 40] | delta=[30 0 10 20 0]
+plotNakaRushtonFit5 render page: renderIdx=20 | globalBlockIdx=43 | clusterLabel= | appendPage=1
+Delta point audit: 20240202R6 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 11 14 40] | delta=[-20 20 30 50 0]
+Delta point audit: 20240202R6 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 8 11 14.3 40] | delta=[-5 -10 5 15 0]
+Delta point audit: 20240202R6 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 8 11 14 40] | delta=[20 -10 30 -30 0]
+Delta point audit: 20240202R6 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 8 11 14.3 40] | delta=[5 -25 15 15 0]
+Power metrics audit: 43 experiments checked | 43 pass | 0 fail | max |sDC rel err|=2.21e-16 | max |PDROI rel err|=3.27e-16 | max |Ptotal rel err|=0 | max |Ptotal identity rel err|=1 | displayZeroFails=0
+Power clustering source: canonical recomputed Ptotal = PDDMD * AreaON * tDC
+Power clustering units: mW
+Per-session PDROI values (mW mm^{-2}): [0.0333052, 0.0423413, 0.022953, 0.0403274, 0.0127626, 0.0259585, 0.0319665, 0.112552, 0.0613763, 0.0739714, 0.00764958, 0.0138463, 0.0126873, 0.0166406, 0.0982311, 0.16526, 0.0308328, 0.197952, 0.0350806, 0.00907732, 0.0129823, 0.0129823, 0.15822, 0.0234746, 0.0126027, 0.0159603, 0.0080021, 0.0080021, 0.211711, 0.211711, 0.236953, 0.118477, 0.0107745, 0.00538723, 0.00616556, 0.00154139, 0.00308278, 0.00607767, 0.00607767, 0.00151942, 0.00684031, 0.00342016, 0.00342016]
+Per-session Ptotal values (mW): [0.538689, 0.684842, 0.655686, 0.396911, 0.116304, 0.147342, 0.0784636, 0.117496, 0.115687, 0.113751, 0.134778, 0.150704, 0.136126, 0.170278, 0.0829637, 0.0672515, 0.128612, 0.0700938, 0.136501, 0.158914, 0.142794, 0.142794, 0.0596097, 0.129717, 0.130985, 0.133778, 0.155826, 0.155826, 0.042559, 0.042559, 0.0432983, 0.0216492, 0.134853, 0.0674263, 0.0720646, 0.0180162, 0.0360323, 0.0718944, 0.0718944, 0.0179736, 0.0703412, 0.0351706, 0.0351706]
+Psycluster exclusion validated | excluded=20230811R4 | individual pages=20 | aggregate contribution=0
+Final psychometric PDF target: Y:\users\PK\colStimPipeline\outputs\M28-psychfit-L-weibullSignedX0.pdf
+Cluster mapping ready | render pages 20 | assignments 20 | clusters 3
+render page 1 | experiment 20230812R0 | cluster 3/3 | source row 4
+render page 2 | experiment 20230812R2 | cluster 2/3 | source row 5
+render page 3 | experiment 20230817R2 | cluster 3/3 | source row 12
+Prepared 20 post-clustering individual-page cluster labels.
+Post-clustering individual render: nRenderBlocks=20 | numel(clusterLabelsForBlocks)=20 | plotAverageFlag=0
+Post-clustering saved render: 20 pages with real cluster labels and permutation statistics.
+plotNakaRushtonFit5 received showDeltaPermutationStats=true (5000 permutations).
+plotNakaRushtonFit5 render setup: nRenderBlocks=20 | numel(clusterLabel)=20 | plotAverageFlag=0
+plotNakaRushtonFit5 render page: renderIdx=1 | globalBlockIdx=4 | clusterLabel=Cluster: 3/3 | appendPage=0
+Delta point audit: 20230812R0 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[10 30 40 10 10]
+Delta point audit: 20230812R0 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[5 45 20 5 5]
+Delta point audit: 20230812R0 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[50 0 70 20 20]
+Delta point audit: 20230812R0 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[13 18 25 30 60] | delta=[15 50 45 50 30]
+Individual permutation ON | block 4 | contrasts 5
+Added null intervals 5 | labels 5 | overall annotations 1
+Legend validation passed for block 4: {Biasing, Masking}
+experiment 20230812R0 | n contrasts 5 | mean DeltaBias 26.000 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002 | *
+experiment 20230812R0 permutation contrast diagnostics:
+  x 13 | con 75.000% incon 45.000% | nCon 20 nIncon 20 | conCorrect 15 inconCorrect 9 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.112 | raw positive one-sided p 0.05599
+  x 18 | con 55.000% incon 40.000% | nCon 20 nIncon 20 | conCorrect 11 inconCorrect 8 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.5351 | raw positive one-sided p 0.2675
+  x 25 | con 90.000% incon 35.000% | nCon 20 nIncon 20 | conCorrect 18 inconCorrect 7 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.002 | raw positive one-sided p 0.0009998
+  x 30 | con 70.000% incon 55.000% | nCon 20 nIncon 20 | conCorrect 14 inconCorrect 11 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.5239 | raw positive one-sided p 0.2619
+  x 60 | con 80.000% incon 65.000% | nCon 20 nIncon 20 | conCorrect 16 inconCorrect 13 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.4627 | raw positive one-sided p 0.2314
+Cluster annotation validated | experiment 20230812R0 | cluster 3/3 | class matlab.graphics.shape.TextBox
+PDF save setup | saveFlag=1 | page=1 | append=0
+PDF target: Y:\users\PK\colStimPipeline\outputs\M28-psychfit-L-weibullSignedX0.pdf
+plotNakaRushtonFit5 render page: renderIdx=2 | globalBlockIdx=5 | clusterLabel=Cluster: 2/3 | appendPage=1
+Delta point audit: 20230812R2 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[11 15 20 35 80] | delta=[-10 0 -10 10 10]
+Delta point audit: 20230812R2 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[11 15 20 35 80] | delta=[-5 20 5 5 5]
+Delta point audit: 20230812R2 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[11 15 20 35 80] | delta=[10 20 10 0 10]
+Delta point audit: 20230812R2 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[11 15 20 35 80] | delta=[-5 -10 -15 0 5]
+Individual permutation ON | block 5 | contrasts 5
+Added null intervals 5 | labels 5 | overall annotations 1
+Legend validation passed for block 5: {Biasing, Masking}
+experiment 20230812R2 | n contrasts 5 | mean DeltaBias 5.000 | raw two-sided p 0.4779 | raw positive one-sided p 0.239 | n.s.
+experiment 20230812R2 permutation contrast diagnostics:
+  x 11 | con 55.000% incon 55.000% | nCon 20 nIncon 20 | conCorrect 11 inconCorrect 11 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 1 | raw positive one-sided p 0.6235
+  x 15 | con 70.000% incon 60.000% | nCon 20 nIncon 20 | conCorrect 14 inconCorrect 12 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.7534 | raw positive one-sided p 0.3767
+  x 20 | con 90.000% incon 90.000% | nCon 20 nIncon 20 | conCorrect 18 inconCorrect 18 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 1 | raw positive one-sided p 0.6989
+  x 35 | con 95.000% incon 90.000% | nCon 20 nIncon 20 | conCorrect 19 inconCorrect 18 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.9758 | raw positive one-sided p 0.4879
+  x 80 | con 90.000% incon 80.000% | nCon 20 nIncon 20 | conCorrect 18 inconCorrect 16 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.6695 | raw positive one-sided p 0.3347
+PDF save setup | saveFlag=1 | page=2 | append=1
+PDF target: Y:\users\PK\colStimPipeline\outputs\M28-psychfit-L-weibullSignedX0.pdf
+plotNakaRushtonFit5 render page: renderIdx=3 | globalBlockIdx=12 | clusterLabel=Cluster: 3/3 | appendPage=1
+Delta point audit: 20230817R2 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[10 13 18 22 60] | delta=[66.7 52.4 -9.52 66.7 16.7]
+Delta point audit: 20230817R2 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[10 13 18 22 60] | delta=[-33.3 16.7 4.76 0 -8.33]
+Delta point audit: 20230817R2 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[10 13 18 22 60] | delta=[66.7 16.7 50 42.9 16.7]
+Delta point audit: 20230817R2 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact | max contrast diff=0 | x=[10 13 18 22 60] | delta=[16.7 -8.33 25 21.4 -8.33]
+Individual permutation ON | block 12 | contrasts 5
+Added null intervals 5 | labels 5 | overall annotations 1
+Legend validation passed for block 12: {Biasing, Masking}
+experiment 20230817R2 | n contrasts 5 | mean DeltaBias 38.571 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002 | *
+experiment 20230817R2 permutation contrast diagnostics:
+  x 10 | con 91.667% incon 25.000% | nCon 20 nIncon 20 | conCorrect 18 inconCorrect 5 | conErr -1.6667 inconErr 0.0000 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002 | RECONSTRUCTION ERROR > 0.25 pct-pt
+  x 13 | con 83.333% incon 48.810% | nCon 20 nIncon 20 | conCorrect 17 inconCorrect 10 | conErr 1.6667 inconErr 1.1905 | raw two-sided p 0.03719 | raw positive one-sided p 0.0186 | RECONSTRUCTION ERROR > 0.25 pct-pt
+  x 18 | con 78.571% incon 58.333% | nCon 20 nIncon 20 | conCorrect 16 inconCorrect 12 | conErr 1.4286 inconErr 1.6667 | raw two-sided p 0.08358 | raw positive one-sided p 0.04179 | RECONSTRUCTION ERROR > 0.25 pct-pt
+  x 22 | con 100.000% incon 45.238% | nCon 20 nIncon 20 | conCorrect 20 inconCorrect 9 | conErr 0.0000 inconErr -0.2381 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002
+  x 60 | con 100.000% incon 83.333% | nCon 20 nIncon 20 | conCorrect 20 inconCorrect 17 | conErr 0.0000 inconErr 1.6667 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002 | RECONSTRUCTION ERROR > 0.25 pct-pt
+PDF save setup | saveFlag=1 | page=3 | append=1
+PDF target: Y:\users\PK\colStimPipeline\outputs\M28-psychfit-L-weibullSignedX0.pdf
+plotNakaRushtonFit5 render page: renderIdx=4 | globalBlockIdx=13 | clusterLabel=Cluster: 3/3 | appendPage=1
+Delta point audit: 20230822R4 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 14 20 24 35 80] | delta=[30 40 20 -20 0 -10]
+Delta point audit: 20230822R4 | side=Horizontal | metric=deltaMask | plotted=4/4 | skipped=4 | method=nearest/tolerance,unmatched | max contrast diff=5 | x=[13.7 19.3 23.3 33.3] | delta=[50 0 -10 -20]
+[Warning: 20230822R4 Horizontal deltaMask plotted 4 of expected 4 delta
+points. Skipped reasons: baseline zero contrast unavailable; no one-to-one
+match within 5 contrast points] 
+[> In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>printDeltaPointAuditSummary', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1329)" style="font-weight:bold">plotNakaRushtonFit5>printDeltaPointAuditSummary</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1329,0)">line 1329</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>plotSideDeltaPanel', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1248)" style="font-weight:bold">plotNakaRushtonFit5>plotSideDeltaPanel</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1248,0)">line 1248</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 89)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',89,0)">line 89</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 480)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',480,0)">line 480</a>)] 
+Delta point audit: 20230822R4 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 14 20 24 35 80] | delta=[-10 0 20 20 50 30]
+Delta point audit: 20230822R4 | side=Vertical | metric=deltaMask | plotted=4/4 | skipped=4 | method=nearest/tolerance,unmatched | max contrast diff=5 | x=[13.7 19.3 23.3 33.3] | delta=[-20 10 30 25]
+[Warning: 20230822R4 Vertical deltaMask plotted 4 of expected 4 delta points.
+Skipped reasons: baseline zero contrast unavailable; no one-to-one match
+within 5 contrast points] 
+[> In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>printDeltaPointAuditSummary', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1329)" style="font-weight:bold">plotNakaRushtonFit5>printDeltaPointAuditSummary</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1329,0)">line 1329</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>plotSideDeltaPanel', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1248)" style="font-weight:bold">plotNakaRushtonFit5>plotSideDeltaPanel</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1248,0)">line 1248</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 94)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',94,0)">line 94</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 480)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',480,0)">line 480</a>)] 
+Individual permutation ON | block 13 | contrasts 6
+Added null intervals 6 | labels 6 | overall annotations 1
+Legend validation passed for block 13: {Biasing, Masking}
+experiment 20230822R4 | n contrasts 6 | mean DeltaBias 14.167 | raw two-sided p 0.0112 | raw positive one-sided p 0.005599 | *
+experiment 20230822R4 permutation contrast diagnostics:
+  x 0 | con 55.000% incon 45.000% | nCon 40 nIncon 40 | conCorrect 22 inconCorrect 18 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.5067 | raw positive one-sided p 0.2533
+  x 14 | con 50.000% incon 30.000% | nCon 20 nIncon 20 | conCorrect 10 inconCorrect 6 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.3483 | raw positive one-sided p 0.1742
+  x 20 | con 80.000% incon 60.000% | nCon 20 nIncon 20 | conCorrect 16 inconCorrect 12 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.3155 | raw positive one-sided p 0.1578
+  x 24 | con 75.000% incon 75.000% | nCon 20 nIncon 20 | conCorrect 15 inconCorrect 15 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 1 | raw positive one-sided p 0.6517
+  x 35 | con 95.000% incon 70.000% | nCon 20 nIncon 20 | conCorrect 19 inconCorrect 14 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.09758 | raw positive one-sided p 0.04879
+  x 80 | con 95.000% incon 85.000% | nCon 20 nIncon 20 | conCorrect 19 inconCorrect 17 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.5891 | raw positive one-sided p 0.2945
+PDF save setup | saveFlag=1 | page=4 | append=1
+PDF target: Y:\users\PK\colStimPipeline\outputs\M28-psychfit-L-weibullSignedX0.pdf
+plotNakaRushtonFit5 render page: renderIdx=5 | globalBlockIdx=14 | clusterLabel=Cluster: 3/3 | appendPage=1
+Delta point audit: 20230823R2 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 15 18 25 80] | delta=[30 30 40 10 10 -10]
+Delta point audit: 20230823R2 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=1 | method=exact,nearest/tolerance,unmatched | max contrast diff=2 | x=[10 15 18.7 25 80] | delta=[-15 0 15 15 5]
+[Warning: 20230823R2 Horizontal deltaMask plotted 5 of expected 5 delta
+points. Skipped reasons: baseline zero contrast unavailable] 
+[> In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>printDeltaPointAuditSummary', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1329)" style="font-weight:bold">plotNakaRushtonFit5>printDeltaPointAuditSummary</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1329,0)">line 1329</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>plotSideDeltaPanel', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1248)" style="font-weight:bold">plotNakaRushtonFit5>plotSideDeltaPanel</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1248,0)">line 1248</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 89)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',89,0)">line 89</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 480)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',480,0)">line 480</a>)] 
+Delta point audit: 20230823R2 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 15 18 25 80] | delta=[50 0 40 80 80 10]
+Delta point audit: 20230823R2 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=1 | method=exact,nearest/tolerance,unmatched | max contrast diff=2 | x=[10 15 18.7 25 80] | delta=[40 -10 30 30 15]
+[Warning: 20230823R2 Vertical deltaMask plotted 5 of expected 5 delta points.
+Skipped reasons: baseline zero contrast unavailable] 
+[> In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>printDeltaPointAuditSummary', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1329)" style="font-weight:bold">plotNakaRushtonFit5>printDeltaPointAuditSummary</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1329,0)">line 1329</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5>plotSideDeltaPanel', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 1248)" style="font-weight:bold">plotNakaRushtonFit5>plotSideDeltaPanel</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',1248,0)">line 1248</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 94)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',94,0)">line 94</a>)
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 480)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',480,0)">line 480</a>)] 
+Individual permutation ON | block 14 | contrasts 6
+Added null intervals 6 | labels 6 | overall annotations 1
+Legend validation passed for block 14: {Biasing, Masking}
+experiment 20230823R2 | n contrasts 6 | mean DeltaBias 30.833 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002 | *
+experiment 20230823R2 permutation contrast diagnostics:
+  x 0 | con 60.000% incon 20.000% | nCon 40 nIncon 40 | conCorrect 24 inconCorrect 8 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002
+  x 10 | con 55.000% incon 40.000% | nCon 20 nIncon 20 | conCorrect 11 inconCorrect 8 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.5171 | raw positive one-sided p 0.2585
+  x 15 | con 95.000% incon 55.000% | nCon 20 nIncon 20 | conCorrect 19 inconCorrect 11 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.0104 | raw positive one-sided p 0.005199
+  x 18 | con 95.000% incon 50.000% | nCon 20 nIncon 20 | conCorrect 19 inconCorrect 10 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.002799 | raw positive one-sided p 0.0014
+  x 25 | con 95.000% incon 50.000% | nCon 20 nIncon 20 | conCorrect 19 inconCorrect 10 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.0012 | raw positive one-sided p 0.0005999
+  x 80 | con 90.000% incon 90.000% | nCon 20 nIncon 20 | conCorrect 18 inconCorrect 18 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 1 | raw positive one-sided p 0.6977
+PDF save setup | saveFlag=1 | page=5 | append=1
+PDF target: Y:\users\PK\colStimPipeline\outputs\M28-psychfit-L-weibullSignedX0.pdf
+plotNakaRushtonFit5 render page: renderIdx=6 | globalBlockIdx=21 | clusterLabel=Cluster: 3/3 | appendPage=1
+Delta point audit: 20230830R3 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 20 25 45 100] | delta=[0 40 30 10 -10 0]
+Delta point audit: 20230830R3 | side=Horizontal | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10.7 20.7 26.7 46.7 100] | delta=[20 -10 35 5 5 0]
+Delta point audit: 20230830R3 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 20 25 45 100] | delta=[20 50 20 30 60 20]
+Delta point audit: 20230830R3 | side=Vertical | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10.7 20.7 26.7 46.7 100] | delta=[-20 45 0 25 30 0]
+Individual permutation ON | block 21 | contrasts 6
+Added null intervals 6 | labels 6 | overall annotations 1
+Legend validation passed for block 21: {Biasing, Masking}
+experiment 20230830R3 | n contrasts 6 | mean DeltaBias 22.500 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002 | *
+experiment 20230830R3 permutation contrast diagnostics:
+  x 0 | con 65.000% incon 55.000% | nCon 40 nIncon 40 | conCorrect 26 inconCorrect 22 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.5043 | raw positive one-sided p 0.2521
+  x 10 | con 70.000% incon 25.000% | nCon 20 nIncon 20 | conCorrect 14 inconCorrect 5 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.009598 | raw positive one-sided p 0.004799
+  x 20 | con 85.000% incon 60.000% | nCon 20 nIncon 20 | conCorrect 17 inconCorrect 12 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.1516 | raw positive one-sided p 0.07578
+  x 25 | con 95.000% incon 75.000% | nCon 20 nIncon 20 | conCorrect 19 inconCorrect 15 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.1836 | raw positive one-sided p 0.09178
+  x 45 | con 90.000% incon 65.000% | nCon 20 nIncon 20 | conCorrect 18 inconCorrect 13 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.1272 | raw positive one-sided p 0.06359
+  x 100 | con 100.000% incon 90.000% | nCon 20 nIncon 20 | conCorrect 20 inconCorrect 18 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.4619 | raw positive one-sided p 0.231
+PDF save setup | saveFlag=1 | page=6 | append=1
+PDF target: Y:\users\PK\colStimPipeline\outputs\M28-psychfit-L-weibullSignedX0.pdf
+plotNakaRushtonFit5 render page: renderIdx=7 | globalBlockIdx=22 | clusterLabel=Cluster: 3/3 | appendPage=1
+Delta point audit: 20230830R4 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 20 25 45 100] | delta=[90 40 70 40 -10 0]
+Delta point audit: 20230830R4 | side=Horizontal | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10.7 20.7 26.7 46.7 100] | delta=[15 0 35 30 5 0]
+Delta point audit: 20230830R4 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 20 25 45 100] | delta=[20 60 80 20 20 10]
+Delta point audit: 20230830R4 | side=Vertical | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10.7 20.7 26.7 46.7 100] | delta=[-20 40 20 30 10 -5]
+Individual permutation ON | block 22 | contrasts 6
+Added null intervals 6 | labels 6 | overall annotations 1
+Legend validation passed for block 22: {Biasing, Masking}
+experiment 20230830R4 | n contrasts 6 | mean DeltaBias 36.667 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002 | *
+experiment 20230830R4 permutation contrast diagnostics:
+  x 0 | con 90.000% incon 35.000% | nCon 40 nIncon 40 | conCorrect 36 inconCorrect 14 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002
+  x 10 | con 70.000% incon 20.000% | nCon 20 nIncon 20 | conCorrect 14 inconCorrect 4 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.0016 | raw positive one-sided p 0.0007998
+  x 20 | con 100.000% incon 25.000% | nCon 20 nIncon 20 | conCorrect 20 inconCorrect 5 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002
+  x 25 | con 85.000% incon 55.000% | nCon 20 nIncon 20 | conCorrect 17 inconCorrect 11 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.07838 | raw positive one-sided p 0.03919
+  x 45 | con 90.000% incon 85.000% | nCon 20 nIncon 20 | conCorrect 18 inconCorrect 17 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 1 | raw positive one-sided p 0.5089
+  x 100 | con 100.000% incon 95.000% | nCon 20 nIncon 20 | conCorrect 20 inconCorrect 19 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 1 | raw positive one-sided p 0.5115
+PDF save setup | saveFlag=1 | page=7 | append=1
+PDF target: Y:\users\PK\colStimPipeline\outputs\M28-psychfit-L-weibullSignedX0.pdf
+plotNakaRushtonFit5 render page: renderIdx=8 | globalBlockIdx=25 | clusterLabel=Cluster: 2/3 | appendPage=1
+Delta point audit: 20230906R2 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 16 22 35 100] | delta=[30 60 30 0 0 -20]
+Delta point audit: 20230906R2 | side=Horizontal | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10 16.7 23 36.7 100] | delta=[0 -20 15 10 0 10]
+Delta point audit: 20230906R2 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 16 22 35 100] | delta=[20 30 20 20 40 0]
+Delta point audit: 20230906R2 | side=Vertical | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10 16.7 23 36.7 100] | delta=[-25 -25 20 20 10 0]
+Individual permutation ON | block 25 | contrasts 6
+Added null intervals 6 | labels 6 | overall annotations 1
+Legend validation passed for block 25: {Biasing, Masking}
+experiment 20230906R2 | n contrasts 6 | mean DeltaBias 19.167 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002 | *
+experiment 20230906R2 permutation contrast diagnostics:
+  x 0 | con 70.000% incon 45.000% | nCon 40 nIncon 40 | conCorrect 28 inconCorrect 18 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.04039 | raw positive one-sided p 0.0202
+  x 10 | con 90.000% incon 45.000% | nCon 20 nIncon 20 | conCorrect 18 inconCorrect 9 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.004799 | raw positive one-sided p 0.0024
+  x 16 | con 80.000% incon 55.000% | nCon 20 nIncon 20 | conCorrect 16 inconCorrect 11 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.1708 | raw positive one-sided p 0.08538
+  x 22 | con 90.000% incon 80.000% | nCon 20 nIncon 20 | conCorrect 18 inconCorrect 16 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.6987 | raw positive one-sided p 0.3493
+  x 35 | con 100.000% incon 80.000% | nCon 20 nIncon 20 | conCorrect 20 inconCorrect 16 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.1116 | raw positive one-sided p 0.05579
+  x 100 | con 90.000% incon 100.000% | nCon 20 nIncon 20 | conCorrect 18 inconCorrect 20 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.4907 | raw positive one-sided p 1
+PDF save setup | saveFlag=1 | page=8 | append=1
+PDF target: Y:\users\PK\colStimPipeline\outputs\M28-psychfit-L-weibullSignedX0.pdf
+plotNakaRushtonFit5 render page: renderIdx=9 | globalBlockIdx=26 | clusterLabel=Cluster: 3/3 | appendPage=1
+Delta point audit: 20230906R3 | side=Horizontal | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 16 22 35 100] | delta=[10 40 50 20 0 0]
+Delta point audit: 20230906R3 | side=Horizontal | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10 16.7 23 36.7 100] | delta=[-10 -20 25 10 0 0]
+Delta point audit: 20230906R3 | side=Vertical | metric=deltaBias | plotted=6/6 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 10 16 22 35 100] | delta=[30 40 80 10 40 10]
+Delta point audit: 20230906R3 | side=Vertical | metric=deltaMask | plotted=6/6 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=5 | x=[0 10 16.7 23 36.7 100] | delta=[10 0 30 45 10 5]
+Individual permutation ON | block 26 | contrasts 6
+Added null intervals 6 | labels 6 | overall annotations 1
+Legend validation passed for block 26: {Biasing, Masking}
+experiment 20230906R3 | n contrasts 6 | mean DeltaBias 27.500 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002 | *
+experiment 20230906R3 permutation contrast diagnostics:
+  x 0 | con 55.000% incon 35.000% | nCon 40 nIncon 40 | conCorrect 22 inconCorrect 14 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.11 | raw positive one-sided p 0.05499
+  x 10 | con 75.000% incon 35.000% | nCon 20 nIncon 20 | conCorrect 15 inconCorrect 7 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.0212 | raw positive one-sided p 0.0106
+  x 16 | con 90.000% incon 25.000% | nCon 20 nIncon 20 | conCorrect 18 inconCorrect 5 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.0007998 | raw positive one-sided p 0.0003999
+  x 22 | con 80.000% incon 65.000% | nCon 20 nIncon 20 | conCorrect 16 inconCorrect 13 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.4819 | raw positive one-sided p 0.241
+  x 35 | con 100.000% incon 80.000% | nCon 20 nIncon 20 | conCorrect 20 inconCorrect 16 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.1008 | raw positive one-sided p 0.05039
+  x 100 | con 100.000% incon 95.000% | nCon 20 nIncon 20 | conCorrect 20 inconCorrect 19 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 1 | raw positive one-sided p 0.5027
+PDF save setup | saveFlag=1 | page=9 | append=1
+PDF target: Y:\users\PK\colStimPipeline\outputs\M28-psychfit-L-weibullSignedX0.pdf
+plotNakaRushtonFit5 render page: renderIdx=10 | globalBlockIdx=33 | clusterLabel=Cluster: 3/3 | appendPage=1
+Delta point audit: 20240118R3 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 9 13 16 40] | delta=[60 80 70 10 10]
+Delta point audit: 20240118R3 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 9 12.7 16 40] | delta=[-8.33 8.33 18.3 15 5]
+Delta point audit: 20240118R3 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 9 13 16 40] | delta=[20 40 50 70 0]
+Delta point audit: 20240118R3 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 9 12.7 16 40] | delta=[11.7 10 -13.3 20 10]
+Individual permutation ON | block 33 | contrasts 5
+Added null intervals 5 | labels 5 | overall annotations 1
+Legend validation passed for block 33: {Biasing, Masking}
+experiment 20240118R3 | n contrasts 5 | mean DeltaBias 41.000 | raw two-sided p 0.0003999 | raw positive one-sided p 0.0002 | *
+experiment 20240118R3 permutation contrast diagnostics:
+  x 0 | con 60.000% incon 20.000% | nCon 40 nIncon 40 | conCorrect 24 inconCorrect 8 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.0007998 | raw positive one-sided p 0.0003999
+  x 9 | con 75.000% incon 15.000% | nCon 20 nIncon 20 | conCorrect 15 inconCorrect 3 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.0012 | raw positive one-sided p 0.0005999
+  x 13 | con 90.000% incon 30.000% | nCon 20 nIncon 20 | conCorrect 18 inconCorrect 6 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.0007998 | raw positive one-sided p 0.0003999
+  x 16 | con 90.000% incon 50.000% | nCon 20 nIncon 20 | conCorrect 18 inconCorrect 10 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.0144 | raw positive one-sided p 0.007199
+  x 40 | con 95.000% incon 90.000% | nCon 20 nIncon 20 | conCorrect 19 inconCorrect 18 | conErr 0.0000 inconErr 0.0000 | raw two-sided p 0.9766 | raw positive one-sided p 0.4883
+PDF save setup | saveFlag=1 | page=10 | append=1
+PDF target: Y:\users\PK\colStimPipeline\outputs\M28-psychfit-L-weibullSignedX0.pdf
+plotNakaRushtonFit5 render page: renderIdx=11 | globalBlockIdx=34 | clusterLabel=Cluster: 2/3 | appendPage=1
+Delta point audit: 20240118R10 | side=Horizontal | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 9 13 16 40] | delta=[10 20 10 20 0]
+Delta point audit: 20240118R10 | side=Horizontal | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 9 12.7 16 40] | delta=[-13.3 -11.7 -1.67 20 0]
+Delta point audit: 20240118R10 | side=Vertical | metric=deltaBias | plotted=5/5 | skipped=0 | method=exact,exact/zero | max contrast diff=0 | x=[0 9 13 16 40] | delta=[10 30 20 20 0]
+Delta point audit: 20240118R10 | side=Vertical | metric=deltaMask | plotted=5/5 | skipped=0 | method=exact,exact/zero,nearest/tolerance | max contrast diff=1 | x=[0 9 12.7 16 40] | delta=[-3.33 -5 -18.3 15 10]
+{Operation terminated by user during ver
+
+
+In ver
+
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('shadedErrorBar', 'Y:\users\PK\colStimPipeline\FEXfunctions\raacampbell-shadedErrorBar\shadedErrorBar.m', 121)" style="font-weight:bold">shadedErrorBar</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\FEXfunctions\raacampbell-shadedErrorBar\shadedErrorBar.m',121,0)">line 121</a>)
+elseif sum( size(ver('MATLAB'))) > 0
+
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('plotNakaRushtonFit5', 'Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m', 500)" style="font-weight:bold">plotNakaRushtonFit5</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\psychometrics\plotNakaRushtonFit5.m',500,0)">line 500</a>)
+                shadedErrorBar(mdl.xBlock(cond,:,block), mdl.yBlock(cond,:,block), semY', 'patchSaturation', patchSaturationVal, 'lineprops', ...
+
+In <a href="matlab:matlab.internal.language.introspective.errorDocCallback('mainPipeline', 'Y:\users\PK\colStimPipeline\mainPipeline.m', 480)" style="font-weight:bold">mainPipeline</a> (<a href="matlab: opentoline('Y:\users\PK\colStimPipeline\mainPipeline.m',480,0)">line 480</a>)
+                        [clusterMdl, reportState] = plotNakaRushtonFit5(behavioralData, bitmapData, ...
+} 
+cd('Y:\users\PK\colStimPipeline')
+system('git status')
+On branch feature/signed-x0-weibull
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   analyzePsychometricModels.m
+	modified:   mainPipeline.m
+	modified:   psychometrics/bayesModel/fitPsyMLE2.m
+	modified:   psychometrics/plotNakaRushtonFit5.m
+	modified:   psychometrics/plotPowerClusterFitParameters.m
+	modified:   psychometrics/plotPowerClusterMeanDistributions.m
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	figures/figures2025/optoEvokedResponseCortex.png
+	outputs/M28-psychfit-L-weibullfreeAll.pdf
+	outputs/M28-psychfit-R-weibullfreeAll.pdf
+	outputs/M32-psychfit-R-weibullfreeAll.pdf
+	outputs/signedX0_ChipL_runlog.txt
+	psychometrics/validateWeibullSignedX0Model.m
+	psychometrics/weibullModel/getWeibullSignedX0InitParams.m
+	psychometrics/weibullModel/getWeibullSignedX0ModelFuncs.m
+	psychometrics/weibullModel/weibullSignedX0Mdl.m
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+ans =
+
+     0
+

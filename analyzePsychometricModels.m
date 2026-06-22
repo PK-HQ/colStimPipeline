@@ -5,14 +5,18 @@ if nargin < 13 || isempty(plotOpts)
         'nDeltaPermutations', 500);
 end
 %% Plot by cluster, and by model type
-nClusters=sort(clusterIdx,'descend');%unique(clusterIdx);
+validClusterIDs = unique(clusterIdx( ...
+    isfinite(clusterIdx) & clusterIdx > 0), 'stable');
+if isempty(validClusterIDs)
+    error('analyzePsychometricModels:NoIncludedClusters', ...
+        'No positive cluster IDs remain after exclusions.');
+end
 % Initialize mdlStruct and other structures
 mdlStruct = struct();
 AICCdeltax = struct();
 AICCbeta = struct();
 thresh=[];beta=[];exp=[];c50=[];
-nClusters=numel(unique(clusterIdx));
-for cluster=1:nClusters%1:nClusters
+for cluster = reshape(validClusterIDs, 1, [])
     disp(['Cluster ' num2str(cluster)])
     
     % Get columns
@@ -121,7 +125,26 @@ for cluster=1:nClusters%1:nClusters
 end
 nBlockStr=num2str(numel(analysisBlockID));
 save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-psychometrics' nBlockStr '.mat'],'mdlStruct')
-save([mainPath monkeyName '/Meta/psychometrics/' chamberWanted '-chamber/' modelTypeStr '/mdlStruct' chamberWanted num2str(columnsDesired) '.mat'], 'mdlStruct');
+modelSaveDir = fullfile( ...
+    mainPath, ...
+    monkeyName, ...
+    'Meta', ...
+    'psychometrics', ...
+    [chamberWanted '-chamber'], ...
+    modelTypeStr);
+if ~exist(modelSaveDir, 'dir')
+    [mkdirOK, mkdirMessage] = mkdir(modelSaveDir);
+    if ~mkdirOK
+        error('analyzePsychometricModels:CannotCreateModelDirectory', ...
+            'Could not create model directory %s: %s', ...
+            modelSaveDir, mkdirMessage);
+    end
+end
+modelSavePath = fullfile( ...
+    modelSaveDir, ...
+    sprintf('mdlStruct%s%d.mat', chamberWanted, columnsDesired));
+save(modelSavePath, 'mdlStruct');
+fprintf('Saved model structure: %s\n', modelSavePath);
 %% Plot param dist
 
 %{

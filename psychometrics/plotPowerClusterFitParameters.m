@@ -7,6 +7,14 @@ function [figureHandles, distributionData, sourceAudit, statsAudit] = ...
     end
     opts = applyDefaults(opts);
 
+    if isfield(mdl, 'signedX0') && ...
+            isfield(opts, 'modelFieldName') && ...
+            contains(char(opts.modelFieldName), 'weibullSignedX0')
+        [figureHandles, distributionData, sourceAudit, statsAudit] = ...
+            plotSignedX0HorizontalDistribution(mdl, aggregateFits, opts);
+        return;
+    end
+
     viewNames = {'horizontal', 'vertical', 'merged'};
     viewTitles = {'Horizontal visual stimulus', ...
         'Vertical visual stimulus', 'Merged'};
@@ -271,6 +279,63 @@ function opts = applyDefaults(opts)
         opts.statsOpts.testDirection, {'two-sided', 'one-sided'});
 end
 
+function [figureHandles, distributionData, sourceAudit, statsAudit] = plotSignedX0HorizontalDistribution(mdl, aggregateFits, opts)
+    figureHandles = gobjects(numel(aggregateFits), 1);
+    distributionData = repmat(struct(), numel(aggregateFits), 1);
+    sourceAudit = emptyDistributionSourceAuditTable();
+    statsAudit = emptyDistributionStatsAuditTable();
+
+    x0 = mdl.signedX0.X0Horizontal(:);
+    fprintf('\n=== Signed-X0 parameter distribution ===\n');
+    fprintf('  source field: mdl.signedX0.X0Horizontal; X0Vertical = -X0Horizontal\n');
+    fprintf('  rows available: %d\n', numel(x0));
+
+    for aggregateIdx = 1:numel(aggregateFits)
+        rows = unique(aggregateFits(aggregateIdx).mdlRowIndices(:)', 'stable');
+        validRows = rows(isfinite(rows) & rows == round(rows) & ...
+            rows >= 1 & rows <= numel(x0) & isfinite(x0(rows)));
+        values = x0(validRows);
+        clusterTitle = parameterTitle(aggregateFits(aggregateIdx), numel(rows));
+
+        figureHandles(aggregateIdx) = figure(...
+            'Name', [clusterTitle ' X0 horizontal-opto distribution'], ...
+            'Color', 'w', ...
+            'Visible', opts.figureVisible);
+        ax = axes('Parent', figureHandles(aggregateIdx));
+        hold(ax, 'on');
+        yline(ax, 0, '--', 'Color', 0.4 .* [1 1 1], ...
+            'LineWidth', 1.5, 'HandleVisibility', 'off');
+        if ~isempty(values)
+            jitter = opts.jitterWidth .* (rand(size(values)) - 0.5);
+            scatter(ax, 1 + jitter, values, opts.pointSize, ...
+                [0.35 0.10 0.65], 'filled', ...
+                'MarkerFaceAlpha', opts.pointAlpha, ...
+                'MarkerEdgeColor', 'k');
+            mu = mean(values, 'omitnan');
+            sem = std(values, 'omitnan') ./ sqrt(sum(isfinite(values)));
+            errorbar(ax, 1, mu, sem, 'ko', ...
+                'MarkerFaceColor', 'w', ...
+                'MarkerSize', 8, ...
+                'LineWidth', 1.5, ...
+                'HandleVisibility', 'off');
+        end
+        xlim(ax, [0.5 1.5]);
+        set(ax, 'XTick', 1, 'XTickLabel', {'H-Opto'});
+        ylabel(ax, 'X0 horizontal-opto (%)');
+        title(ax, sprintf('%s | n=%d', clusterTitle, numel(validRows)), ...
+            'Interpreter', 'none', 'FontWeight', 'normal');
+        axis(ax, 'square');
+        upFontSize(18, 0.01);
+
+        distributionData(aggregateIdx).clusterID = aggregateFits(aggregateIdx).clusterID;
+        distributionData(aggregateIdx).mdlRowIndices = rows;
+        distributionData(aggregateIdx).validMdlRows = validRows;
+        distributionData(aggregateIdx).X0Horizontal = values;
+        fprintf('  %s: valid X0Horizontal dots %d of %d | mean %.3g | SEM %.3g\n', ...
+            clusterTitle, numel(validRows), numel(rows), ...
+            mean(values, 'omitnan'), std(values, 'omitnan') ./ sqrt(max(1, sum(isfinite(values)))));
+    end
+end
 function statsOpts = performanceStatsOptions(opts)
     statsOpts = opts.statsOpts;
     statsOpts.alpha = opts.alpha;
