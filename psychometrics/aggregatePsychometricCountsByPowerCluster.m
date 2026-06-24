@@ -27,6 +27,11 @@ function agg = aggregatePsychometricCountsByPowerCluster(mdl, powerCluster, opts
     conditionNames = {'baseline', 'con', 'incon'};
 
     pointStore = initializePointStore(numel(clusterIDs), viewNames, conditionNames);
+    haveSignedBX0Source = isfield(mdl, 'signedBX0');
+    if haveSignedBX0Source
+        requireSignedBX0SourceFields(mdl);
+    end
+    signedChoiceStore = initializeSignedChoiceStore(numel(clusterIDs));
 
     for block = 1:nBlocks
         if ~validClusterLabel(block)
@@ -35,7 +40,11 @@ function agg = aggregatePsychometricCountsByPowerCluster(mdl, powerCluster, opts
         blockClusterID = getClusterLabel(powerCluster, block);
         clusterIdx = findClusterIndex(clusterIDs, blockClusterID);
         blockData = extractBlockData(mdl, block, nBlocks);
-
+        if haveSignedBX0Source
+            signedChoiceBlock = extractSignedChoiceBlock(mdl.signedBX0, block);
+            signedChoiceStore(clusterIdx) = appendSignedChoiceBlock(...
+                signedChoiceStore(clusterIdx), signedChoiceBlock, block);
+        end
         for viewIdx = 1:numel(viewNames)
             viewName = viewNames{viewIdx};
             for conditionIdx = 1:numel(conditionNames)
@@ -62,6 +71,11 @@ function agg = aggregatePsychometricCountsByPowerCluster(mdl, powerCluster, opts
                 agg(clusterIdx).(viewName).(conditionName) = aggregateCondition( ...
                     pointStore(clusterIdx).(viewName).(conditionName), opts);
             end
+        end
+
+        if haveSignedBX0Source
+            agg(clusterIdx).signedChoice = aggregateSignedChoiceStore(...
+                signedChoiceStore(clusterIdx), opts, agg(clusterIdx).sessionIDs);
         end
     end
 end
@@ -520,6 +534,221 @@ function summary = emptyAggregateSummary(opts)
         'minSessionsPerBin', opts.minSessionsPerBin);
 end
 
+function store = initializeSignedChoiceStore(nClusters)
+    emptyPoints = struct('x', [], 'successes', [], 'nTrials', [], 'session', []);
+    emptySigned = struct( ...
+        'baseline', emptyPoints, ...
+        'horizontalOpto', emptyPoints, ...
+        'verticalOpto', emptyPoints);
+    store = repmat(emptySigned, nClusters, 1);
+end
+
+function requireSignedBX0SourceFields(mdl)
+    if ~isfield(mdl.signedBX0, 'modelVersion') || ...
+            ~strcmp(char(mdl.signedBX0.modelVersion), 'fullBeta_slopeCap_v1')
+        error('aggregatePsychometricCountsByPowerCluster:SignedBX0ModelVersionMismatch', ...
+            ['mdl.signedBX0 is not fullBeta_slopeCap_v1. Recompute weibullSignedBX0 ' ...
+            'fits before aggregate signed-BX0 analysis.']);
+    end
+    requiredFields = { ...
+        'xBaselineChoice', 'nBaselineChoice', 'successBaselineChoice', ...
+        'xHorizontalOptoChoice', 'nHorizontalOptoChoice', 'successHorizontalOptoChoice', ...
+        'xVerticalOptoChoice', 'nVerticalOptoChoice', 'successVerticalOptoChoice'};
+    missing = requiredFields(~isfield(mdl.signedBX0, requiredFields));
+    if ~isempty(missing)
+        error('aggregatePsychometricCountsByPowerCluster:MissingSignedBX0Source', ...
+            'mdl.signedBX0 is missing required aggregate source field(s): %s.', ...
+            strjoin(missing, ', '));
+    end
+end
+
+function signedBlock = extractSignedChoiceBlock(signedBX0, block)
+    signedBlock.baseline = extractSignedConditionBlock(signedBX0, block, ...
+        'xBaselineChoice', 'successBaselineChoice', 'nBaselineChoice', 'baseline');
+    signedBlock.horizontalOpto = extractSignedConditionBlock(signedBX0, block, ...
+        'xHorizontalOptoChoice', 'successHorizontalOptoChoice', 'nHorizontalOptoChoice', 'horizontalOpto');
+    signedBlock.verticalOpto = extractSignedConditionBlock(signedBX0, block, ...
+        'xVerticalOptoChoice', 'successVerticalOptoChoice', 'nVerticalOptoChoice', 'verticalOpto');
+end
+
+function condition = extractSignedConditionBlock(signedBX0, block, xField, successField, nField, conditionName)
+    x = getSignedBlockVector(signedBX0.(xField), block, xField);
+    successes = getSignedBlockVector(signedBX0.(successField), block, successField);
+    nTrials = getSignedBlockVector(signedBX0.(nField), block, nField);
+    [x, successes, nTrials] = cleanSignedChoiceData(x, successes, nTrials, conditionName, block);
+    condition = struct('x', x, 'successes', successes, 'nTrials', nTrials);
+end
+
+function values = getSignedBlockVector(data, block, fieldName)
+    if iscell(data)
+        if numel(data) < block
+            error('aggregatePsychometricCountsByPowerCluster:SignedSourceBlockMissing', ...
+                '%s does not contain block/session row %d.', fieldName, block);
+        end
+        values = data{block};
+    elseif isnumeric(data)
+        if size(data, 1) < block
+            error('aggregatePsychometricCountsByPowerCluster:SignedSourceBlockMissing', ...
+                '%s does not contain block/session row %d.', fieldName, block);
+        end
+        values = data(block, :);
+    else
+        error('aggregatePsychometricCountsByPowerCluster:SignedSourceType', ...
+            '%s must be numeric or cell array data.', fieldName);
+    end
+    values = values(:)';
+end
+
+function [x, successes, nTrials] = cleanSignedChoiceData(x, successes, nTrials, conditionName, block)
+    x = x(:)';
+    successes = successes(:)';
+    nTrials = nTrials(:)';
+    nValues = min([numel(x), numel(successes), numel(nTrials)]);
+    x = x(1:nValues);
+    successes = successes(1:nValues);
+    nTrials = nTrials(1:nValues);
+
+    valid = isfinite(x) & isfinite(successes) & isfinite(nTrials) & ...
+        nTrials > 0 & successes >= 0 & successes <= nTrials;
+    x = x(valid);
+    successes = successes(valid);
+    nTrials = nTrials(valid);
+
+    if isempty(x)
+        error('aggregatePsychometricCountsByPowerCluster:EmptySignedSource', ...
+            'Block/session row %d has no usable signed %s source counts.', ...
+            block, conditionName);
+    end
+end
+
+function store = appendSignedChoiceBlock(store, signedBlock, sessionID)
+    conditionNames = {'baseline', 'horizontalOpto', 'verticalOpto'};
+    for conditionIdx = 1:numel(conditionNames)
+        conditionName = conditionNames{conditionIdx};
+        condition = signedBlock.(conditionName);
+        store.(conditionName).x = [store.(conditionName).x, condition.x];
+        store.(conditionName).successes = [store.(conditionName).successes, condition.successes];
+        store.(conditionName).nTrials = [store.(conditionName).nTrials, condition.nTrials];
+        store.(conditionName).session = [store.(conditionName).session, ...
+            repmat(sessionID, 1, numel(condition.x))];
+    end
+end
+
+function signedChoice = aggregateSignedChoiceStore(store, opts, sourceRows)
+    signedChoice = struct();
+    signedChoice.baseline = aggregateSignedCondition(store.baseline, opts);
+    signedChoice.horizontalOpto = aggregateSignedCondition(store.horizontalOpto, opts);
+    signedChoice.verticalOpto = aggregateSignedCondition(store.verticalOpto, opts);
+    signedChoice.audit = makeSignedChoiceAudit(signedChoice, store, sourceRows);
+end
+
+function summary = aggregateSignedCondition(points, opts)
+    summary = emptySignedAggregateSummary(opts);
+    if isempty(points.x)
+        return;
+    end
+
+    x = points.x;
+    successes = points.successes;
+    nTrials = points.nTrials;
+    session = points.session;
+    binCenter = opts.binWidth .* round(x ./ opts.binWidth);
+
+    uniqueBins = unique(binCenter, 'sorted');
+    binSummaries = repmat(struct(), numel(uniqueBins), 1);
+    keepBin = false(size(uniqueBins));
+
+    for binIdx = 1:numel(uniqueBins)
+        inBin = binCenter == uniqueBins(binIdx);
+        sessionIDs = unique(session(inBin), 'stable');
+        sessionPct = nan(size(sessionIDs));
+
+        for sessionIdx = 1:numel(sessionIDs)
+            inSession = inBin & session == sessionIDs(sessionIdx);
+            sessionPct(sessionIdx) = 100 .* sum(successes(inSession)) ./ sum(nTrials(inSession));
+        end
+
+        binSummaries(binIdx).x = uniqueBins(binIdx);
+        binSummaries(binIdx).successes = sum(successes(inBin));
+        binSummaries(binIdx).nTrials = sum(nTrials(inBin));
+        binSummaries(binIdx).pctChooseVertical = 100 .* ...
+            binSummaries(binIdx).successes ./ binSummaries(binIdx).nTrials;
+        binSummaries(binIdx).nPoints = sum(inBin);
+        binSummaries(binIdx).nSessions = numel(sessionIDs);
+        binSummaries(binIdx).sessionIDs = sessionIDs;
+        binSummaries(binIdx).sessionValues = sessionPct;
+        binSummaries(binIdx).sessionMean = mean(sessionPct, 'omitnan');
+        binSummaries(binIdx).sessionMedian = median(sessionPct, 'omitnan');
+        if numel(sessionPct) > 1
+            binSummaries(binIdx).sessionSEM = std(sessionPct, 0, 'omitnan') ./ ...
+                sqrt(sum(~isnan(sessionPct)));
+        else
+            binSummaries(binIdx).sessionSEM = NaN;
+        end
+
+        keepBin(binIdx) = binSummaries(binIdx).nSessions >= opts.minSessionsPerBin;
+    end
+
+    binSummaries = binSummaries(keepBin);
+    if isempty(binSummaries)
+        return;
+    end
+
+    summary.x = [binSummaries.x];
+    summary.y = [binSummaries.pctChooseVertical];
+    summary.pctChooseVertical = [binSummaries.pctChooseVertical];
+    summary.successes = [binSummaries.successes];
+    summary.nTrials = [binSummaries.nTrials];
+    summary.nPoints = [binSummaries.nPoints];
+    summary.nSessions = [binSummaries.nSessions];
+    summary.sessionIDs = {binSummaries.sessionIDs};
+    summary.sessionValues = {binSummaries.sessionValues};
+    summary.sessionMean = [binSummaries.sessionMean];
+    summary.sessionMedian = [binSummaries.sessionMedian];
+    summary.sessionSEM = [binSummaries.sessionSEM];
+end
+
+function summary = emptySignedAggregateSummary(opts)
+    summary = struct( ...
+        'x', [], ...
+        'y', [], ...
+        'pctChooseVertical', [], ...
+        'successes', [], ...
+        'nTrials', [], ...
+        'nPoints', [], ...
+        'nSessions', [], ...
+        'sessionIDs', {{}}, ...
+        'sessionValues', {{}}, ...
+        'sessionMean', [], ...
+        'sessionMedian', [], ...
+        'sessionSEM', [], ...
+        'binWidth', opts.binWidth, ...
+        'minSessionsPerBin', opts.minSessionsPerBin);
+end
+
+function audit = makeSignedChoiceAudit(signedChoice, store, sourceRows)
+    conditionNames = {'baseline', 'horizontalOpto', 'verticalOpto'};
+    audit = struct();
+    audit.sourceRows = sourceRows(:)';
+    audit.nSessions = numel(sourceRows);
+    audit.conditions = struct();
+    for conditionIdx = 1:numel(conditionNames)
+        conditionName = conditionNames{conditionIdx};
+        rawPoints = store.(conditionName);
+        summary = signedChoice.(conditionName);
+        audit.conditions.(conditionName).sourceRows = unique(rawPoints.session, 'stable');
+        audit.conditions.(conditionName).nSessions = numel(unique(rawPoints.session, 'stable'));
+        audit.conditions.(conditionName).nSourcePoints = numel(rawPoints.x);
+        audit.conditions.(conditionName).nAggregateBins = numel(summary.x);
+        audit.conditions.(conditionName).totalTrials = sum(rawPoints.nTrials);
+        audit.conditions.(conditionName).totalSuccesses = sum(rawPoints.successes);
+        if isempty(rawPoints.x)
+            audit.conditions.(conditionName).xRange = [NaN NaN];
+        else
+            audit.conditions.(conditionName).xRange = [min(rawPoints.x), max(rawPoints.x)];
+        end
+    end
+end
 function clusterIdx = findClusterIndex(clusterIDs, clusterID)
     if isnumeric(clusterIDs) || islogical(clusterIDs) || iscategorical(clusterIDs)
         clusterIdx = find(clusterIDs == clusterID, 1);

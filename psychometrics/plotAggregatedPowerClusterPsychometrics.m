@@ -11,13 +11,7 @@ function [out, figureHandles] = plotAggregatedPowerClusterPsychometrics(agg, opt
         opts = struct();
     end
     opts = applyDefaults(opts);
-    if strcmp(opts.modelTypeStr, 'weibullSignedBX0')
-        error('plotAggregatedPowerClusterPsychometrics:SignedBX0AggregateUnavailable', ...
-            ['weibullSignedBX0 aggregate signed-source fitting is not implemented in ' ...
-            'plotAggregatedPowerClusterPsychometrics. The current aggregate helper ' ...
-            'contains folded baseline/con/incon data only; refusing to use the legacy ' ...
-            'folded aggregate fitter for the production signed B+X0 model.']);
-    end
+
     validateAggregateInput(agg);
 
     if isempty(agg)
@@ -51,12 +45,21 @@ function [out, figureHandles] = plotAggregatedPowerClusterPsychometrics(agg, opt
         deltaSummaries = repmat(struct('biasing', NaN, 'masking', NaN), 1, 3);
         mergedViewData = struct();
         mergedDeltaData = struct();
+        signedBX0Fit = [];
+        if strcmp(opts.modelTypeStr, 'weibullSignedBX0')
+            signedBX0Fit = fitAggregateSignedBX0(agg(clusterIdx), opts);
+            out(clusterIdx).signedBX0 = signedBX0Fit.signedBX0;
+        end
 
         for viewIdx = 1:numel(viewNames)
             viewName = viewNames{viewIdx};
             viewData = agg(clusterIdx).(viewName);
 
-            fitResult = fitAggregateView(viewData, opts);
+            if strcmp(opts.modelTypeStr, 'weibullSignedBX0')
+                fitResult = signedBX0Fit.signedBX0.panelFits.(viewName);
+            else
+                fitResult = fitAggregateView(viewData, opts);
+            end
             conditionMeans = computeConditionMeans(viewData);
             deltaSummary = computeScalarDeltas(conditionMeans);
             deltaSummaries(viewIdx) = deltaSummary;
@@ -254,6 +257,569 @@ function style = getPlotStyle()
     style.referenceLineWidth = 1.5;
 end
 
+function signedFit = fitAggregateSignedBX0(clusterAgg, opts)
+    signedChoice = clusterAgg.signedChoice;
+    validateSignedAggregateSource(signedChoice);
+    data = buildSignedBX0ObjectiveData(signedChoice);
+    [initialParams, lb, ub] = getWeibullSignedBX0InitParams();
+    [~, objectiveFunction] = getWeibullSignedBX0ModelFuncs(struct());
+
+    starts = makeSignedBX0AggregateStarts(initialParams, lb, ub);
+    [fitParams, nLL, exitFlag] = optimizeSignedBX0Starts(...
+        objectiveFunction, data, starts, lb, ub, opts, false);
+    [noX0FitParams, noX0NLL, noX0ExitFlag] = optimizeSignedBX0Starts(...
+        objectiveFunction, data, starts, lb, ub, opts, true);
+
+    nTrials = sum(data.sumBaselineChoice) + ...
+        sum(data.sumHorizontalOptoChoice) + ...
+        sum(data.sumVerticalOptoChoice);
+    aicc = calculateAggregateAICc(nLL, 11, nTrials);
+    noX0AICc = calculateAggregateAICc(noX0NLL, 10, nTrials);
+    deltaAICcX0 = noX0AICc - aicc;
+    weights = aggregateAkaikeWeights([noX0AICc, aicc]);
+
+    if ~isSignedBX0AggregateFitValid(fitParams, objectiveFunction, data)
+        error('plotAggregatedPowerClusterPsychometrics:InvalidSignedBX0AggregateFit', ...
+            'Aggregate weibullSignedBX0 fit did not produce valid finite predictions.');
+    end
+
+    xGridMax = chooseSignedBX0GridMax(signedChoice, opts);
+    xGrid = linspace(0, xGridMax, opts.fitGridPoints);
+    displayCurves = projectSignedBX0DisplayCurves(xGrid, fitParams);
+
+    signedFit = struct();
+    signedFit.success = true;
+    signedFit.message = '';
+    signedFit.exitFlag = exitFlag;
+    signedFit.noX0ExitFlag = noX0ExitFlag;
+    signedFit.x = xGrid;
+    signedFit.displayCurves = displayCurves;
+    signedFit.data = data;
+    signedFit.signedBX0 = struct( ...
+        'modelVersion', 'fullBeta_slopeCap_v1', ...
+        'parameterNames', {{'A_baseline', 'alpha_baseline', 'beta_baseline', ...
+            'A_con', 'alpha_con', 'beta_con', ...
+            'A_incon', 'alpha_incon', 'beta_incon', ...
+            'deltaB', 'deltaX0'}}, ...
+        'maxAllowedSlopePctPerContrast', 5.0, ...
+        'slopeConstraintActive', true, ...
+        'slopeDiagnostics', getWeibullSignedBX0SlopeDiagnostics(fitParams, 5.0), ...
+        'noX0SlopeDiagnostics', getWeibullSignedBX0SlopeDiagnostics([noX0FitParams(1:10), 0], 5.0), ...
+        'fitParams', fitParams, ...
+        'nLL', nLL, ...
+        'AICc', aicc, ...
+        'noX0FitParams', noX0FitParams(1:10), ...
+        'noX0NLL', noX0NLL, ...
+        'noX0AICc', noX0AICc, ...
+        'deltaAICcX0', deltaAICcX0, ...
+        'akaikeWeightBOnly', weights(1), ...
+        'akaikeWeightBX0', weights(2), ...
+        'BHorizontal', 50 - fitParams(10), ...
+        'BVertical', 50 + fitParams(10), ...
+        'X0Horizontal', fitParams(11), ...
+        'X0Vertical', -fitParams(11), ...
+        'deltaB', fitParams(10), ...
+        'deltaX0', fitParams(11), ...
+        'fitStatus', 'ok', ...
+        'nTrials', nTrials, ...
+        'sourceAudit', signedChoice.audit, ...
+        'kM0', 10, ...
+        'kM1', 11);
+    signedFit.signedBX0.panelFits = fitAggregateSignedBX0PanelFits(...
+        clusterAgg, xGrid, fitParams(11), signedFit.signedBX0, opts);
+end
+
+function panelFits = fitAggregateSignedBX0PanelFits(clusterAgg, xGrid, globalDeltaX0, primarySignedBX0, opts)
+    viewNames = {'horizontal', 'vertical', 'merged'};
+    panelFits = struct();
+    for viewIdx = 1:numel(viewNames)
+        viewName = viewNames{viewIdx};
+        fitResult = fitAggregateSignedBX0Panel(clusterAgg.(viewName), xGrid, ...
+            globalDeltaX0, primarySignedBX0.fitParams, opts, viewName);
+        fitResult.signedBX0.deltaAICcX0 = primarySignedBX0.deltaAICcX0;
+        fitResult.signedBX0.akaikeWeightBX0 = primarySignedBX0.akaikeWeightBX0;
+        fitResult.signedBX0.akaikeWeightBOnly = primarySignedBX0.akaikeWeightBOnly;
+        fitResult.signedBX0.primaryFitParams = primarySignedBX0.fitParams;
+        fitResult.signedBX0.primaryNLL = primarySignedBX0.nLL;
+        fitResult.signedBX0.primaryAICc = primarySignedBX0.AICc;
+        fitResult.signedBX0.primaryNoX0AICc = primarySignedBX0.noX0AICc;
+        panelFits.(viewName) = fitResult;
+    end
+end
+
+function fitResult = fitAggregateSignedBX0Panel(viewData, xGrid, globalDeltaX0, primaryParams, opts, viewName)
+    fitResult = emptyFitResult();
+    fitResult.modelType = 'weibullSignedBX0';
+    fitResult.message = '';
+    if ~hasAggregatePanelData(viewData)
+        fitResult.message = 'All three aggregate conditions require populated binomial bins.';
+        return;
+    end
+
+    [initialParams, lbFull, ubFull] = getWeibullSignedBX0InitParams();
+    lb = lbFull(1:10);
+    ub = ubFull(1:10);
+    params0 = initialParams(1:10);
+    if numel(primaryParams) >= 10 && all(isfinite(primaryParams(1:10)))
+        params0 = primaryParams(1:10);
+    end
+    params0 = min(max(params0, lb), ub);
+    starts = makeSignedBX0AggregatePanelStarts(params0, lb, ub);
+    bestNLL = Inf;
+    bestParams = nan(1, 10);
+    bestExitFlag = NaN;
+    for startIdx = 1:size(starts, 1)
+        [candidateParams, exitFlag] = optimizeSignedBX0AggregatePanelStart(...
+            starts(startIdx, :), lb, ub, viewData, globalDeltaX0, opts);
+        candidateNLL = signedBX0AggregatePanelNLL(candidateParams, viewData, globalDeltaX0);
+        diagnostics = getSignedBX0AggregatePanelSlopeDiagnostics(candidateParams, globalDeltaX0);
+        if isfinite(candidateNLL) && candidateNLL < bestNLL && diagnostics.isValid
+            bestNLL = candidateNLL;
+            bestParams = candidateParams;
+            bestExitFlag = exitFlag;
+        end
+    end
+    if ~isfinite(bestNLL)
+        error('plotAggregatedPowerClusterPsychometrics:SignedBX0PanelFitFailed', ...
+            'All aggregate signed-BX0 panel starts failed for %s.', viewName);
+    end
+
+    validateSignedBX0AggregateBranchIndependence(bestParams, globalDeltaX0);
+    [baselineY, conY, inconY] = predictSignedBX0AggregatePanelCurves(...
+        xGrid, bestParams, globalDeltaX0);
+    fitResult.success = true;
+    fitResult.nLL = bestNLL;
+    fitResult.exitFlag = bestExitFlag;
+    fitResult.deltaParams = bestParams;
+    fitResult.x = xGrid;
+    fitResult.jointFitID = ['aggregateSignedBX0Panel_' viewName];
+    fitResult.baseline.params = [bestParams(1), 50, bestParams(2), bestParams(3), 0];
+    fitResult.con.params = [bestParams(4), 50 + bestParams(10), bestParams(5), bestParams(6), -globalDeltaX0];
+    fitResult.incon.params = [bestParams(7), 50 - bestParams(10), bestParams(8), bestParams(9), +globalDeltaX0];
+    fitResult.baseline.y = baselineY;
+    fitResult.con.y = conY;
+    fitResult.incon.y = inconY;
+    fitResult.signedBX0 = struct( ...
+        'fitParams', bestParams, ...
+        'parameterNames', {{'A_baseline', 'alpha_baseline', 'beta_baseline', ...
+        'A_con', 'alpha_con', 'beta_con', ...
+        'A_incon', 'alpha_incon', 'beta_incon', 'deltaB_panel'}}, ...
+        'globalDeltaX0', globalDeltaX0, ...
+        'deltaB', bestParams(10), ...
+        'sourcePanel', viewName, ...
+        'nLL', bestNLL, ...
+        'slopeDiagnostics', getSignedBX0AggregatePanelSlopeDiagnostics(bestParams, globalDeltaX0));
+end
+
+function ok = hasAggregatePanelData(viewData)
+    ok = isfield(viewData, 'baseline') && isfield(viewData, 'con') && ...
+        isfield(viewData, 'incon') && ~isempty(viewData.baseline.x) && ...
+        ~isempty(viewData.con.x) && ~isempty(viewData.incon.x) && ...
+        sum(viewData.baseline.nTrials) > 0 && sum(viewData.con.nTrials) > 0 && ...
+        sum(viewData.incon.nTrials) > 0;
+end
+
+function starts = makeSignedBX0AggregatePanelStarts(params0, lb, ub)
+    starts = repmat(params0(:)', 7, 1);
+    starts(2, [3 6 9]) = 1.5;
+    starts(3, [3 6 9]) = 5;
+    starts(4, 10) = 10;
+    starts(5, 10) = -10;
+    starts(6, [3 6 9 10]) = [2.5 2.5 2.5 5];
+    starts(7, [3 6 9 10]) = [6 6 6 -5];
+    starts = min(max(starts, lb), ub);
+    starts = unique(starts, 'rows', 'stable');
+end
+
+function [params, exitFlag] = optimizeSignedBX0AggregatePanelStart(params0, lb, ub, viewData, globalDeltaX0, opts)
+    activeIdx = 1:10;
+    u0 = paramsToUnit(params0, lb, ub);
+    unitObjective = @(u) signedBX0AggregatePanelNLL(...
+        lb + min(max(u(:)', 0), 1) .* (ub - lb), viewData, globalDeltaX0);
+    if exist('fmincon', 'file') == 2
+        fopts = optimoptions('fmincon', ...
+            'Display', 'off', ...
+            'MaxIterations', opts.maxIterations, ...
+            'MaxFunctionEvaluations', 10 .* opts.maxIterations, ...
+            'OptimalityTolerance', 1e-8, ...
+            'StepTolerance', 1e-8);
+        [uFit, ~, exitFlag] = fmincon(unitObjective, u0(activeIdx), [], [], [], [], ...
+            zeros(size(u0(activeIdx))), ones(size(u0(activeIdx))), [], fopts);
+    else
+        fopts = optimset('Display', 'off', ...
+            'MaxIter', opts.maxIterations, ...
+            'MaxFunEvals', 10 .* opts.maxIterations, ...
+            'TolX', 1e-8, ...
+            'TolFun', 1e-8);
+        [uFit, ~, exitFlag] = fminsearchbnd(unitObjective, u0(activeIdx), ...
+            zeros(size(u0(activeIdx))), ones(size(u0(activeIdx))), fopts);
+    end
+    params = lb + min(max(uFit(:)', 0), 1) .* (ub - lb);
+end
+
+function nLL = signedBX0AggregatePanelNLL(params, viewData, globalDeltaX0)
+    if numel(params) ~= 10 || any(~isfinite(params)) || ~isfinite(globalDeltaX0)
+        nLL = 1e12;
+        return;
+    end
+    diagnostics = getSignedBX0AggregatePanelSlopeDiagnostics(params, globalDeltaX0);
+    if ~diagnostics.isValid
+        excess = diagnostics.slopeExcess;
+        excess(~isfinite(excess)) = 5.0;
+        nLL = 1e12 + 1e6 .* sum(excess .^ 2);
+        return;
+    end
+    [baselineY, conY, inconY] = predictSignedBX0AggregatePanelCurves(...
+        [], params, globalDeltaX0, viewData);
+    nLL = aggregatePanelConditionNLL(viewData.baseline, baselineY) + ...
+        aggregatePanelConditionNLL(viewData.con, conY) + ...
+        aggregatePanelConditionNLL(viewData.incon, inconY);
+end
+
+function nLL = aggregatePanelConditionNLL(conditionData, prediction)
+    probability = min(max(prediction ./ 100, 1e-10), 1 - 1e-10);
+    successes = conditionData.successes;
+    failures = conditionData.nTrials - successes;
+    nLL = -sum(successes .* log(probability) + failures .* log(1 - probability));
+end
+
+function [baselineY, conY, inconY] = predictSignedBX0AggregatePanelCurves(xGrid, params, globalDeltaX0, viewData)
+    if nargin >= 4 && ~isempty(viewData)
+        xBaseline = viewData.baseline.x;
+        xCon = viewData.con.x;
+        xIncon = viewData.incon.x;
+    else
+        xBaseline = xGrid;
+        xCon = xGrid;
+        xIncon = xGrid;
+    end
+    baselineY = predictShiftedWeibullBranch(abs(xBaseline), params(1), 50, params(2), params(3), 0);
+    conY = predictShiftedWeibullBranch(abs(xCon), params(4), 50 + params(10), params(5), params(6), -globalDeltaX0);
+    inconY = predictShiftedWeibullBranch(abs(xIncon), params(7), 50 - params(10), params(8), params(9), +globalDeltaX0);
+end
+
+function diagnostics = getSignedBX0AggregatePanelSlopeDiagnostics(params, globalDeltaX0)
+    maxSlopePctPerContrast = 5.0;
+    B_con = 50 + params(10);
+    B_incon = 50 - params(10);
+    amplitudes = [(100 - params(1)) - 50, ...
+        (100 - params(4)) - B_con, ...
+        (100 - params(7)) - B_incon];
+    alphas = [params(2), params(5), params(8)];
+    betas = [params(3), params(6), params(9)];
+    slopeValues = nan(1, 3);
+    if all(isfinite([amplitudes, alphas, betas, globalDeltaX0])) && ...
+            all(amplitudes > 0) && all(alphas > 0) && all(betas > 1)
+        slopeValues = getWeibullHalfMaxSlope(amplitudes, alphas, betas);
+    end
+    diagnostics.maxSlopeValues = slopeValues;
+    diagnostics.maxSlopeOverall = max(slopeValues, [], 'omitnan');
+    diagnostics.maxAllowedSlopePctPerContrast = maxSlopePctPerContrast;
+    diagnostics.slopeConstraintActive = true;
+    diagnostics.slopeCapActive = isfinite(diagnostics.maxSlopeOverall) && ...
+        diagnostics.maxSlopeOverall > maxSlopePctPerContrast;
+    diagnostics.isValid = all(isfinite(slopeValues)) && all(slopeValues <= maxSlopePctPerContrast);
+    diagnostics.slopeExcess = max(0, slopeValues - maxSlopePctPerContrast);
+end
+
+function validateSignedBX0AggregateBranchIndependence(params, globalDeltaX0)
+    c = linspace(0, 100, 51);
+    [con0, incon0] = predictSignedBX0AggregatePanelCurves(c, params, globalDeltaX0);
+    conPerturbed = params;
+    conPerturbed(4:6) = min(conPerturbed(4:6) + [1, 2, 0.2], [45, 100, 10]);
+    [~, inconAfterConChange] = predictSignedBX0AggregatePanelCurves(c, conPerturbed, globalDeltaX0);
+    inconPerturbed = params;
+    inconPerturbed(7:9) = min(inconPerturbed(7:9) + [1, 2, 0.2], [45, 100, 10]);
+    [conAfterInconChange, ~] = predictSignedBX0AggregatePanelCurves(c, inconPerturbed, globalDeltaX0);
+    if max(abs(inconAfterConChange(:) - incon0(:)), [], 'omitnan') > 1e-9 || ...
+            max(abs(conAfterInconChange(:) - con0(:)), [], 'omitnan') > 1e-9
+        error('plotAggregatedPowerClusterPsychometrics:SignedBX0BranchSwitching', ...
+            'Aggregate signed-BX0 displayed branches switch con/incon shape parameters.');
+    end
+end
+function validateSignedAggregateSource(signedChoice)
+    if isempty(signedChoice) || ~isstruct(signedChoice)
+        error('plotAggregatedPowerClusterPsychometrics:MissingSignedBX0AggregateSource', ...
+            'weibullSignedBX0 aggregate fitting requires agg(cluster).signedChoice.');
+    end
+    requiredConditions = {'baseline', 'horizontalOpto', 'verticalOpto'};
+    requiredFields = {'x', 'successes', 'nTrials'};
+    for conditionIdx = 1:numel(requiredConditions)
+        conditionName = requiredConditions{conditionIdx};
+        if ~isfield(signedChoice, conditionName)
+            error('plotAggregatedPowerClusterPsychometrics:MissingSignedBX0Condition', ...
+                'signedChoice is missing physical condition %s.', conditionName);
+        end
+        conditionData = signedChoice.(conditionName);
+        missing = requiredFields(~isfield(conditionData, requiredFields));
+        if ~isempty(missing)
+            error('plotAggregatedPowerClusterPsychometrics:MissingSignedBX0Fields', ...
+                'signedChoice.%s is missing field(s): %s.', ...
+                conditionName, strjoin(missing, ', '));
+        end
+        x = conditionData.x;
+        successes = conditionData.successes;
+        nTrials = conditionData.nTrials;
+        valid = isfinite(x) & isfinite(successes) & isfinite(nTrials) & ...
+            nTrials > 0 & successes >= 0 & successes <= nTrials;
+        if isempty(x) || ~all(valid)
+            error('plotAggregatedPowerClusterPsychometrics:InvalidSignedBX0Counts', ...
+                'signedChoice.%s contains invalid or empty signed binomial counts.', ...
+                conditionName);
+        end
+        if ~any(x < 0) || ~any(x > 0)
+            warning('plotAggregatedPowerClusterPsychometrics:SignedBX0ContrastCoverage', ...
+                'signedChoice.%s does not contain both negative and positive signed contrasts.', ...
+                conditionName);
+        end
+    end
+end
+
+function data = buildSignedBX0ObjectiveData(signedChoice)
+    data = struct( ...
+        'xBaselineChoice', signedChoice.baseline.x, ...
+        'sumBaselineChoice', signedChoice.baseline.nTrials, ...
+        'successBaselineChoice', signedChoice.baseline.successes, ...
+        'xHorizontalOptoChoice', signedChoice.horizontalOpto.x, ...
+        'sumHorizontalOptoChoice', signedChoice.horizontalOpto.nTrials, ...
+        'successHorizontalOptoChoice', signedChoice.horizontalOpto.successes, ...
+        'xVerticalOptoChoice', signedChoice.verticalOpto.x, ...
+        'sumVerticalOptoChoice', signedChoice.verticalOpto.nTrials, ...
+        'successVerticalOptoChoice', signedChoice.verticalOpto.successes);
+end
+
+function starts = makeSignedBX0AggregateStarts(initialParams, lb, ub)
+    starts = [ ...
+        initialParams; ...
+        setSignedBX0Deltas(initialParams, 0, 0); ...
+        setSignedBX0Deltas(initialParams, 5, 0); ...
+        setSignedBX0Deltas(initialParams, -5, 0); ...
+        setSignedBX0Deltas(initialParams, 0, 3); ...
+        setSignedBX0Deltas(initialParams, 0, -3); ...
+        setSignedBX0Deltas(initialParams, 5, 3); ...
+        setSignedBX0Deltas(initialParams, 5, -3); ...
+        setSignedBX0Deltas(initialParams, -5, 3); ...
+        setSignedBX0Deltas(initialParams, -5, -3)];
+    starts = min(max(starts, lb), ub);
+    starts = unique(starts, 'rows', 'stable');
+end
+
+function params = setSignedBX0Deltas(params, deltaB, deltaX0)
+    params(10) = deltaB;
+    params(11) = deltaX0;
+end
+
+function [bestParams, bestNLL, bestExitFlag] = optimizeSignedBX0Starts(...
+        objectiveFunction, data, starts, lb, ub, opts, forceNoX0)
+    bestParams = nan(1, 11);
+    bestNLL = Inf;
+    bestExitFlag = NaN;
+    for startIdx = 1:size(starts, 1)
+        start = starts(startIdx, :);
+        if forceNoX0
+            start(11) = 0;
+        end
+        [candidateParams, exitFlag] = optimizeSignedBX0SingleStart(...
+            objectiveFunction, data, start, lb, ub, opts, forceNoX0);
+        candidateNLL = objectiveFunction(candidateParams, data);
+        if isSignedBX0AggregateFitValid(candidateParams, objectiveFunction, data) && ...
+                candidateNLL < bestNLL
+            bestParams = candidateParams;
+            bestNLL = candidateNLL;
+            bestExitFlag = exitFlag;
+        end
+    end
+    if ~isfinite(bestNLL)
+        error('plotAggregatedPowerClusterPsychometrics:SignedBX0OptimizationFailed', ...
+            'All aggregate weibullSignedBX0 deterministic starts failed.');
+    end
+end
+
+function [params, exitFlag] = optimizeSignedBX0SingleStart(...
+        objectiveFunction, data, start, lb, ub, opts, forceNoX0)
+    if forceNoX0
+        activeIdx = 1:10;
+    else
+        activeIdx = 1:11;
+    end
+    activeLb = lb(activeIdx);
+    activeUb = ub(activeIdx);
+    u0 = paramsToUnit(start(activeIdx), activeLb, activeUb);
+    unitObjective = @(u) objectiveFunction(unitToSignedBX0Params(...
+        u, activeIdx, activeLb, activeUb, forceNoX0), data);
+
+    if exist('fmincon', 'file') == 2
+        fopts = optimoptions('fmincon', ...
+            'Display', 'off', ...
+            'MaxIterations', opts.maxIterations, ...
+            'MaxFunctionEvaluations', 10 .* opts.maxIterations, ...
+            'OptimalityTolerance', 1e-8, ...
+            'StepTolerance', 1e-8);
+        [uFit, ~, exitFlag] = fmincon(unitObjective, u0, [], [], [], [], ...
+            zeros(size(u0)), ones(size(u0)), [], fopts);
+    else
+        fopts = optimset('Display', 'off', ...
+            'MaxIter', opts.maxIterations, ...
+            'MaxFunEvals', 10 .* opts.maxIterations, ...
+            'TolX', 1e-8, ...
+            'TolFun', 1e-8);
+        [uFit, ~, exitFlag] = fminsearchbnd(unitObjective, u0, ...
+            zeros(size(u0)), ones(size(u0)), fopts);
+    end
+
+    params = unitToSignedBX0Params(uFit, activeIdx, activeLb, activeUb, forceNoX0);
+end
+
+function u = paramsToUnit(params, lb, ub)
+    u = (params - lb) ./ (ub - lb);
+    u = min(max(u, 0), 1);
+end
+
+function params = unitToSignedBX0Params(u, activeIdx, activeLb, activeUb, forceNoX0)
+    params = nan(1, 11);
+    params(activeIdx) = activeLb + u .* (activeUb - activeLb);
+    if forceNoX0
+        params(11) = 0;
+    end
+end
+
+function ok = isSignedBX0AggregateFitValid(params, objectiveFunction, data)
+    ok = numel(params) == 11 && all(isfinite(params));
+    if ~ok
+        return;
+    end
+    nLL = objectiveFunction(params, data);
+    if ~isfinite(nLL) || nLL >= 1e11
+        ok = false;
+        return;
+    end
+    xTest = unique([data.xBaselineChoice, data.xHorizontalOptoChoice, data.xVerticalOptoChoice]);
+    if isempty(xTest)
+        ok = false;
+        return;
+    end
+    curves = evaluateSignedBX0PhysicalPredictions(xTest, params);
+    values = [curves.baseline, curves.horizontalOpto, curves.verticalOpto];
+    ok = isreal(values) && all(isfinite(values)) && ...
+        all(values >= 0) && all(values <= 100);
+end
+
+function curves = evaluateSignedBX0PhysicalPredictions(x, params)
+    curves.baseline = weibullSignedBX0Mdl(x, ...
+        params(1), params(2), params(3), ...
+        params(1), params(2), params(3), 50, 0);
+    curves.horizontalOpto = weibullSignedBX0Mdl(x, ...
+        params(4), params(5), params(6), ...
+        params(7), params(8), params(9), 50 - params(10), params(11));
+    curves.verticalOpto = weibullSignedBX0Mdl(x, ...
+        params(7), params(8), params(9), ...
+        params(4), params(5), params(6), 50 + params(10), -params(11));
+end
+
+function aicc = calculateAggregateAICc(nLL, k, n)
+    aic = 2 .* k + 2 .* nLL;
+    if n > (k + 1)
+        aicc = aic + (2 .* k .* (k + 1)) ./ (n - k - 1);
+    else
+        aicc = Inf;
+    end
+end
+
+function weights = aggregateAkaikeWeights(aiccValues)
+    finiteAICc = aiccValues(isfinite(aiccValues));
+    if isempty(finiteAICc)
+        weights = nan(size(aiccValues));
+        return;
+    end
+    delta = aiccValues - min(finiteAICc);
+    relLike = exp(-0.5 .* delta);
+    weights = relLike ./ sum(relLike(isfinite(relLike)));
+end
+
+function xGridMax = chooseSignedBX0GridMax(signedChoice, opts)
+    if ~isempty(opts.xLim)
+        xGridMax = opts.xLim(2);
+        return;
+    end
+    allX = abs([signedChoice.baseline.x, ...
+        signedChoice.horizontalOpto.x, signedChoice.verticalOpto.x]);
+    if isempty(allX)
+        xGridMax = 100;
+    else
+        xGridMax = max(100, ceil(max(allX) ./ 5) .* 5);
+    end
+end
+
+function displayCurves = projectSignedBX0DisplayCurves(c, params)
+    pBLneg = weibullSignedBX0Mdl(-c, params(1), params(2), params(3), ...
+        params(1), params(2), params(3), 50, 0);
+    pBLpos = weibullSignedBX0Mdl(+c, params(1), params(2), params(3), ...
+        params(1), params(2), params(3), 50, 0);
+    pHneg = weibullSignedBX0Mdl(-c, params(4), params(5), params(6), ...
+        params(7), params(8), params(9), 50 - params(10), params(11));
+    pHpos = weibullSignedBX0Mdl(+c, params(4), params(5), params(6), ...
+        params(7), params(8), params(9), 50 - params(10), params(11));
+    pVneg = weibullSignedBX0Mdl(-c, params(7), params(8), params(9), ...
+        params(4), params(5), params(6), 50 + params(10), -params(11));
+    pVpos = weibullSignedBX0Mdl(+c, params(7), params(8), params(9), ...
+        params(4), params(5), params(6), 50 + params(10), -params(11));
+
+    displayCurves.horizontal.baseline = 100 - pBLneg;
+    displayCurves.horizontal.con = 100 - pHneg;
+    displayCurves.horizontal.incon = 100 - pVneg;
+    displayCurves.vertical.baseline = pBLpos;
+    displayCurves.vertical.con = pVpos;
+    displayCurves.vertical.incon = pHpos;
+    displayCurves.merged.baseline = 0.5 .* (...
+        displayCurves.horizontal.baseline + displayCurves.vertical.baseline);
+    displayCurves.merged.con = 0.5 .* (...
+        displayCurves.horizontal.con + displayCurves.vertical.con);
+    displayCurves.merged.incon = 0.5 .* (...
+        displayCurves.horizontal.incon + displayCurves.vertical.incon);
+end
+
+function ok = areSignedBX0DisplayCurvesValid(displayCurves)
+    viewNames = {'horizontal', 'vertical', 'merged'};
+    conditionNames = {'baseline', 'con', 'incon'};
+    ok = true;
+    for viewIdx = 1:numel(viewNames)
+        viewName = viewNames{viewIdx};
+        for conditionIdx = 1:numel(conditionNames)
+            conditionName = conditionNames{conditionIdx};
+            values = displayCurves.(viewName).(conditionName);
+            ok = ok && isreal(values) && all(isfinite(values)) && ...
+                all(values >= 0) && all(values <= 100);
+        end
+    end
+end
+function fitResult = projectSignedBX0FitToView(signedFit, viewName)
+    fitResult = emptyFitResult();
+    fitResult.modelType = 'weibullSignedBX0';
+    fitResult.success = signedFit.success;
+    fitResult.message = signedFit.message;
+    fitResult.nLL = signedFit.signedBX0.nLL;
+    fitResult.exitFlag = signedFit.exitFlag;
+    fitResult.deltaParams = signedFit.signedBX0.fitParams;
+    fitResult.x = signedFit.x;
+    fitResult.signedBX0 = signedFit.signedBX0;
+    fitResult.jointFitID = 'aggregateSignedBX0';
+    params = signedFit.signedBX0.fitParams;
+    fitResult.baseline.params = [params(1), 50, params(2), params(3), 0];
+    switch viewName
+        case 'horizontal'
+            fitResult.con.params = [params(4), 50 - params(10), params(5), params(6), params(11)];
+            fitResult.incon.params = [params(7), 50 - params(10), params(8), params(9), params(11)];
+        case 'vertical'
+            fitResult.con.params = [params(4), 50 + params(10), params(5), params(6), -params(11)];
+            fitResult.incon.params = [params(7), 50 + params(10), params(8), params(9), -params(11)];
+        otherwise
+            fitResult.con.params = [NaN NaN NaN NaN NaN];
+            fitResult.incon.params = [NaN NaN NaN NaN NaN];
+    end
+    fitResult.baseline.y = signedFit.displayCurves.(viewName).baseline;
+    fitResult.con.y = signedFit.displayCurves.(viewName).con;
+    fitResult.incon.y = signedFit.displayCurves.(viewName).incon;
+end
 function fitResult = fitAggregateView(viewData, opts)
     conditionNames = {'baseline', 'con', 'incon'};
     fitResult = emptyFitResult();
@@ -347,6 +913,7 @@ end
 function fitResult = emptyFitResult()
     emptyCondition = struct('params', nan(1, 4), 'y', []);
     fitResult = struct( ...
+        'modelType', '', ...
         'success', false, ...
         'message', '', ...
         'nLL', NaN, ...
@@ -791,31 +1358,53 @@ function assertAggregateDeltaPermutationVisualizationAudit(audit, permResult, cl
         error('plotAggregatedPowerClusterPsychometrics:MissingDeltaPermutationVisualizationAudit', ...
             'Missing permutation visualization audit for C%d.', clusterID);
     end
+    vis = audit.visualization;
     nExpected = numel(permResult.contrast);
-    if audit.visualization.nNullIntervals ~= nExpected || ...
-            audit.visualization.nNullMedians ~= nExpected || ...
-            audit.visualization.nLabels ~= nExpected || ...
-            audit.visualization.nOverall < 1
+    nNullIntervals = getAuditScalarField(vis, 'nNullIntervals', 0);
+    nNullMedians = getAuditScalarField(vis, 'nNullMedians', 0);
+    nLabels = getAuditScalarField(vis, 'nLabels', 0);
+    nOverall = getAuditScalarField(vis, 'nOverall', 0);
+    nOverallNullBands = getAuditScalarField(vis, 'nOverallNullBands', 0);
+    nOverallNullMedians = getAuditScalarField(vis, 'nOverallNullMedians', 0);
+
+    if nOverallNullBands > 0 || nOverallNullMedians > 0
+        if nNullIntervals ~= 0 || nNullMedians ~= 0 || nLabels ~= 0 || ...
+                nOverall < 1 || nOverallNullBands ~= 1 || nOverallNullMedians ~= 1
+            error('plotAggregatedPowerClusterPsychometrics:DeltaPermutationVisualizationCountMismatch', ...
+                ['Overall-only permutation visualization mismatch for C%d: ' ...
+                'contrast intervals %d, medians %d, labels %d, overall labels %d, ' ...
+                'overall bands %d, overall medians %d.'], clusterID, ...
+                nNullIntervals, nNullMedians, nLabels, nOverall, ...
+                nOverallNullBands, nOverallNullMedians);
+        end
+    elseif nNullIntervals ~= nExpected || nNullMedians ~= nExpected || ...
+            nLabels ~= nExpected || nOverall < 1
         error('plotAggregatedPowerClusterPsychometrics:DeltaPermutationVisualizationCountMismatch', ...
             ['Permutation visualization count mismatch for C%d: expected %d, ' ...
             'intervals %d, medians %d, labels %d, overall %d.'], ...
-            clusterID, nExpected, audit.visualization.nNullIntervals, ...
-            audit.visualization.nNullMedians, audit.visualization.nLabels, ...
-            audit.visualization.nOverall);
+            clusterID, nExpected, nNullIntervals, nNullMedians, nLabels, nOverall);
     end
-    if ~audit.visualization.labelsShareY
+
+    if isfield(vis, 'labelsShareY') && ~vis.labelsShareY
         error('plotAggregatedPowerClusterPsychometrics:DeltaPermutationLabelYMismatch', ...
             'Permutation labels do not share one y-coordinate for C%d.', clusterID);
     end
-    if isfield(audit.visualization, 'allHandlesHidden') && ~audit.visualization.allHandlesHidden
+    if isfield(vis, 'allHandlesHidden') && ~vis.allHandlesHidden
         error('plotAggregatedPowerClusterPsychometrics:DeltaPermutationHandleVisibility', ...
             'Permutation visualization handles are not hidden from legend for C%d.', clusterID);
     end
-    fprintf('Added null intervals %d | labels %d | overall annotations %d\n', ...
-        audit.visualization.nNullIntervals, audit.visualization.nLabels, ...
-        audit.visualization.nOverall);
+    fprintf(['Added permutation visuals | contrast boxes %d | contrast labels %d | ' ...
+        'overall bands %d | overall annotations %d\n'], ...
+        nNullIntervals, nLabels, nOverallNullBands, nOverall);
 end
 
+function value = getAuditScalarField(auditStruct, fieldName, defaultValue)
+    if isfield(auditStruct, fieldName) && ~isempty(auditStruct.(fieldName))
+        value = auditStruct.(fieldName);
+    else
+        value = defaultValue;
+    end
+end
 function validateAggregateDeltaPermutationLegend(ax, clusterID)
     legends = findobj(ancestor(ax, 'figure'), 'Type', 'Legend');
     expected = {'Biasing', 'Masking'};
@@ -1136,6 +1725,11 @@ function addFitParameterTable(ax, fitResult)
     if ~fitResult.success
         return;
     end
+    if isfield(fitResult, 'modelType') && ...
+            strcmp(fitResult.modelType, 'weibullSignedBX0')
+        addSignedBX0AggregateFitParameterTable(ax, fitResult.signedBX0);
+        return;
+    end
 
     parameterHeaders = {'A', 'B', '\alpha', '\beta'};
     rowLabels = {'Baseline', 'Con-Opto', 'Incon-Opto'};
@@ -1193,6 +1787,92 @@ function addFitParameterTable(ax, fitResult)
     end
 end
 
+function addSignedBX0AggregateFitParameterTable(ax, signedBX0)
+    if ~isfield(signedBX0, 'fitParams') || numel(signedBX0.fitParams) < 10 || ...
+            ~isfield(signedBX0, 'globalDeltaX0') || ~isfinite(signedBX0.globalDeltaX0)
+        return;
+    end
+
+    params = signedBX0.fitParams(1:10);
+    deltaB = params(10);
+    deltaX0 = signedBX0.globalDeltaX0;
+    tableValues = [ ...
+        params(1), 50, params(2), params(3), 0; ...
+        params(4), 50 + deltaB, params(5), params(6), -deltaX0; ...
+        params(7), 50 - deltaB, params(8), params(9), +deltaX0];
+    parameterHeaders = {'A', 'B', '\alpha', '\beta', 'X0'};
+    rowLabels = {'Baseline', 'Con-Opto', 'Incon-Opto'};
+    rowColors = [0 0 0; 0.55 0 0; 0 0.05 0.45];
+
+    axPosition = get(ax, 'Position');
+    tableGap = 0.004;
+    maxTableRight = 0.988;
+    tableX = axPosition(1) + axPosition(3) + tableGap;
+    tableWidth = min(0.205, maxTableRight - tableX);
+    if tableWidth < 0.185
+        tableWidth = 0.185;
+        tableX = max(0.01, maxTableRight - tableWidth);
+    end
+
+    tableHeight = 0.44 .* axPosition(4);
+    tableY = axPosition(2) + 0.5 .* axPosition(4) - 0.5 .* tableHeight;
+    rowHeight = tableHeight ./ 5;
+    fontSize = 10.5;
+    columnX = [0.00, 0.43, 0.56, 0.69, 0.82, 0.94];
+    columnWidth = [0.41, 0.105, 0.105, 0.105, 0.105, 0.055];
+    columnX = tableX + tableWidth .* columnX;
+    columnWidth = tableWidth .* columnWidth;
+    if columnX(end) + columnWidth(end) > 0.99
+        error('plotAggregatedPowerClusterPsychometrics:SignedBX0TableClipped', ...
+            'Aggregate signed-BX0 X0 table column exceeds the normalized figure boundary.');
+    end
+
+    addTableCell(columnX(1), tableY + 4 .* rowHeight, columnWidth(1), ...
+        rowHeight, '', [0 0 0], fontSize, 'bold', 'left');
+    for column = 1:5
+        addTableCell(columnX(column + 1), tableY + 4 .* rowHeight, ...
+            columnWidth(column + 1), rowHeight, parameterHeaders{column}, ...
+            [0 0 0], fontSize, 'bold', 'center');
+    end
+
+    for row = 1:3
+        yPosition = tableY + (4 - row) .* rowHeight;
+        addTableCell(columnX(1), yPosition, columnWidth(1), rowHeight, ...
+            rowLabels{row}, rowColors(row,:), fontSize, 'bold', 'left');
+        for column = 1:5
+            valueText = formatSignedBX0AggregateParameterValue(...
+                tableValues(row, column), parameterHeaders{column});
+            addTableCell(columnX(column + 1), yPosition, columnWidth(column + 1), ...
+                rowHeight, valueText, rowColors(row,:), fontSize, 'normal', 'center');
+        end
+    end
+
+    if isfield(signedBX0, 'deltaAICcX0') && isfinite(signedBX0.deltaAICcX0) && ...
+            signedBX0.deltaAICcX0 >= 8
+        aicColor = [0 0 0];
+    else
+        aicColor = [0.45 0.45 0.45];
+    end
+    if isfield(signedBX0, 'deltaAICcX0')
+        deltaAICcX0 = signedBX0.deltaAICcX0;
+    else
+        deltaAICcX0 = NaN;
+    end
+    addTableCell(tableX, tableY, tableWidth, rowHeight, ...
+        sprintf('DeltaAICc_X0    %.1f', deltaAICcX0), ...
+        aicColor, fontSize, 'normal', 'left');
+end
+function valueText = formatSignedBX0AggregateParameterValue(value, parameterName)
+    if ~isfinite(value)
+        valueText = '';
+        return;
+    end
+    if strcmp(parameterName, 'X0')
+        valueText = sprintf('%+.1f', value);
+    else
+        valueText = sprintf('%.1f', value);
+    end
+end
 function addTableCell(xPosition, yPosition, width, height, textValue, ...
         color, fontSize, fontWeight, horizontalAlignment)
     xPosition = max(0, min(0.999, xPosition));

@@ -1,108 +1,141 @@
 function results = validateWeibullSignedBX0Model()
-%VALIDATEWEIBULLSIGNEDBX0MODEL Static mathematical checks for weibullSignedBX0.
-%
-% This validator is intentionally self-contained and does not touch animal
-% data. It checks the signed raw model, the folded display transform, and
-% the nested B-only/B+X0 model convention.
+%VALIDATEWEIBULLSIGNEDBX0MODEL Static scientific checks for weibullSignedBX0.
+% The production model has 11 free parameters: baseline A/alpha/beta,
+% con A/alpha/beta, incon A/alpha/beta, deltaB, and one opponent deltaX0.
 
-tol = 1e-8;
-x = -100:0.5:100;
-params = [8, 16, 3.2, 7, 14, 2.4, 11, 18, 4.1, 6, 5];
-
-pBaseline = weibullSignedBX0Mdl(x, params(1), params(2), params(3), ...
-    params(1), params(2), params(3), 50, 0);
-pHorizontal = weibullSignedBX0Mdl(x, params(4), params(5), params(6), ...
-    params(7), params(8), params(9), 50 - params(10), +params(11));
-pVertical = weibullSignedBX0Mdl(x, params(7), params(8), params(9), ...
-    params(4), params(5), params(6), 50 + params(10), -params(11));
-
-results = struct();
-results.rawPredictionsFinite = all(isfinite([pBaseline, pHorizontal, pVertical]));
-results.rawPredictionsReal = isreal([pBaseline, pHorizontal, pVertical]);
-results.baselineBAtZero = abs(localPredict(params, 'baseline', 0) - 50) < tol;
-results.horizontalJoinIsB = ...
-    abs(localPredict(params, 'horizontal', params(11)) - (50 - params(10))) < tol;
-results.verticalJoinIsB = ...
-    abs(localPredict(params, 'vertical', -params(11)) - (50 + params(10))) < tol;
-results.displayHorizontalJoinIsOneHundredMinusB = ...
-    abs((100 - localPredict(params, 'horizontal', params(11))) - ...
-    (100 - (50 - params(10)))) < tol;
-results.displayVerticalJoinIsB = ...
-    abs(localPredict(params, 'vertical', -params(11)) - ...
-    (50 + params(10))) < tol;
-results.opponentBConvention = ...
-    (50 - params(10)) < 50 && (50 + params(10)) > 50;
-results.opponentX0Convention = ...
-    params(11) > 0 && (+params(11)) == -(-params(11));
-results.branchMapping = localBranchMappingCheck(params);
-results.fractionalBetaIsReal = localFractionalBetaCheck();
-
-kM0 = 10;
-kM1 = 11;
-nTrials = 720;
-nLL0 = 225;
-nLL1 = 215;
-[~, aicc0] = localAIC(nLL0, kM0, nTrials);
-[~, aicc1] = localAIC(nLL1, kM1, nTrials);
-results.kM1EqualsKM0PlusOne = kM1 == kM0 + 1;
-results.deltaAICcConvention = (aicc0 - aicc1) > 0;
-
-results.syntheticRecovery = localSyntheticRecoveryCheck(params);
-
-names = fieldnames(results);
-failed = names(~structfun(@logical, results));
-if ~isempty(failed)
-    error('validateWeibullSignedBX0Model:Failed', ...
-        'Failed checks: %s', strjoin(failed, ', '));
-end
-
-fprintf('validateWeibullSignedBX0Model passed %d checks.\n', numel(names));
-end
-
-function p = localPredict(params, conditionName, x)
-switch conditionName
-    case 'baseline'
-        p = weibullSignedBX0Mdl(x, params(1), params(2), params(3), ...
-            params(1), params(2), params(3), 50, 0);
-    case 'horizontal'
-        p = weibullSignedBX0Mdl(x, params(4), params(5), params(6), ...
-            params(7), params(8), params(9), 50 - params(10), +params(11));
-    case 'vertical'
-        p = weibullSignedBX0Mdl(x, params(7), params(8), params(9), ...
-            params(4), params(5), params(6), 50 + params(10), -params(11));
-    otherwise
-        error('Unknown condition: %s', conditionName);
-end
-end
-
-function ok = localBranchMappingCheck(params)
-xLeft = -40;
-xRight = 40;
-pHLeft = localPredict(params, 'horizontal', xLeft);
-pHRight = localPredict(params, 'horizontal', xRight);
-pVLeft = localPredict(params, 'vertical', xLeft);
-pVRight = localPredict(params, 'vertical', xRight);
-
-displayHCon = 100 - pHLeft;
-displayHIncon = pHRight;
-displayVIncon = 100 - pVLeft;
-displayVCon = pVRight;
-ok = all(isfinite([displayHCon, displayHIncon, displayVIncon, displayVCon]));
-end
-
-function ok = localFractionalBetaCheck()
-x = -50:50;
-p = weibullSignedBX0Mdl(x, 8, 15, 1.7, 11, 18, 2.3, 47, 4);
-ok = isreal(p) && all(isfinite(p));
-end
-
-function ok = localSyntheticRecoveryCheck(params)
 [initialParams, lb, ub] = getWeibullSignedBX0InitParams();
-ok = numel(initialParams) == 11 && numel(lb) == 11 && numel(ub) == 11 && ...
-    all(params >= lb) && all(params <= ub);
+[mdl, objectiveFunction] = getWeibullSignedBX0ModelFuncs(struct());
+
+assert(numel(initialParams) == 11, 'Expected 11 initial parameters.');
+assert(numel(lb) == 11 && numel(ub) == 11, 'Expected 11 bounds.');
+assert(strcmp(mdl.modelVersion, 'fullBeta_slopeCap_v1'), ...
+    'Unexpected weibullSignedBX0 modelVersion.');
+assert(isequal(mdl.parameterNames, {'A_baseline', 'alpha_baseline', 'beta_baseline', ...
+    'A_con', 'alpha_con', 'beta_con', ...
+    'A_incon', 'alpha_incon', 'beta_incon', ...
+    'deltaB', 'deltaX0'}), 'Unexpected parameter names/order.');
+assert(all(lb([3 6 9]) == 1.25) && all(ub([3 6 9]) == 8), ...
+    'Beta bounds must remain 1.25 to 8.');
+assert(lb(11) < 0 && ub(11) > 0, 'deltaX0 must be a fitted signed parameter.');
+
+params = [8 16 3.2 7 14 2.4 11 18 4.1 6 5];
+assert(isfinite(objectiveFunction(params, localSyntheticData())), ...
+    'Valid parameters should give finite objective.');
+assert(objectiveFunction(params(1:9), localSyntheticData()) >= 1e11, ...
+    'Legacy 9-parameter prototype must be rejected.');
+
+x0 = params(11);
+baseAtJoin = weibullSignedBX0Mdl(0, params(1), params(2), params(3), ...
+    params(1), params(2), params(3), 50, 0);
+hAtJoin = weibullSignedBX0Mdl(x0, params(4), params(5), params(6), ...
+    params(7), params(8), params(9), 50 - params(10), x0);
+vAtJoin = weibullSignedBX0Mdl(-x0, params(7), params(8), params(9), ...
+    params(4), params(5), params(6), 50 + params(10), -x0);
+assert(abs(baseAtJoin - 50) < 1e-10, 'Baseline join must be 50 at X0=0.');
+assert(abs(hAtJoin - (50 - params(10))) < 1e-10, ...
+    'Horizontal raw halves must meet at B_H.');
+assert(abs(vAtJoin - (50 + params(10))) < 1e-10, ...
+    'Vertical raw halves must meet at B_V.');
+
+foldedHLeftAtJoin = 100 - hAtJoin;
+assert(abs(foldedHLeftAtJoin - (100 - (50 - params(10)))) < 1e-10, ...
+    'Folded negative-side percent-correct branch must meet at 100-B.');
+
+x = linspace(-80, 80, 4001);
+y = weibullSignedBX0Mdl(x, params(4), params(5), params(6), ...
+    params(7), params(8), params(9), 50 - params(10), x0);
+assert(isreal(y) && all(isfinite(y)) && all(y >= 0) && all(y <= 100), ...
+    'Predictions must remain real and bounded for signed x and fractional beta.');
+
+rightShiftParams = params;
+rightShiftParams(11) = 8;
+leftShiftParams = params;
+leftShiftParams(11) = -8;
+assert(abs(weibullSignedBX0Mdl(rightShiftParams(11), params(4), params(5), params(6), ...
+    params(7), params(8), params(9), 50 - params(10), rightShiftParams(11)) - (50 - params(10))) < 1e-10, ...
+    'Positive X0 must place the raw join to the right.');
+assert(abs(weibullSignedBX0Mdl(leftShiftParams(11), params(4), params(5), params(6), ...
+    params(7), params(8), params(9), 50 - params(10), leftShiftParams(11)) - (50 - params(10))) < 1e-10, ...
+    'Negative X0 must place the raw join to the left.');
+
+slopeDiagnostics = getWeibullSignedBX0SlopeDiagnostics(params, mdl.maxSlopePctPerContrast);
+assert(slopeDiagnostics.isValid, 'Reference parameter set should satisfy slope cap.');
+assert(slopeDiagnostics.maxSlopeOverall <= mdl.maxSlopePctPerContrast + 1e-8, ...
+    'Reference slope should be below cap.');
+localCheckAnalyticSlope(params(4), params(5), params(6), 50 - params(10), params(11));
+
+steepParams = params;
+steepParams(5) = 2;
+steepParams(6) = 8;
+assert(objectiveFunction(steepParams, localSyntheticData()) >= 1e11, ...
+    'Slope-cap violating parameters must be rejected by objective.');
+
+nTrials = 240;
+[~, aicc0] = localAIC(10, 10, nTrials);
+[~, aicc1] = localAIC(9, 11, nTrials);
+assert(isfinite(aicc0) && isfinite(aicc1), 'AICc check failed.');
+localCheckIndividualDisplayMapping(params, 7.9, false);
+localCheckIndividualDisplayMapping(params, 8.0, true);
+
+results = struct( ...
+    'modelVersion', mdl.modelVersion, ...
+    'nFreeParametersM1', 11, ...
+    'nFreeParametersM0', 10, ...
+    'maxSlopePctPerContrast', mdl.maxSlopePctPerContrast, ...
+    'maxSlopeReference', slopeDiagnostics.maxSlopeOverall, ...
+    'passed', true);
+fprintf('weibullSignedBX0 validation passed: 11-param full beta, B+X0 opponent, slope cap %.1f.\n', ...
+    mdl.maxSlopePctPerContrast);
+end
+
+
+function localCheckIndividualDisplayMapping(params, deltaAICcX0, expectStrongColor)
+deltaB = params(10);
+deltaX0 = params(11);
+tableValues = [ ...
+    params(1), 50, params(2), params(3), 0; ...
+    params(4), 50 + deltaB, params(5), params(6), -deltaX0; ...
+    params(7), 50 - deltaB, params(8), params(9), +deltaX0];
+assert(isequal(size(tableValues), [3 5]), ...
+    'Individual BX0 table must have exactly three rows and five columns.');
+assert(tableValues(1,5) == 0, 'Baseline display X0 must be zero.');
+assert(tableValues(2,5) == -deltaX0 && tableValues(3,5) == +deltaX0, ...
+    'Con/Incon display X0 values must come from one fitted deltaX0 with opposite signs.');
+assert(abs(tableValues(2,5) + tableValues(3,5)) < 1e-12, ...
+    'Con/Incon display X0 values must be exact opposites.');
+strongColor = deltaAICcX0 >= 8;
+assert(strongColor == expectStrongColor, ...
+    'DeltaAICc_X0 display color threshold must be black only for values >= 8.');
+end
+function data = localSyntheticData()
+x = [-60 -30 -15 0 15 30 60];
+n = 40 .* ones(size(x));
+data = struct( ...
+    'xBaselineChoice', x, ...
+    'sumBaselineChoice', n, ...
+    'successBaselineChoice', round(n .* 0.5), ...
+    'xHorizontalOptoChoice', x, ...
+    'sumHorizontalOptoChoice', n, ...
+    'successHorizontalOptoChoice', round(n .* [0.12 0.24 0.38 0.45 0.70 0.82 0.90]), ...
+    'xVerticalOptoChoice', x, ...
+    'sumVerticalOptoChoice', n, ...
+    'successVerticalOptoChoice', round(n .* [0.08 0.18 0.30 0.55 0.62 0.76 0.88]));
+end
+
+function localCheckAnalyticSlope(A, alpha, beta, B, X0)
+amplitude = B - A;
+analytic = getWeibullHalfMaxSlope(amplitude, alpha, beta);
+zPeak = ((beta - 1) ./ beta) .^ (1 ./ beta);
+xPeak = X0 - alpha .* zPeak;
+dx = 1e-4;
+y1 = weibullSignedBX0Mdl(xPeak - dx, A, alpha, beta, A, alpha, beta, B, X0);
+y2 = weibullSignedBX0Mdl(xPeak + dx, A, alpha, beta, A, alpha, beta, B, X0);
+numeric = abs((y2 - y1) ./ (2 .* dx));
+assert(abs(numeric - analytic) < 1e-3, ...
+    'Analytic half-slope does not match numerical derivative.');
 end
 
 function [aic, aicc] = localAIC(nLL, k, n)
-aic = 2 * k + 2 * nLL;
-aicc = aic + (2 * k * (k + 1)) / (n - k - 1);
+aic = 2 .* k + 2 .* nLL;
+aicc = aic + (2 .* k .* (k + 1)) ./ (n - k - 1);
 end

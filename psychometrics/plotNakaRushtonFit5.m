@@ -74,6 +74,11 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
             'Visible', plotOpts.figureVisible);
         
         sideData = getPreMergedSideData(mdl, block);
+        signedBX0DisplayParams = [];
+        if strcmp(modelTypeStr, 'weibullSignedBX0')
+            signedBX0DisplayParams = getSignedBX0DisplayParamsForBlock(...
+                fitParams(block, :));
+        end
 
         % Row 1, columns 1-2: split pre-merged data by visual stimulus side
         axRow1Col1 = subplot(2,3,1);
@@ -84,26 +89,52 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
         [mdl, sideData.vertical] = plotSidePsychometricPanel(mdl, block, sideData.vertical, ...
             xLimMerged, meanBar, tickCfg, 'Vertical visual stimulus');
 
+        signedBX0PanelFits = [];
+        bx0HorizontalDeltaFit = [];
+        bx0VerticalDeltaFit = [];
         if strcmp(modelTypeStr, 'weibullSignedBX0')
+            globalDeltaX0 = getSignedBX0GlobalDeltaX0(mdl, block, ...
+                signedBX0DisplayParams);
+            [mdl, signedBX0PanelFits] = fitSignedBX0PanelFitsForBlock( ...
+                mdl, block, sideData, globalDeltaX0, ...
+                signedBX0DisplayParams, blockInfo);
+
             bx0XGrid = linspace(xLimMerged(1), xLimMerged(2), 400);
-            bx0DisplayCurves = predictSignedBX0DisplayCurves( ...
-                bx0XGrid, fitParams(block, :));
+            displayCurves.horizontal = predictSignedBX0PanelFitCurves( ...
+                bx0XGrid, signedBX0PanelFits.horizontal.fitParams, ...
+                signedBX0PanelFits.globalDeltaX0, 'horizontal');
+            displayCurves.vertical = predictSignedBX0PanelFitCurves( ...
+                bx0XGrid, signedBX0PanelFits.vertical.fitParams, ...
+                signedBX0PanelFits.globalDeltaX0, 'vertical');
+
+            assertSignedBX0PanelCurveSource(displayCurves.horizontal, 'horizontal');
+            assertSignedBX0PanelCurveSource(displayCurves.vertical, 'vertical');
             overlaySignedBX0SideCurves(axRow1Col1, bx0XGrid, ...
-                bx0DisplayCurves.horizontal);
+                displayCurves.horizontal);
             overlaySignedBX0SideCurves(axRow1Col2, bx0XGrid, ...
-                bx0DisplayCurves.vertical);
+                displayCurves.vertical);
+
+            bx0HorizontalDeltaFit = struct('x', bx0XGrid, ...
+                'viewCurves', displayCurves.horizontal, ...
+                'sourcePanel', 'horizontal');
+            bx0VerticalDeltaFit = struct('x', bx0XGrid, ...
+                'viewCurves', displayCurves.vertical, ...
+                'sourcePanel', 'vertical');
+            validateSignedBX0PanelFitFields(mdl.signedBX0.panelFits.horizontal, ...
+                mdl.signedBX0.panelFits.vertical, ...
+                mdl.signedBX0.panelFits.merged, block);
         end
 
         % Row 2, columns 1-2: deltas from the side-specific split data
         subplot(2,3,4)
         mdl = plotSideDeltaPanel(mdl, block, sideData.horizontal, ...
             xLimMerged, meanBar, tickCfg, 'Horizontal visual stimulus', ...
-            'Horizontal', blockInfo, baselineModeThis);
+            'Horizontal', blockInfo, baselineModeThis, bx0HorizontalDeltaFit);
 
         subplot(2,3,5)
         mdl = plotSideDeltaPanel(mdl, block, sideData.vertical, ...
             xLimMerged, meanBar, tickCfg, 'Vertical visual stimulus', ...
-            'Vertical', blockInfo, baselineModeThis);
+            'Vertical', blockInfo, baselineModeThis, bx0VerticalDeltaFit);
         
         % Row 1, column 3: merged fitted data
         axMergedPanel = subplot(2,3,3);
@@ -132,9 +163,11 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
                 case 1 % Baseline
                     xPlot = x;
                     if strcmp(modelTypeStr, 'weibullSignedBX0')
-                        displayCurves = predictSignedBX0DisplayCurves(...
-                            xPlot, fitParams(block, :));
-                        predictedCurve = displayCurves.merged.baseline;
+                        displayCurves = predictSignedBX0PanelFitCurves(...
+                            xPlot, signedBX0PanelFits.merged.fitParams, ...
+                            signedBX0PanelFits.globalDeltaX0, 'merged');
+                        assertSignedBX0PanelCurveSource(displayCurves, 'merged');
+                        predictedCurve = displayCurves.baseline;
                     elseif strcmp(modelTypeStr, 'weibullSignedX0')
                         displayCurves = predictSignedX0DisplayCurves(...
                             xPlot, fitParams(block, :));
@@ -167,9 +200,11 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
                 case 2 % Con-Opto
                     xPlot = x; % Positive contrasts for congruent condition
                     if strcmp(modelTypeStr, 'weibullSignedBX0')
-                        displayCurves = predictSignedBX0DisplayCurves(...
-                            xPlot, fitParams(block, :));
-                        predictedCurve = displayCurves.merged.con;
+                        displayCurves = predictSignedBX0PanelFitCurves(...
+                            xPlot, signedBX0PanelFits.merged.fitParams, ...
+                            signedBX0PanelFits.globalDeltaX0, 'merged');
+                        assertSignedBX0PanelCurveSource(displayCurves, 'merged');
+                        predictedCurve = displayCurves.con;
                     elseif strcmp(modelTypeStr, 'weibullSignedX0')
                         displayCurves = predictSignedX0DisplayCurves(...
                             xPlot, fitParams(block, :));
@@ -203,9 +238,11 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
                 case 3 % Incon-Opto
                     xPlot = x; % Positive contrasts for congruent condition
                     if strcmp(modelTypeStr, 'weibullSignedBX0')
-                        displayCurves = predictSignedBX0DisplayCurves(...
-                            xPlot, fitParams(block, :));
-                        predictedCurve = displayCurves.merged.incon;
+                        displayCurves = predictSignedBX0PanelFitCurves(...
+                            xPlot, signedBX0PanelFits.merged.fitParams, ...
+                            signedBX0PanelFits.globalDeltaX0, 'merged');
+                        assertSignedBX0PanelCurveSource(displayCurves, 'merged');
+                        predictedCurve = displayCurves.incon;
                     elseif strcmp(modelTypeStr, 'weibullSignedX0')
                         displayCurves = predictSignedX0DisplayCurves(...
                             xPlot, fitParams(block, :));
@@ -486,16 +523,20 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
                         powerDisplay.PDROI, ...
                         powerDisplay.Ptotal);
 
-                    if strcmp(modelTypeStr, 'weibullSignedBX0')
-                        optoText = sprintf('%s\n%s', optoText, ...
-                            signedBX0AnnotationText(mdl, block));
-                    elseif strcmp(modelTypeStr, 'weibullSignedX0')
+                    if strcmp(modelTypeStr, 'weibullSignedX0')
                         optoText = sprintf('%s\n%s', optoText, ...
                             signedX0AnnotationText(mdl, block));
                     end
                     optoStatsTextHandle = addOptoStatsText(axRow1Col1, optoText);
 
-                    addFitParameterTable(axMergedPanel, mdl.headers, fitParams(block,:), modelTypeStr);
+                    if strcmp(modelTypeStr, 'weibullSignedBX0')
+                        addSignedBX0FitParameterTable(axMergedPanel, ...
+                            signedBX0PanelFits.merged.fitParams, ...
+                            signedBX0PanelFits.globalDeltaX0, ...
+                            mdl.signedBX0.deltaAICcX0(block));
+                    else
+                        addFitParameterTable(axMergedPanel, mdl.headers, fitParams(block,:), modelTypeStr);
+                    end
                     
                     1;
                 end
@@ -1249,13 +1290,17 @@ function [mdl, sideData] = plotSidePsychometricPanel(mdl, block, sideData, xLimM
     upFontSize(32, 0.01);
 end
 
-function mdl = plotSideDeltaPanel(mdl, block, sideData, xLimMerged, meanBar, tickCfg, titleStr, sideFieldName, blockInfo, baselineMode)
+function mdl = plotSideDeltaPanel(mdl, block, sideData, xLimMerged, meanBar, tickCfg, titleStr, sideFieldName, blockInfo, baselineMode, fittedDeltaInput)
     hold on;
 
     lineWidth = 3;
     markerSize = 15;
     biasColor = [127, 0, 255] / 255;
     maskColor = [125, 125, 125] / 255;
+
+    if nargin < 11
+        fittedDeltaInput = [];
+    end
 
     [xBias, yBias, xMask, yMask, deltaAudit] = computeSideDeltaData(sideData);
     deltaAudit = addDeltaPointAuditMetadata( ...
@@ -1271,6 +1316,8 @@ function mdl = plotSideDeltaPanel(mdl, block, sideData, xLimMerged, meanBar, tic
     end
     mdl.deltaPointAudit = [mdl.deltaPointAudit; deltaAudit];
     printDeltaPointAuditSummary(deltaAudit, blockInfo.label);
+
+    plotFittedSideDeltaCurves(fittedDeltaInput, biasColor, maskColor, lineWidth);
 
     hBias = plotConditionSeries(xBias, yBias, ...
         biasColor, 's', biasColor, markerSize, lineWidth, 'Biasing', 'on');
@@ -1312,6 +1359,59 @@ function mdl = plotSideDeltaPanel(mdl, block, sideData, xLimMerged, meanBar, tic
     addDeltaSummaryText(deltaBias, deltaMask);
 end
 
+
+function plotFittedSideDeltaCurves(fittedDeltaInput, biasColor, maskColor, lineWidth)
+    if isempty(fittedDeltaInput) || ~isstruct(fittedDeltaInput) || ...
+            ~isfield(fittedDeltaInput, 'x') || ...
+            ~isfield(fittedDeltaInput, 'viewCurves')
+        return;
+    end
+    viewCurves = fittedDeltaInput.viewCurves;
+    requiredFields = {'baseline', 'con', 'incon'};
+    if any(~isfield(viewCurves, requiredFields))
+        return;
+    end
+
+    sourcePanel = '';
+    if isfield(fittedDeltaInput, 'sourcePanel')
+        sourcePanel = char(lower(fittedDeltaInput.sourcePanel));
+    elseif isfield(viewCurves, 'sourcePanel')
+        sourcePanel = char(lower(viewCurves.sourcePanel));
+    end
+
+    switch sourcePanel
+        case 'horizontal'
+            biasHorizontal = viewCurves.con - viewCurves.incon;
+            maskHorizontal = viewCurves.baseline - 0.5 .* (viewCurves.con + viewCurves.incon);
+            biasCurve = biasHorizontal;
+            maskCurve = maskHorizontal;
+        case 'vertical'
+            biasVertical = viewCurves.con - viewCurves.incon;
+            maskVertical = viewCurves.baseline - 0.5 .* (viewCurves.con + viewCurves.incon);
+            biasCurve = biasVertical;
+            maskCurve = maskVertical;
+        case 'merged'
+            biasMerged = viewCurves.con - viewCurves.incon;
+            maskMerged = viewCurves.baseline - 0.5 .* (viewCurves.con + viewCurves.incon);
+            biasCurve = biasMerged;
+            maskCurve = maskMerged;
+        otherwise
+            error('plotNakaRushtonFit5:SignedBX0DeltaSourceMissing', ...
+                'Signed-BX0 fitted delta curves require a horizontal, vertical, or merged sourcePanel.');
+    end
+
+    xGrid = fittedDeltaInput.x;
+    plot(xGrid, biasCurve, '-', ...
+        'Color', biasColor, ...
+        'LineWidth', lineWidth, ...
+        'Tag', 'SignedBX0FittedBiasCurve', ...
+        'HandleVisibility', 'off');
+    plot(xGrid, maskCurve, '-', ...
+        'Color', maskColor, ...
+        'LineWidth', lineWidth, ...
+        'Tag', 'SignedBX0FittedMaskCurve', ...
+        'HandleVisibility', 'off');
+end
 function audit = addDeltaPointAuditMetadata(audit, block, blockInfo, baselineMode)
     if isempty(audit) || height(audit) == 0
         return;
@@ -1429,6 +1529,484 @@ function annotationHandle = addOptoStatsText(ax, optoText)
         'Tag', 'PlotNakaStatsText');
 end
 
+function displayParams = getSignedBX0DisplayParamsForBlock(fitParamRow)
+    displayParams = squeeze(fitParamRow);
+    displayParams = displayParams(:)';
+    if numel(displayParams) < 11 || any(~isfinite(displayParams(1:11)))
+        error('plotNakaRushtonFit5:SignedBX0ParamCount', ...
+            'weibullSignedBX0 plotting requires 11 full-model parameters.');
+    end
+    displayParams = displayParams(1:11);
+end
+
+function globalDeltaX0 = getSignedBX0GlobalDeltaX0(mdl, block, signedBX0DisplayParams)
+    globalDeltaX0 = NaN;
+    if isfield(mdl, 'signedBX0') && isfield(mdl.signedBX0, 'deltaX0') && ...
+            numel(mdl.signedBX0.deltaX0) >= block
+        globalDeltaX0 = mdl.signedBX0.deltaX0(block);
+    end
+    if ~isfinite(globalDeltaX0)
+        globalDeltaX0 = signedBX0DisplayParams(11);
+    end
+    if numel(globalDeltaX0) ~= 1 || ~isfinite(globalDeltaX0)
+        error('plotNakaRushtonFit5:InvalidSignedBX0GlobalX0', ...
+            'Expected exactly one finite global deltaX0 for block %d.', block);
+    end
+end
+
+function [mdl, panelFits] = fitSignedBX0PanelFitsForBlock(mdl, block, sideData, globalDeltaX0, primaryParams, blockInfo)
+    if numel(globalDeltaX0) ~= 1 || ~isfinite(globalDeltaX0)
+        error('plotNakaRushtonFit5:InvalidSignedBX0GlobalX0', ...
+            'Panel fitting requires one fixed global deltaX0.');
+    end
+
+    nRows = size(mdl.fittedParams, 1);
+    mdl = ensureSignedBX0PanelFitStorage(mdl, nRows);
+    panelFits = struct();
+    panelFits.globalDeltaX0 = globalDeltaX0;
+
+    panelNames = {'horizontal', 'vertical', 'merged'};
+    for panelIdx = 1:numel(panelNames)
+        panelName = panelNames{panelIdx};
+        switch panelName
+            case 'horizontal'
+                panelData = buildSignedBX0PanelFitData(panelName, ...
+                    sideData.horizontal.xBaseline, sideData.horizontal.yBaseline, 'sideBaseline', ...
+                    sideData.horizontal.xConOpto, sideData.horizontal.yConOpto, 'sideOpto', ...
+                    sideData.horizontal.xInconOpto, sideData.horizontal.yInconOpto, 'sideOpto');
+            case 'vertical'
+                panelData = buildSignedBX0PanelFitData(panelName, ...
+                    sideData.vertical.xBaseline, sideData.vertical.yBaseline, 'sideBaseline', ...
+                    sideData.vertical.xConOpto, sideData.vertical.yConOpto, 'sideOpto', ...
+                    sideData.vertical.xInconOpto, sideData.vertical.yInconOpto, 'sideOpto');
+            case 'merged'
+                panelData = buildSignedBX0MergedPanelFitData(mdl, block);
+        end
+
+        fitResult = fitSignedBX0SinglePanel(panelData, globalDeltaX0, primaryParams, blockInfo);
+        fitResult.sourcePanel = panelName;
+        assertSignedBX0PanelFit(fitResult, panelName, globalDeltaX0);
+        panelFits.(panelName) = fitResult;
+        mdl = storeSignedBX0PanelFit(mdl, block, panelName, fitResult);
+        fprintf(['weibullSignedBX0 panel fit audit | experiment %s | panel %s | ' ...
+            'sourceChecksum %.12g | fitChecksum %.12g\n'], ...
+            char(blockInfo.label), panelName, fitResult.sourceChecksum, fitResult.fitChecksum);
+    end
+end
+
+function mdl = ensureSignedBX0PanelFitStorage(mdl, nRows)
+    if ~isfield(mdl, 'signedBX0')
+        mdl.signedBX0 = struct();
+    end
+    if ~isfield(mdl.signedBX0, 'panelFits') || isempty(mdl.signedBX0.panelFits)
+        mdl.signedBX0.panelFits = struct();
+    end
+
+    panelNames = {'horizontal', 'vertical', 'merged'};
+    for panelIdx = 1:numel(panelNames)
+        panelName = panelNames{panelIdx};
+        if ~isfield(mdl.signedBX0.panelFits, panelName) || ...
+                isempty(mdl.signedBX0.panelFits.(panelName))
+            mdl.signedBX0.panelFits.(panelName) = struct();
+        end
+        panel = mdl.signedBX0.panelFits.(panelName);
+        panel.fitParams = initializePanelField(panel, 'fitParams', nRows, 10, NaN);
+        panel.nLL = initializePanelField(panel, 'nLL', nRows, 1, NaN);
+        panel.fitStatus = initializePanelCellField(panel, 'fitStatus', nRows, '');
+        panel.bestStartIndex = initializePanelField(panel, 'bestStartIndex', nRows, 1, NaN);
+        panel.exitFlag = initializePanelField(panel, 'exitFlag', nRows, 1, NaN);
+        panel.boundHit = initializePanelField(panel, 'boundHit', nRows, 1, false);
+        panel.boundHitFields = initializePanelCellField(panel, 'boundHitFields', nRows, {});
+        panel.maxSlopeOverall = initializePanelField(panel, 'maxSlopeOverall', nRows, 1, NaN);
+        panel.slopeCapActive = initializePanelField(panel, 'slopeCapActive', nRows, 1, false);
+        panel.sourceChecksum = initializePanelField(panel, 'sourceChecksum', nRows, 1, NaN);
+        panel.fitChecksum = initializePanelField(panel, 'fitChecksum', nRows, 1, NaN);
+        panel.globalDeltaX0 = initializePanelField(panel, 'globalDeltaX0', nRows, 1, NaN);
+        panel.parameterNames = signedBX0PanelParameterNames();
+        mdl.signedBX0.panelFits.(panelName) = panel;
+    end
+end
+
+function value = initializePanelField(panel, fieldName, nRows, nCols, fillValue)
+    if isfield(panel, fieldName) && ~isempty(panel.(fieldName)) && ...
+            size(panel.(fieldName), 1) >= nRows && size(panel.(fieldName), 2) >= nCols
+        value = panel.(fieldName);
+    else
+        value = repmat(fillValue, nRows, nCols);
+    end
+end
+
+function value = initializePanelCellField(panel, fieldName, nRows, fillValue)
+    if isfield(panel, fieldName) && ~isempty(panel.(fieldName)) && ...
+            numel(panel.(fieldName)) >= nRows
+        value = panel.(fieldName);
+    else
+        value = repmat({fillValue}, nRows, 1);
+    end
+end
+
+function names = signedBX0PanelParameterNames()
+    names = {'A_baseline', 'alpha_baseline', 'beta_baseline', ...
+        'A_con', 'alpha_con', 'beta_con', ...
+        'A_incon', 'alpha_incon', 'beta_incon', 'deltaB_panel'};
+end
+
+function panelData = buildSignedBX0MergedPanelFitData(mdl, block)
+    xBaseline = rmnan(mdl.xBaseline(block, :));
+    yBaseline = rmnan(mdl.yBaseline(block, :));
+    xCon = rmnan(mdl.xConOpto(block, :));
+    yCon = rmnan(mdl.yConOpto(block, :));
+    xIncon = rmnan(mdl.xInconOpto(block, :));
+    yIncon = rmnan(mdl.yInconOpto(block, :));
+
+    idxBaseline = xBaseline >= 0;
+    idxCon = xCon >= 0;
+    idxIncon = xIncon >= 0;
+    panelData = buildSignedBX0PanelFitData('merged', ...
+        abs(xBaseline(idxBaseline)), yBaseline(idxBaseline), 'merged', ...
+        abs(xCon(idxCon)), yCon(idxCon), 'merged', ...
+        abs(xIncon(idxIncon)), yIncon(idxIncon), 'merged');
+end
+
+function panelData = buildSignedBX0PanelFitData(panelName, xBaseline, yBaseline, baselineWeightMode, xCon, yCon, conWeightMode, xIncon, yIncon, inconWeightMode)
+    [xBaseline, yBaseline] = cleanAndSortXY(abs(xBaseline), yBaseline);
+    [xCon, yCon] = cleanAndSortXY(abs(xCon), yCon);
+    [xIncon, yIncon] = cleanAndSortXY(abs(xIncon), yIncon);
+
+    nBaseline = getPlotMeanWeights(xBaseline, baselineWeightMode);
+    nCon = getPlotMeanWeights(xCon, conWeightMode);
+    nIncon = getPlotMeanWeights(xIncon, inconWeightMode);
+
+    panelData = struct();
+    panelData.panelName = panelName;
+    panelData.xBaseline = xBaseline;
+    panelData.yBaseline = yBaseline;
+    panelData.nBaseline = nBaseline;
+    panelData.successBaseline = round((yBaseline ./ 100) .* nBaseline);
+    panelData.xCon = xCon;
+    panelData.yCon = yCon;
+    panelData.nCon = nCon;
+    panelData.successCon = round((yCon ./ 100) .* nCon);
+    panelData.xIncon = xIncon;
+    panelData.yIncon = yIncon;
+    panelData.nIncon = nIncon;
+    panelData.successIncon = round((yIncon ./ 100) .* nIncon);
+    panelData.sourceChecksum = computeSignedBX0PanelSourceChecksum(panelData);
+
+    if isempty(xBaseline) || isempty(xCon) || isempty(xIncon)
+        error('plotNakaRushtonFit5:SignedBX0PanelSourceMissing', ...
+            'weibullSignedBX0 panel %s has missing baseline/con/incon source data.', panelName);
+    end
+end
+
+function checksum = computeSignedBX0PanelSourceChecksum(panelData)
+    values = [panelData.xBaseline, panelData.yBaseline, panelData.nBaseline, panelData.successBaseline, ...
+        panelData.xCon, panelData.yCon, panelData.nCon, panelData.successCon, ...
+        panelData.xIncon, panelData.yIncon, panelData.nIncon, panelData.successIncon];
+    values = values(isfinite(values));
+    checksum = sum(values .* (1:numel(values)));
+end
+
+function fitResult = fitSignedBX0SinglePanel(panelData, globalDeltaX0, primaryParams, blockInfo)
+    [initialParams, lbFull, ubFull] = getWeibullSignedBX0InitParams();
+    lb = lbFull(1:10);
+    ub = ubFull(1:10);
+    params0 = initialParams(1:10);
+    if numel(primaryParams) >= 10 && all(isfinite(primaryParams(1:10)))
+        params0 = primaryParams(1:10);
+    end
+    params0 = min(max(params0, lb), ub);
+
+    starts = makeSignedBX0PanelDeterministicStarts(params0, lb, ub);
+    bestNLL = Inf;
+    bestParams = nan(1, 10);
+    bestStartIndex = NaN;
+    bestExitFlag = NaN;
+    exitFlags = nan(size(starts, 1), 1);
+    attemptedMaxSlopes = nan(size(starts, 1), 1);
+
+    for startIdx = 1:size(starts, 1)
+        [candidateParams, candidateNLL, exitFlag] = fitSignedBX0PanelWithExit( ...
+            starts(startIdx, :), lb, ub, panelData, globalDeltaX0);
+        exitFlags(startIdx) = exitFlag;
+        slopeDiagnostics = getSignedBX0PanelSlopeDiagnostics(candidateParams, globalDeltaX0);
+        attemptedMaxSlopes(startIdx) = slopeDiagnostics.maxSlopeOverall;
+        if numel(candidateParams) == 10 && all(isfinite(candidateParams)) && ...
+                isfinite(candidateNLL) && slopeDiagnostics.isValid && candidateNLL < bestNLL
+            bestNLL = candidateNLL;
+            bestParams = candidateParams;
+            bestStartIndex = startIdx;
+            bestExitFlag = exitFlag;
+        end
+    end
+
+    if ~isfinite(bestNLL)
+        error('plotNakaRushtonFit5:SignedBX0PanelFitFailed', ...
+            ['All conditional weibullSignedBX0 panel starts failed for %s panel %s. ' ...
+            'Exit flags: %s. Lowest attempted max slope: %.4g.'], ...
+            blockInfo.label, panelData.panelName, mat2str(exitFlags'), ...
+            min(attemptedMaxSlopes, [], 'omitnan'));
+    end
+
+    diagnostics = makeSignedBX0PanelFitDiagnostics(bestParams, bestStartIndex, ...
+        bestExitFlag, lb, ub, globalDeltaX0);
+    fitResult = struct( ...
+        'fitParams', bestParams, ...
+        'nLL', bestNLL, ...
+        'fitStatus', 'ok', ...
+        'bestStartIndex', bestStartIndex, ...
+        'exitFlag', bestExitFlag, ...
+        'boundHit', diagnostics.boundHit, ...
+        'boundHitFields', {diagnostics.boundHitFields}, ...
+        'maxSlopeOverall', diagnostics.maxSlopeOverall, ...
+        'slopeCapActive', diagnostics.slopeCapActive, ...
+        'sourceChecksum', panelData.sourceChecksum, ...
+        'fitChecksum', sum(bestParams .* (1:10)) + 11 .* globalDeltaX0, ...
+        'globalDeltaX0', globalDeltaX0, ...
+        'parameterNames', {signedBX0PanelParameterNames()});
+end
+
+function starts = makeSignedBX0PanelDeterministicStarts(params0, lb, ub)
+    starts = repmat(params0(:)', 7, 1);
+    starts(2, [3 6 9]) = 1.5;
+    starts(3, [3 6 9]) = 5;
+    starts(4, 10) = 10;
+    starts(5, 10) = -10;
+    starts(6, [3 6 9 10]) = [2.5 2.5 2.5 5];
+    starts(7, [3 6 9 10]) = [6 6 6 -5];
+    starts = min(max(starts, lb), ub);
+    starts = unique(starts, 'rows', 'stable');
+end
+
+function [fittedParams, nLL, exitFlag] = fitSignedBX0PanelWithExit(params0, lb, ub, panelData, globalDeltaX0)
+    toParams = @(u) lb + u(:)' .* (ub - lb);
+    toUnit = @(p) (p(:)' - lb) ./ (ub - lb);
+    u0 = min(max(toUnit(params0), 0), 1);
+    obj = @(u) signedBX0PanelObjective(toParams(min(max(u, 0), 1)), ...
+        panelData, globalDeltaX0);
+
+    haveFMC = exist('fmincon','file') == 2;
+    if haveFMC
+        fopts = optimoptions('fmincon', ...
+            'Algorithm','interior-point', ...
+            'Display','off', ...
+            'MaxFunctionEvaluations', 5000, ...
+            'FiniteDifferenceType','central');
+        [uFit, ~, exitFlag] = fmincon(obj, u0, [], [], [], [], ...
+            zeros(size(u0)), ones(size(u0)), [], fopts);
+    else
+        opts = optimset('Display', 'off', 'MaxFunEvals', 5000, ...
+            'MaxIter', 5000);
+        [uFit, ~, exitFlag] = fminsearchbnd(obj, u0, zeros(size(u0)), ...
+            ones(size(u0)), opts);
+    end
+
+    fittedParams = toParams(min(max(uFit, 0), 1));
+    nLL = signedBX0PanelObjective(fittedParams, panelData, globalDeltaX0);
+end
+
+function nLL = signedBX0PanelObjective(panelParams, panelData, globalDeltaX0)
+    epsilon = 1e-10;
+    if numel(panelParams) ~= 10 || any(~isfinite(panelParams(:))) || ...
+            ~isfinite(globalDeltaX0)
+        nLL = 1e12;
+        return;
+    end
+
+    slopeDiagnostics = getSignedBX0PanelSlopeDiagnostics(panelParams, globalDeltaX0);
+    if ~slopeDiagnostics.isValid
+        excess = slopeDiagnostics.slopeExcess;
+        excess(~isfinite(excess)) = 5.0;
+        nLL = 1e12 + 1e6 .* sum(excess .^ 2);
+        return;
+    end
+
+    curves = predictSignedBX0PanelFitCurvesForData(panelParams, globalDeltaX0, ...
+        panelData.xBaseline, panelData.xCon, panelData.xIncon);
+    pBaseline = min(max(curves.baseline ./ 100, epsilon), 1 - epsilon);
+    pCon = min(max(curves.con ./ 100, epsilon), 1 - epsilon);
+    pIncon = min(max(curves.incon ./ 100, epsilon), 1 - epsilon);
+
+    nLL = signedBX0ConditionNLL(panelData.successBaseline, panelData.nBaseline, pBaseline) + ...
+        signedBX0ConditionNLL(panelData.successCon, panelData.nCon, pCon) + ...
+        signedBX0ConditionNLL(panelData.successIncon, panelData.nIncon, pIncon);
+end
+
+function nLL = signedBX0ConditionNLL(successes, nTrials, probability)
+    failures = nTrials - successes;
+    nLL = -sum(successes .* log(probability) + failures .* log(1 - probability));
+end
+
+function curves = predictSignedBX0PanelFitCurvesForData(panelParams, globalDeltaX0, xBaseline, xCon, xIncon)
+    validateSignedBX0BranchIndependence(panelParams, globalDeltaX0);
+    baselineCurve = predictSignedBX0PanelBaseline(abs(xBaseline), panelParams);
+    [conCurve, inconCurve] = predictSignedBX0PanelOpto(abs(xCon), abs(xIncon), ...
+        panelParams, globalDeltaX0);
+    curves = struct('baseline', baselineCurve, 'con', conCurve, 'incon', inconCurve);
+end
+
+function displayCurves = predictSignedBX0PanelFitCurves(xMagnitude, panelParams, globalDeltaX0, sourcePanel)
+    validateSignedBX0BranchIndependence(panelParams, globalDeltaX0);
+    xMagnitude = abs(xMagnitude);
+    displayCurves.baseline = predictSignedBX0PanelBaseline(xMagnitude, panelParams);
+    [displayCurves.con, displayCurves.incon] = predictSignedBX0PanelOpto( ...
+        xMagnitude, xMagnitude, panelParams, globalDeltaX0);
+    displayCurves.sourcePanel = sourcePanel;
+    validateSignedBX0PanelCurves(displayCurves, size(xMagnitude), sourcePanel);
+end
+
+function yBaseline = predictSignedBX0PanelBaseline(c, panelParams)
+    yBaseline = predictShiftedWeibullBranch(c, ...
+        panelParams(1), 50, panelParams(2), panelParams(3), 0);
+end
+
+function [yCon, yIncon] = predictSignedBX0PanelOpto(cCon, cIncon, panelParams, globalDeltaX0)
+    deltaB_panel = panelParams(10);
+    B_con = 50 + deltaB_panel;
+    B_incon = 50 - deltaB_panel;
+    X0_con = -globalDeltaX0;
+    X0_incon = +globalDeltaX0;
+    yCon = predictShiftedWeibullBranch(abs(cCon), ...
+        panelParams(4), B_con, panelParams(5), panelParams(6), X0_con);
+    yIncon = predictShiftedWeibullBranch(abs(cIncon), ...
+        panelParams(7), B_incon, panelParams(8), panelParams(9), X0_incon);
+end
+
+function diagnostics = getSignedBX0PanelSlopeDiagnostics(panelParams, globalDeltaX0)
+    maxSlopePctPerContrast = 5.0;
+    deltaB_panel = panelParams(10);
+    B_con = 50 + deltaB_panel;
+    B_incon = 50 - deltaB_panel;
+    amplitudes = [(100 - panelParams(1)) - 50, ...
+        (100 - panelParams(4)) - B_con, ...
+        (100 - panelParams(7)) - B_incon];
+    alphas = [panelParams(2), panelParams(5), panelParams(8)];
+    betas = [panelParams(3), panelParams(6), panelParams(9)];
+    slopeValues = nan(1, 3);
+    if all(isfinite([amplitudes, alphas, betas, globalDeltaX0])) && ...
+            all(amplitudes > 0) && all(alphas > 0) && all(betas > 1)
+        slopeValues = getWeibullHalfMaxSlope(amplitudes, alphas, betas);
+    end
+    diagnostics.maxSlopeBaseline = slopeValues(1);
+    diagnostics.maxSlopeCon = slopeValues(2);
+    diagnostics.maxSlopeIncon = slopeValues(3);
+    diagnostics.maxSlopeValues = slopeValues;
+    diagnostics.maxSlopeOverall = max(slopeValues, [], 'omitnan');
+    diagnostics.maxAllowedSlopePctPerContrast = maxSlopePctPerContrast;
+    diagnostics.slopeConstraintActive = true;
+    diagnostics.slopeCapActive = isfinite(diagnostics.maxSlopeOverall) && ...
+        diagnostics.maxSlopeOverall > maxSlopePctPerContrast;
+    diagnostics.isValid = all(isfinite(slopeValues)) && ...
+        all(slopeValues <= maxSlopePctPerContrast);
+    diagnostics.slopeExcess = max(0, slopeValues - maxSlopePctPerContrast);
+end
+
+function diagnostics = makeSignedBX0PanelFitDiagnostics(params, bestStartIndex, exitFlag, lb, ub, globalDeltaX0)
+    parameterNames = signedBX0PanelParameterNames();
+    tol = max(1e-6, 1e-3 .* (ub - lb));
+    hit = abs(params - lb) <= tol | abs(params - ub) <= tol;
+    slopeDiagnostics = getSignedBX0PanelSlopeDiagnostics(params, globalDeltaX0);
+    diagnostics = struct( ...
+        'bestStartIndex', bestStartIndex, ...
+        'exitFlag', exitFlag, ...
+        'boundHit', any(hit), ...
+        'boundHitFields', {parameterNames(hit)}, ...
+        'maxSlopeOverall', slopeDiagnostics.maxSlopeOverall, ...
+        'slopeCapActive', slopeDiagnostics.slopeCapActive);
+end
+
+function assertSignedBX0PanelFit(fitResult, expectedPanel, globalDeltaX0)
+    actualPanel = '<missing>';
+    if isfield(fitResult, 'sourcePanel')
+        actualPanel = fitResult.sourcePanel;
+    end
+    if ~strcmp(actualPanel, expectedPanel)
+        error('plotNakaRushtonFit5:SignedBX0PanelMismatch', ...
+            'Expected %s panel fit, got %s.', expectedPanel, actualPanel);
+    end
+    if numel(fitResult.fitParams) ~= 10 || any(~isfinite(fitResult.fitParams))
+        error('plotNakaRushtonFit5:SignedBX0PanelParamCount', ...
+            'Panel %s must have exactly 10 finite fitted parameters.', expectedPanel);
+    end
+    if fitResult.globalDeltaX0 ~= globalDeltaX0
+        error('plotNakaRushtonFit5:SignedBX0PanelX0Mismatch', ...
+            'Panel %s did not hold the global deltaX0 fixed.', expectedPanel);
+    end
+end
+
+function assertSignedBX0PanelCurveSource(displayCurves, expectedPanel)
+    actualPanel = '<missing>';
+    if isfield(displayCurves, 'sourcePanel')
+        actualPanel = displayCurves.sourcePanel;
+    end
+    if ~strcmp(actualPanel, expectedPanel)
+        error('plotNakaRushtonFit5:SignedBX0CurveSourceMismatch', ...
+            'Expected %s curves, got %s.', expectedPanel, actualPanel);
+    end
+end
+
+function validateSignedBX0BranchIndependence(panelParams, globalDeltaX0)
+    c = [0 10 25 50 75 100];
+    [con0, incon0] = predictSignedBX0PanelOpto(c, c, panelParams, globalDeltaX0);
+    conPerturbed = panelParams;
+    conPerturbed(4:6) = min(conPerturbed(4:6) + [0.5 1 0.1], [24.5 59 7.9]);
+    [~, inconAfterConChange] = predictSignedBX0PanelOpto(c, c, conPerturbed, globalDeltaX0);
+    inconPerturbed = panelParams;
+    inconPerturbed(7:9) = min(inconPerturbed(7:9) + [0.5 1 0.1], [24.5 59 7.9]);
+    [conAfterInconChange, ~] = predictSignedBX0PanelOpto(c, c, inconPerturbed, globalDeltaX0);
+    if any(abs(incon0 - inconAfterConChange) > 1e-10) || ...
+            any(abs(con0 - conAfterInconChange) > 1e-10)
+        error('plotNakaRushtonFit5:SignedBX0BranchSwitching', ...
+            'Displayed con/incon panel predictions are not branch-independent.');
+    end
+end
+function validateSignedBX0PanelCurves(displayCurves, expectedSize, sourcePanel)
+    conditionNames = {'baseline', 'con', 'incon'};
+    for conditionIdx = 1:numel(conditionNames)
+        conditionName = conditionNames{conditionIdx};
+        y = displayCurves.(conditionName);
+        if ~isequal(size(y), expectedSize) || ~isreal(y) || ...
+                any(~isfinite(y(:))) || any(y(:) < 0) || any(y(:) > 100)
+            error('plotNakaRushtonFit5:InvalidSignedBX0PanelCurve', ...
+                ['Invalid weibullSignedBX0 %s panel curve for %s. ' ...
+                'Expected size %s, got %s.'], ...
+                sourcePanel, conditionName, mat2str(expectedSize), mat2str(size(y)));
+        end
+    end
+end
+
+function mdl = storeSignedBX0PanelFit(mdl, block, panelName, fitResult)
+    panel = mdl.signedBX0.panelFits.(panelName);
+    panel.fitParams(block,:) = fitResult.fitParams;
+    panel.nLL(block) = fitResult.nLL;
+    panel.fitStatus{block} = fitResult.fitStatus;
+    panel.bestStartIndex(block) = fitResult.bestStartIndex;
+    panel.exitFlag(block) = fitResult.exitFlag;
+    panel.boundHit(block) = logical(fitResult.boundHit);
+    panel.boundHitFields{block} = fitResult.boundHitFields;
+    panel.maxSlopeOverall(block) = fitResult.maxSlopeOverall;
+    panel.slopeCapActive(block) = logical(fitResult.slopeCapActive);
+    panel.sourceChecksum(block) = fitResult.sourceChecksum;
+    panel.fitChecksum(block) = fitResult.fitChecksum;
+    panel.globalDeltaX0(block) = fitResult.globalDeltaX0;
+    panel.parameterNames = fitResult.parameterNames;
+    mdl.signedBX0.panelFits.(panelName) = panel;
+end
+function validateSignedBX0PanelFitFields(panelFitsHorizontal, panelFitsVertical, panelFitsMerged, block)
+    panelFits.horizontal = panelFitsHorizontal;
+    panelFits.vertical = panelFitsVertical;
+    panelFits.merged = panelFitsMerged;
+    names = {'horizontal', 'vertical', 'merged'};
+    for ii = 1:numel(names)
+        panelName = names{ii};
+        params = panelFits.(panelName).fitParams(block, :);
+        if numel(params) ~= 10 || any(~isfinite(params))
+            error('plotNakaRushtonFit5:SignedBX0PanelStorageInvalid', ...
+                'Stored %s panel fit for block %d is not a finite 10-parameter vector.', ...
+                panelName, block);
+        end
+    end
+end
 function displayCurves = predictSignedBX0DisplayCurves(xMagnitude, fitParamRow)
     params = squeeze(fitParamRow);
     params = params(:)';
@@ -1664,79 +2242,95 @@ function addFitParameterTable(ax, headers, fitParamRow, modelTypeStr)
     end
 end
 
-function addSignedBX0FitParameterTable(ax, fitParamRow)
-    fitParamRow = squeeze(fitParamRow);
-    fitParamRow = fitParamRow(:)';
-    if numel(fitParamRow) < 11
+function addSignedBX0FitParameterTable(ax, panelFitParams, globalDeltaX0, deltaAICcX0)
+    if nargin < 4 || isempty(deltaAICcX0)
+        deltaAICcX0 = NaN;
+    end
+    if nargin < 3 || isempty(globalDeltaX0) || ~isfinite(globalDeltaX0)
+        return;
+    end
+    panelFitParams = squeeze(panelFitParams);
+    panelFitParams = panelFitParams(:)';
+    if numel(panelFitParams) < 10 || any(~isfinite(panelFitParams(1:10)))
         return;
     end
 
-    params = fitParamRow(1:11);
-    deltaB = params(10);
-    deltaX0 = params(11);
+    params = panelFitParams(1:10);
+    deltaB_panel = params(10);
     tableValues = [ ...
         params(1), 50, params(2), params(3), 0; ...
-        params(4), 50 - deltaB, params(5), params(6), deltaX0; ...
-        params(7), 50 - deltaB, params(8), params(9), deltaX0; ...
-        params(7), 50 + deltaB, params(8), params(9), -deltaX0; ...
-        params(4), 50 + deltaB, params(5), params(6), -deltaX0];
+        params(4), 50 + deltaB_panel, params(5), params(6), -globalDeltaX0; ...
+        params(7), 50 - deltaB_panel, params(8), params(9), +globalDeltaX0];
     paramHeaders = {'A', 'B', '\alpha', '\beta', 'X0'};
-    rowLabels = {'Baseline', 'H-left (Con)', 'H-right (Incon)', ...
-        'V-left (Incon)', 'V-right (Con)'};
-    rowColors = [0 0 0; 0.55 0 0; 0 0.05 0.45; 0 0.05 0.45; 0.55 0 0];
+    rowLabels = {'Baseline', 'Con-Opto', 'Incon-Opto'};
+    rowColors = [0 0 0; 0.55 0 0; 0 0.05 0.45];
+    strongColor = [0 0 0];
+    weakColor = [0.45 0.45 0.45];
 
     axPos = get(ax, 'Position');
-    tableGap = 0.010;
-    maxTableRight = 0.992;
+    tableGap = 0.004;
+    maxTableRight = 0.988;
     tableX = axPos(1) + axPos(3) + tableGap;
     availableWidth = maxTableRight - tableX;
-    tableWidth = min(0.25, availableWidth);
-    if tableWidth < 0.21
-        tableWidth = 0.21;
+    tableWidth = min(0.205, availableWidth);
+    if tableWidth < 0.185
+        tableWidth = 0.185;
         tableX = max(0.01, maxTableRight - tableWidth);
     end
 
-    tableHeight = 0.62 * axPos(4);
-    tableY = axPos(2) + 0.5 * axPos(4) - 0.5 * tableHeight;
-    rowHeight = tableHeight / 6;
-    labelWidth = 0.088;
-    labelGap = 0.002;
-    paramGap = 0.006;
-    valueWidth = (tableWidth - labelWidth - labelGap - ...
-        (numel(paramHeaders) - 1) * paramGap) / numel(paramHeaders);
-    fontSize = 9.2;
+    tableHeight = 0.44 * axPos(4);
+    tableY = axPos(2) + 0.50 * axPos(4) - 0.5 * tableHeight;
+    rowHeight = tableHeight / 5;
+    fontSize = 10.5;
+    columnX = [0.00, 0.43, 0.56, 0.69, 0.82, 0.94];
+    columnWidth = [0.41, 0.105, 0.105, 0.105, 0.105, 0.055];
+    columnX = tableX + tableWidth .* columnX;
+    columnWidth = tableWidth .* columnWidth;
+    if columnX(end) + columnWidth(end) > 0.99
+        error('plotNakaRushtonFit5:SignedBX0TableClipped', ...
+            'Signed-BX0 X0 table column exceeds the normalized figure boundary.');
+    end
 
-    addFitTableCell(tableX, tableY + 5 * rowHeight, labelWidth, ...
+    addFitTableCell(columnX(1), tableY + 4 * rowHeight, columnWidth(1), ...
         rowHeight, '', [0 0 0], fontSize, 'bold', 'left');
     for col = 1:numel(paramHeaders)
-        addFitTableCell(tableX + labelWidth + labelGap + ...
-            (col - 1) * (valueWidth + paramGap), ...
-            tableY + 5 * rowHeight, valueWidth, rowHeight, ...
-            paramHeaders{col}, [0 0 0], fontSize, 'bold', 'center');
+        addFitTableCell(columnX(col + 1), tableY + 4 * rowHeight, ...
+            columnWidth(col + 1), rowHeight, paramHeaders{col}, ...
+            [0 0 0], fontSize, 'bold', 'center');
     end
 
     for row = 1:numel(rowLabels)
-        yPos = tableY + (5 - row) * rowHeight;
-        addFitTableCell(tableX, yPos, labelWidth, rowHeight, ...
+        yPos = tableY + (4 - row) * rowHeight;
+        addFitTableCell(columnX(1), yPos, columnWidth(1), rowHeight, ...
             rowLabels{row}, rowColors(row,:), fontSize, 'bold', 'left');
         for col = 1:numel(paramHeaders)
-            valueStr = formatSignedBX0ParameterValue(...
+            valueStr = formatSignedBX0ParameterValue( ...
                 tableValues(row, col), paramHeaders{col});
-            addFitTableCell(tableX + labelWidth + labelGap + ...
-                (col - 1) * (valueWidth + paramGap), yPos, ...
-                valueWidth, rowHeight, valueStr, rowColors(row,:), ...
-                fontSize, 'normal', 'center');
+            addFitTableCell(columnX(col + 1), yPos, columnWidth(col + 1), ...
+                rowHeight, valueStr, rowColors(row,:), fontSize, 'normal', 'center');
         end
     end
-end
 
+    if isfinite(deltaAICcX0) && deltaAICcX0 >= 8
+        aicColor = strongColor;
+    else
+        aicColor = weakColor;
+    end
+    aicText = sprintf('DeltaAICc_X0    %.1f', deltaAICcX0);
+    addFitTableCell(tableX, tableY, tableWidth, rowHeight, ...
+        aicText, aicColor, fontSize, 'normal', 'left');
+end
 function valueStr = formatSignedBX0ParameterValue(value, paramName)
     if isnan(value)
         valueStr = '';
         return;
     end
     if strcmp(paramName, 'X0')
-        valueStr = sprintf('%+.1f', value);
+        if abs(value) < 0.05
+            valueStr = sprintf('%.1f', 0);
+        else
+            valueStr = sprintf('%+.1f', value);
+        end
     else
         valueStr = sprintf('%.1f', value);
     end
@@ -1874,28 +2468,6 @@ function valueStr = formatFitParameterValue(value, paramName)
     valueStr = sprintf('%.1f', value);
 end
 
-function textOut = signedBX0AnnotationText(mdl, block)
-    textOut = '';
-    if ~isfield(mdl, 'signedBX0')
-        return;
-    end
-    requiredFields = {'deltaB', 'deltaX0', ...
-        'deltaAICcX0', 'akaikeWeightBX0'};
-    for idx = 1:numel(requiredFields)
-        if ~isfield(mdl.signedBX0, requiredFields{idx}) || ...
-                numel(mdl.signedBX0.(requiredFields{idx})) < block
-            return;
-        end
-    end
-    textOut = sprintf(['deltaB: %+.1f%%\n' ...
-        'deltaX0: %+.1f%%\n' ...
-        'DeltaAICc_X0: %.2g\n' ...
-        'w_B+X0: %.2f'], ...
-        mdl.signedBX0.deltaB(block), ...
-        mdl.signedBX0.deltaX0(block), ...
-        mdl.signedBX0.deltaAICcX0(block), ...
-        mdl.signedBX0.akaikeWeightBX0(block));
-end
 function textOut = signedX0AnnotationText(mdl, block)
     textOut = '';
     if ~isfield(mdl, 'signedX0')
@@ -2046,30 +2618,60 @@ function assertDeltaPermutationVisualizationAudit(audit, permResult, contextLabe
         error('plotNakaRushtonFit5:MissingDeltaPermutationVisualizationAudit', ...
             'Missing permutation visualization audit for %s.', contextLabel);
     end
-    nExpected = numel(permResult.contrast);
-    if audit.visualization.nNullIntervals ~= nExpected || ...
-            audit.visualization.nNullMedians ~= nExpected || ...
-            audit.visualization.nLabels ~= nExpected || ...
-            audit.visualization.nOverall < 1
-        error('plotNakaRushtonFit5:DeltaPermutationVisualizationCountMismatch', ...
-            ['Permutation visualization count mismatch for %s: expected %d, ' ...
-            'intervals %d, medians %d, labels %d, overall %d.'], ...
-            contextLabel, nExpected, audit.visualization.nNullIntervals, ...
-            audit.visualization.nNullMedians, audit.visualization.nLabels, ...
-            audit.visualization.nOverall);
+
+    if isfield(audit.visualization, 'nOverallNullBands')
+        if audit.visualization.nNullIntervals ~= 0 || ...
+                audit.visualization.nNullMedians ~= 0 || ...
+                audit.visualization.nLabels ~= 0 || ...
+                audit.visualization.nOverallNullBands ~= 1 || ...
+                audit.visualization.nOverallNullMedians ~= 1 || ...
+                audit.visualization.nOverall < 1
+            error('plotNakaRushtonFit5:DeltaPermutationVisualizationCountMismatch', ...
+                ['Permutation visualization count mismatch for %s: expected ' ...
+                '0 contrast intervals/medians/labels and 1 overall band/median; ' ...
+                'got intervals %d, medians %d, labels %d, bands %d, overall medians %d, overall %d.'], ...
+                contextLabel, audit.visualization.nNullIntervals, ...
+                audit.visualization.nNullMedians, audit.visualization.nLabels, ...
+                audit.visualization.nOverallNullBands, ...
+                audit.visualization.nOverallNullMedians, audit.visualization.nOverall);
+        end
+    else
+        nExpected = numel(permResult.contrast);
+        if audit.visualization.nNullIntervals ~= nExpected || ...
+                audit.visualization.nNullMedians ~= nExpected || ...
+                audit.visualization.nLabels ~= nExpected || ...
+                audit.visualization.nOverall < 1
+            error('plotNakaRushtonFit5:DeltaPermutationVisualizationCountMismatch', ...
+                ['Permutation visualization count mismatch for %s: expected %d, ' ...
+                'intervals %d, medians %d, labels %d, overall %d.'], ...
+                contextLabel, nExpected, audit.visualization.nNullIntervals, ...
+                audit.visualization.nNullMedians, audit.visualization.nLabels, ...
+                audit.visualization.nOverall);
+        end
+        if ~audit.visualization.labelsShareY
+            error('plotNakaRushtonFit5:DeltaPermutationLabelYMismatch', ...
+                'Permutation labels do not share one y-coordinate for %s.', contextLabel);
+        end
     end
-    if ~audit.visualization.labelsShareY
-        error('plotNakaRushtonFit5:DeltaPermutationLabelYMismatch', ...
-            'Permutation labels do not share one y-coordinate for %s.', contextLabel);
-    end
+
     if isfield(audit.visualization, 'allHandlesHidden') && ~audit.visualization.allHandlesHidden
         error('DeltaPermutation:HandleVisibility', ...
             'Permutation visualization handles are not hidden from legend for %s.', char(string(contextLabel)));
     end
-    fprintf('Added null intervals %d | labels %d | overall annotations %d\n', ...
+    fprintf('Added permutation visuals | contrast boxes %d | contrast labels %d | overall bands %d | overall annotations %d\n', ...
         audit.visualization.nNullIntervals, audit.visualization.nLabels, ...
+        getAuditScalarField(audit.visualization, 'nOverallNullBands', 0), ...
         audit.visualization.nOverall);
 end
+
+function value = getAuditScalarField(s, fieldName, defaultValue)
+    if isfield(s, fieldName)
+        value = s.(fieldName);
+    else
+        value = defaultValue;
+    end
+end
+
 function saveDeltaPermutationExampleFigure(fig, plotOpts, exampleType)
     if ~isfield(plotOpts, 'saveDeltaPermutationExamples') || ...
             ~plotOpts.saveDeltaPermutationExamples || ...
@@ -2257,7 +2859,8 @@ function h = plotConditionSeries(xPlot, yPlot, colorVal, markerType, markerFaceC
     [xPlot, yPlot] = cleanAndSortXY(xPlot, yPlot);
 
     if isempty(xPlot)
-        h = plot(nan, nan, '-', ...
+        h = plot(nan, nan, ...
+            'LineStyle', 'none', ...
             'Color', colorVal, ...
             'LineWidth', lineWidth, ...
             'Marker', markerType, ...
@@ -2269,7 +2872,8 @@ function h = plotConditionSeries(xPlot, yPlot, colorVal, markerType, markerFaceC
         return;
     end
 
-    h = plot(xPlot, yPlot, '-', ...
+    h = plot(xPlot, yPlot, ...
+        'LineStyle', 'none', ...
         'Color', colorVal, ...
         'LineWidth', lineWidth, ...
         'Marker', markerType, ...
@@ -2337,7 +2941,8 @@ function mdl = plotPreMergedPanel(mdl, block, xLimPre, meanBar, tickCfg)
     xBaseline = rmnan(mdl.xBaselinePreMerge(block, :));
     yBaseline = rmnan(mdl.yBaselinePreMerge(block, :));
 
-    hBaseline = plot(xBaseline, yBaseline, '-', ...
+    hBaseline = plot(xBaseline, yBaseline, ...
+        'LineStyle', 'none', ...
         'Color', baselineColorLight, ...
         'LineWidth', lineWidth, ...
         'Marker', 'o', ...
@@ -2449,7 +3054,8 @@ function h = plotByCongruencyPooled(x, y, congr, congrValue, colorVal, markerTyp
     idx = congr == congrValue & ~isnan(x) & ~isnan(y);
 
     if ~any(idx)
-        h = plot(nan, nan, '-', ...
+        h = plot(nan, nan, ...
+            'LineStyle', 'none', ...
             'Color', colorVal, ...
             'LineWidth', lineWidth, ...
             'Marker', markerType, ...
@@ -2511,7 +3117,8 @@ end
 
 function h = plotOneBranch(xPlot, yPlot, colorVal, markerType, markerSize, lineWidth, displayName, handleVisibility)
     if isempty(xPlot)
-        h = plot(nan, nan, '-', ...
+        h = plot(nan, nan, ...
+            'LineStyle', 'none', ...
             'Color', colorVal, ...
             'LineWidth', lineWidth, ...
             'Marker', markerType, ...
@@ -2526,7 +3133,8 @@ function h = plotOneBranch(xPlot, yPlot, colorVal, markerType, markerSize, lineW
     [xPlot, sortIdx] = sort(xPlot);
     yPlot = yPlot(sortIdx);
 
-    h = plot(xPlot, yPlot, '-', ...
+    h = plot(xPlot, yPlot, ...
+        'LineStyle', 'none', ...
         'Color', colorVal, ...
         'LineWidth', lineWidth, ...
         'Marker', markerType, ...
@@ -2646,7 +3254,8 @@ function h = plotSideMeanBar(x, y, idx, xRange, colorVal, lineWidth)
     idx = idx & ~isnan(x) & ~isnan(y);
 
     if ~any(idx)
-        h = plot(nan, nan, '-', ...
+        h = plot(nan, nan, ...
+            'LineStyle', 'none', ...
             'Color', colorVal, ...
             'LineWidth', lineWidth, ...
             'HandleVisibility', 'off');
@@ -2740,7 +3349,8 @@ function h = plotMeanBarAtY(yMean, xRange, colorVal, lineWidth)
     % Hidden from legend.
 
     if isnan(yMean)
-        h = plot(nan, nan, '-', ...
+        h = plot(nan, nan, ...
+            'LineStyle', 'none', ...
             'Color', colorVal, ...
             'LineWidth', lineWidth, ...
             'HandleVisibility', 'off');

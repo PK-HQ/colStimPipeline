@@ -557,9 +557,24 @@ for chamberID=2
                         plotPowerClusterFitParameters( ...
                         clusterMdl, aggregatePsychometricFits, ...
                         parameterDistributionOpts);
+                    expectedParameterClusterIDs = sort([aggregatePsychometricFits.clusterID]);
+                    generatedParameterClusterIDs = getFigurePowerClusterIDs(parameterFigures);
+                    assert(isequal(generatedParameterClusterIDs(:)', ...
+                        expectedParameterClusterIDs(:)'), ...
+                        'Parameter figure cluster IDs do not match aggregate fits.');
+                    fprintf('Parameter figures expected: %d | generated: %d | cluster IDs: [%s]\n', ...
+                        numel(expectedParameterClusterIDs), numel(parameterFigures), ...
+                        strjoin(cellstr(string(generatedParameterClusterIDs(:)')), ' '));
                     if saveFlag
+                        stagedParameterClusterIDs = generatedParameterClusterIDs;
                         reportState = stageAndCloseReportFigures( ...
                             parameterFigures, reportState);
+                        fprintf('Staged parameter cluster IDs: [%s] | pages=%d\n', ...
+                            strjoin(cellstr(string(stagedParameterClusterIDs(:)')), ' '), ...
+                            numel(stagedParameterClusterIDs));
+                        assert(isequal(stagedParameterClusterIDs(:)', ...
+                            expectedParameterClusterIDs(:)'), ...
+                            'Staged parameter cluster IDs do not match aggregate fits.');
                         finalPdfPath = reportState.outputFilename;
                         fprintf('Saving final psychometric PDF to:\n%s\n', finalPdfPath);
                         finalPdfPath = finalizeReportPDFAssembly(reportState);
@@ -1328,6 +1343,21 @@ function reportState = stageAndCloseReportFigures(figureHandles, reportState)
     end
 end
 
+function clusterIDs = getFigurePowerClusterIDs(figureHandles)
+    clusterIDs = nan(size(figureHandles));
+    for figureIdx = 1:numel(figureHandles)
+        figHandle = figureHandles(figureIdx);
+        if isempty(figHandle) || ~isgraphics(figHandle)
+            error('mainPipeline:InvalidParameterFigureHandle', ...
+                'Parameter figure %d is not a valid graphics handle.', figureIdx);
+        end
+        if ~isappdata(figHandle, 'PowerClusterID')
+            error('mainPipeline:MissingParameterFigureClusterID', ...
+                'Parameter figure %d is missing PowerClusterID appdata.', figureIdx);
+        end
+        clusterIDs(figureIdx) = getappdata(figHandle, 'PowerClusterID');
+    end
+end
 function reportState = stageAndCloseReportFigure(figHandle, reportState)
     if isempty(figHandle) || ~isgraphics(figHandle)
         error(['Plot producer did not return a live graphics handle. ' ...

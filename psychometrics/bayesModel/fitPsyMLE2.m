@@ -33,6 +33,13 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
         mdl.signedX0.X0Vertical = nan(nBlocks, 1);
         mdl.signedX0.fitStatus = repmat({''}, nBlocks, 1);
     elseif strcmp(modelType, 'weibullSignedBX0')
+        mdl.signedBX0.modelVersion = 'fullBeta_slopeCap_v1';
+        mdl.signedBX0.parameterNames = {'A_baseline', 'alpha_baseline', 'beta_baseline', ...
+            'A_con', 'alpha_con', 'beta_con', ...
+            'A_incon', 'alpha_incon', 'beta_incon', ...
+            'deltaB', 'deltaX0'};
+        mdl.signedBX0.maxAllowedSlopePctPerContrast = 5.0;
+        mdl.signedBX0.slopeConstraintActive = true;
         mdl.signedBX0.fitParams = nan(nBlocks, 11);
         mdl.signedBX0.nLL = nan(nBlocks, 1);
         mdl.signedBX0.AICc = nan(nBlocks, 1);
@@ -49,6 +56,21 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
         mdl.signedBX0.deltaB = nan(nBlocks, 1);
         mdl.signedBX0.deltaX0 = nan(nBlocks, 1);
         mdl.signedBX0.fitStatus = repmat({''}, nBlocks, 1);
+        mdl.signedBX0.nStarts = nan(nBlocks, 1);
+        mdl.signedBX0.bestStartIndex = nan(nBlocks, 1);
+        mdl.signedBX0.exitFlag = nan(nBlocks, 1);
+        mdl.signedBX0.boundHit = false(nBlocks, 1);
+        mdl.signedBX0.boundHitFields = repmat({{}}, nBlocks, 1);
+        mdl.signedBX0.maxSlopeBaselineLeft = nan(nBlocks, 1);
+        mdl.signedBX0.maxSlopeBaselineRight = nan(nBlocks, 1);
+        mdl.signedBX0.maxSlopeHorizontalLeft = nan(nBlocks, 1);
+        mdl.signedBX0.maxSlopeHorizontalRight = nan(nBlocks, 1);
+        mdl.signedBX0.maxSlopeVerticalLeft = nan(nBlocks, 1);
+        mdl.signedBX0.maxSlopeVerticalRight = nan(nBlocks, 1);
+        mdl.signedBX0.maxSlopeOverall = nan(nBlocks, 1);
+        mdl.signedBX0.slopeCapActive = false(nBlocks, 1);
+        mdl.signedBX0.noX0MaxSlopeOverall = nan(nBlocks, 1);
+        mdl.signedBX0.noX0SlopeCapActive = false(nBlocks, 1);
     end
     
     % Get averaged data
@@ -159,16 +181,24 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
         end
         
         % Fit model
+        signedBX0FitDiagnostics = [];
         if manualFittingFlag
             fittedParams = initialParams;
             nLL = objectiveFunction(fittedParams, data);
+            if strcmp(modelType, 'weibullSignedBX0')
+                signedBX0FitDiagnostics = makeSignedBX0FitDiagnostics(...
+                    fittedParams, 1, 1, NaN, lb, ub);
+            end
         else
             rng(42 + block, 'twister');   % different PSO swarm per block
             solverOption = 'globalSearch';
             % Use the modular optimization subfunction
             %nRestarts = 5;  % You can adjust the number of restarts here
             %[fittedParams, nLL] = globalSolvers(objectiveFunction, initialParams, lb, ub, opts, data, solverOption, nRestarts);            
-            if ismember(modelType, {'weibullSignedX0', 'weibullSignedBX0'})
+            if strcmp(modelType, 'weibullSignedBX0')
+                [fittedParams, nLL, signedBX0FitDiagnostics] = fitSignedBX0Multistart(...
+                    objectiveFunction, initialParams, lb, ub, opts, data);
+            elseif strcmp(modelType, 'weibullSignedX0')
                 [fittedParams, nLL] = fitParametersSimple(...
                     objectiveFunction, initialParams, lb, ub, opts, data);
             else
@@ -193,7 +223,7 @@ function [mdl, mdlAvg] = fitPsyMLE2(xBlocks, yBlocks, modelType, plotLine)
         elseif strcmp(modelType, 'weibullSignedBX0')
             signedFitSummary = fitSignedBX0NoX0Comparison(...
                 objectiveFunction, initialParams, lb, ub, opts, data, ...
-                fittedParams, nLL, aicc, n);
+                fittedParams, nLL, aicc, n, signedBX0FitDiagnostics);
         end
         
         % Save results
@@ -460,9 +490,12 @@ function summary = fitSignedNoX0Comparison(objectiveFunction, initialParams, lb,
         'fitStatus', 'ok');
 end
 
-function summary = fitSignedBX0NoX0Comparison(objectiveFunction, initialParams, lb, ub, opts, data, fittedParams, nLL, aicc, nTrials)
+function summary = fitSignedBX0NoX0Comparison(objectiveFunction, initialParams, lb, ub, opts, data, fittedParams, nLL, aicc, nTrials, fitDiagnostics)
+    if nargin < 11 || isempty(fitDiagnostics)
+        fitDiagnostics = makeSignedBX0FitDiagnostics(fittedParams, 1, 1, NaN, lb, ub);
+    end
     objectiveM0 = @(q10, fitData) objectiveFunction([q10(:)', 0], fitData);
-    [noX0Params, noX0NLL] = fitParametersSimple(...
+    [noX0Params, noX0NLL, noX0Diagnostics] = fitSignedBX0BOnlyMultistart(...
         objectiveM0, initialParams(1:10), lb(1:10), ub(1:10), opts, data);
     [~, noX0AICc] = calculateAIC(noX0NLL, 10, nTrials);
 
@@ -485,9 +518,15 @@ function summary = fitSignedBX0NoX0Comparison(objectiveFunction, initialParams, 
         'X0Vertical', -fittedParams(11), ...
         'deltaB', fittedParams(10), ...
         'deltaX0', fittedParams(11), ...
-        'fitStatus', 'ok');
+        'fitStatus', 'ok', ...
+        'nStarts', fitDiagnostics.nStarts, ...
+        'bestStartIndex', fitDiagnostics.bestStartIndex, ...
+        'exitFlag', fitDiagnostics.exitFlag, ...
+        'boundHit', fitDiagnostics.boundHit, ...
+        'boundHitFields', {fitDiagnostics.boundHitFields}, ...
+        'slopeDiagnostics', fitDiagnostics.slopeDiagnostics, ...
+        'noX0SlopeDiagnostics', noX0Diagnostics.slopeDiagnostics);
 end
-
 function weights = akaikeWeights(aiccValues)
     finiteAICc = aiccValues(isfinite(aiccValues));
     if isempty(finiteAICc)
@@ -531,6 +570,11 @@ function mdl = saveSignedBX0Results(mdl, block, summary)
     mdl.signedBX0.deltaB(block) = summary.deltaB;
     mdl.signedBX0.deltaX0(block) = summary.deltaX0;
     mdl.signedBX0.fitStatus{block} = summary.fitStatus;
+    mdl.signedBX0.nStarts(block) = summary.nStarts;
+    mdl.signedBX0.bestStartIndex(block) = summary.bestStartIndex;
+    mdl.signedBX0.exitFlag(block) = summary.exitFlag;
+    mdl.signedBX0.boundHit(block) = logical(summary.boundHit);
+    mdl.signedBX0.boundHitFields{block} = summary.boundHitFields;
 
     params = summary.fitParams;
     mdl.signedBX0.ABaseline(block) = params(1);
@@ -542,8 +586,24 @@ function mdl = saveSignedBX0Results(mdl, block, summary)
     mdl.signedBX0.AIncon(block) = params(7);
     mdl.signedBX0.alphaIncon(block) = params(8);
     mdl.signedBX0.betaIncon(block) = params(9);
-end
 
+    slopeDiagnostics = summary.slopeDiagnostics;
+    mdl.signedBX0.maxSlopeBaselineLeft(block) = slopeDiagnostics.maxSlopeBaselineLeft;
+    mdl.signedBX0.maxSlopeBaselineRight(block) = slopeDiagnostics.maxSlopeBaselineRight;
+    mdl.signedBX0.maxSlopeHorizontalLeft(block) = slopeDiagnostics.maxSlopeHorizontalLeft;
+    mdl.signedBX0.maxSlopeHorizontalRight(block) = slopeDiagnostics.maxSlopeHorizontalRight;
+    mdl.signedBX0.maxSlopeVerticalLeft(block) = slopeDiagnostics.maxSlopeVerticalLeft;
+    mdl.signedBX0.maxSlopeVerticalRight(block) = slopeDiagnostics.maxSlopeVerticalRight;
+    mdl.signedBX0.maxSlopeOverall(block) = slopeDiagnostics.maxSlopeOverall;
+    mdl.signedBX0.maxAllowedSlopePctPerContrast = ...
+        slopeDiagnostics.maxAllowedSlopePctPerContrast;
+    mdl.signedBX0.slopeConstraintActive = slopeDiagnostics.slopeConstraintActive;
+    mdl.signedBX0.slopeCapActive(block) = slopeDiagnostics.slopeCapActive;
+    mdl.signedBX0.noX0MaxSlopeOverall(block) = ...
+        summary.noX0SlopeDiagnostics.maxSlopeOverall;
+    mdl.signedBX0.noX0SlopeCapActive(block) = ...
+        summary.noX0SlopeDiagnostics.slopeCapActive;
+end
 function mdl = saveSignedBX0SourceData(mdl, block, data)
     mdl.signedBX0.xBaselineChoice(block,:) = ...
         padArray(data.xBaselineChoice, 24, 2, NaN);
@@ -600,6 +660,146 @@ function mdl = saveSignedX0SourceData(mdl, block, data)
         padArray(data.sumVerticalOptoChoice, 24, 2, NaN);
     mdl.signedX0.successVerticalOptoChoice(block,:) = ...
         padArray(data.successVerticalOptoChoice, 24, 2, NaN);
+end
+function [fittedParams, nLL, diagnostics] = fitSignedBX0Multistart(objectiveFunction, params0, lb, ub, opts, data)
+    starts = makeSignedBX0DeterministicStarts(params0, lb, ub);
+    bestNLL = Inf;
+    bestParams = nan(size(params0));
+    bestStartIndex = NaN;
+    bestExitFlag = NaN;
+    exitFlags = nan(size(starts, 1), 1);
+    attemptedMaxSlopes = nan(size(starts, 1), 1);
+
+    for startIdx = 1:size(starts, 1)
+        [candidateParams, candidateNLL, exitFlag] = fitParametersSimpleWithExit(...
+            objectiveFunction, starts(startIdx, :), lb, ub, opts, data);
+        exitFlags(startIdx) = exitFlag;
+        candidateDiagnostics = getWeibullSignedBX0SlopeDiagnostics(candidateParams, 5.0);
+        attemptedMaxSlopes(startIdx) = candidateDiagnostics.maxSlopeOverall;
+        if isSignedBX0CandidateValid(candidateParams, candidateNLL) && ...
+                candidateDiagnostics.isValid && candidateNLL < bestNLL
+            bestNLL = candidateNLL;
+            bestParams = candidateParams;
+            bestStartIndex = startIdx;
+            bestExitFlag = exitFlag;
+        end
+    end
+
+    if ~isfinite(bestNLL)
+        error('fitPsyMLE2:SignedBX0MultistartFailed', ...
+            ['All deterministic weibullSignedBX0 starts failed. ' ...
+            'Exit flags: %s. Lowest attempted max slope: %.4g.'], ...
+            mat2str(exitFlags'), min(attemptedMaxSlopes, [], 'omitnan'));
+    end
+
+    fittedParams = bestParams;
+    nLL = bestNLL;
+    diagnostics = makeSignedBX0FitDiagnostics(...
+        fittedParams, size(starts, 1), bestStartIndex, bestExitFlag, lb, ub);
+end
+
+function [fittedParams, nLL, diagnostics] = fitSignedBX0BOnlyMultistart(objectiveFunction, params0, lb, ub, opts, data)
+    starts = makeSignedBX0BOnlyDeterministicStarts(params0, lb, ub);
+    bestNLL = Inf;
+    bestParams = nan(size(params0));
+    exitFlags = nan(size(starts, 1), 1);
+    attemptedMaxSlopes = nan(size(starts, 1), 1);
+
+    for startIdx = 1:size(starts, 1)
+        [candidateParams, candidateNLL, exitFlag] = fitParametersSimpleWithExit(...
+            objectiveFunction, starts(startIdx, :), lb, ub, opts, data);
+        exitFlags(startIdx) = exitFlag;
+        candidateFullParams = [candidateParams(:)', 0];
+        candidateDiagnostics = getWeibullSignedBX0SlopeDiagnostics(candidateFullParams, 5.0);
+        attemptedMaxSlopes(startIdx) = candidateDiagnostics.maxSlopeOverall;
+        if numel(candidateParams) == 10 && all(isfinite(candidateParams)) && ...
+                isfinite(candidateNLL) && candidateDiagnostics.isValid && ...
+                candidateNLL < bestNLL
+            bestNLL = candidateNLL;
+            bestParams = candidateParams;
+        end
+    end
+
+    if ~isfinite(bestNLL)
+        error('fitPsyMLE2:SignedBX0BOnlyMultistartFailed', ...
+            ['All deterministic weibullSignedBX0 B-only starts failed. ' ...
+            'Exit flags: %s. Lowest attempted max slope: %.4g.'], ...
+            mat2str(exitFlags'), min(attemptedMaxSlopes, [], 'omitnan'));
+    end
+
+    fittedParams = bestParams;
+    nLL = bestNLL;
+    diagnostics.slopeDiagnostics = getWeibullSignedBX0SlopeDiagnostics(...
+        [fittedParams, 0], 5.0);
+end
+
+function starts = makeSignedBX0BOnlyDeterministicStarts(params0, lb, ub)
+    starts = repmat(params0(:)', 5, 1);
+    starts(2, [3 6 9]) = 1.5;
+    starts(3, [3 6 9]) = 5;
+    starts(4, 10) = 10;
+    starts(5, 10) = -10;
+    starts = min(max(starts, lb), ub);
+    starts = unique(starts, 'rows', 'stable');
+end
+
+function starts = makeSignedBX0DeterministicStarts(params0, lb, ub)
+    starts = repmat(params0(:)', 11, 1);
+    starts(2, [3 6 9]) = 1.5;
+    starts(3, [3 6 9]) = 5;
+    starts(4, 10) = 10;
+    starts(5, 10) = -10;
+    starts(6, 11) = 5;
+    starts(7, 11) = -5;
+    starts(8, [10 11]) = [10 5];
+    starts(9, [10 11]) = [10 -5];
+    starts(10, [10 11]) = [-10 5];
+    starts(11, [10 11]) = [-10 -5];
+    starts = min(max(starts, lb), ub);
+    starts = unique(starts, 'rows', 'stable');
+end
+
+function ok = isSignedBX0CandidateValid(params, nLL)
+    ok = numel(params) == 11 && all(isfinite(params)) && isfinite(nLL);
+end
+
+function diagnostics = makeSignedBX0FitDiagnostics(params, nStarts, bestStartIndex, exitFlag, lb, ub)
+    parameterNames = {'A_baseline', 'alpha_baseline', 'beta_baseline', ...
+        'A_con', 'alpha_con', 'beta_con', ...
+        'A_incon', 'alpha_incon', 'beta_incon', ...
+        'deltaB', 'deltaX0'};
+    tol = max(1e-6, 1e-3 .* (ub - lb));
+    hit = abs(params - lb) <= tol | abs(params - ub) <= tol;
+    diagnostics = struct( ...
+        'nStarts', nStarts, ...
+        'bestStartIndex', bestStartIndex, ...
+        'exitFlag', exitFlag, ...
+        'boundHit', any(hit), ...
+        'boundHitFields', {parameterNames(hit)}, ...
+        'slopeDiagnostics', getWeibullSignedBX0SlopeDiagnostics(params, 5.0));
+end
+function [fittedParams, nLL, exitFlag] = fitParametersSimpleWithExit(objectiveFunction, params0, lb, ub, opts, data)
+    toParams = @(u) lb + u(:)' .* (ub - lb);
+    toUnit = @(p) (p(:)' - lb) ./ (ub - lb);
+    u0 = min(max(toUnit(params0), 0), 1);
+    obj = @(u) objectiveFunction(toParams(min(max(u, 0), 1)), data);
+
+    haveFMC = exist('fmincon','file') == 2;
+    if haveFMC
+        fopts = optimoptions('fmincon', ...
+            'Algorithm','interior-point', ...
+            'Display','off', ...
+            'MaxFunctionEvaluations', max(5000, 20 .* opts.MaxFunEvals), ...
+            'FiniteDifferenceType','central');
+        [uFit, ~, exitFlag] = fmincon(obj, u0, [], [], [], [], zeros(size(u0)), ...
+            ones(size(u0)), [], fopts);
+    else
+        [uFit, ~, exitFlag] = fminsearchbnd(obj, u0, zeros(size(u0)), ...
+            ones(size(u0)), opts);
+    end
+
+    fittedParams = toParams(min(max(uFit, 0), 1));
+    nLL = objectiveFunction(fittedParams, data);
 end
 function [fittedParams, nLL] = fitParametersSimple(objectiveFunction, params0, lb, ub, opts, data)
     toParams = @(u) lb + u(:)' .* (ub - lb);

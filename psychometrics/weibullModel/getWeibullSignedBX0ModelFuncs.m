@@ -19,15 +19,26 @@ if isfield(common, 'epsilon')
 else
     epsilon = 1e-10;
 end
+if isfield(common, 'maxSlopePctPerContrast')
+    maxSlopePctPerContrast = common.maxSlopePctPerContrast;
+else
+    maxSlopePctPerContrast = 5.0;
+end
 
 mdl = struct();
+mdl.modelVersion = 'fullBeta_slopeCap_v1';
+mdl.parameterNames = signedBX0ParameterNames();
+mdl.maxSlopePctPerContrast = maxSlopePctPerContrast;
 mdl.signed = @(x, params) signedPredictions(x, params);
 mdl.baseline = @(x, params) foldedPredictions(x, params);
 mdl.con = @(x, params) foldedPredictions(x, params);
 mdl.incon = @(x, params) foldedPredictions(x, params);
+mdl.slopeDiagnostics = @(params) getWeibullSignedBX0SlopeDiagnostics(...
+    params, maxSlopePctPerContrast);
+mdl.binomialNLL = @(params, data) signedBinomialNLL(params, data, epsilon);
 
-objectiveFunction = @(params, data) signedBinomialNLL( ...
-    params, data, epsilon);
+objectiveFunction = @(params, data) signedConstrainedNLL( ...
+    params, data, epsilon, maxSlopePctPerContrast);
 end
 
 function y = signedPredictions(x, params)
@@ -94,7 +105,27 @@ y.pc = 0.5 .* ((100 - pHneg) + pVpos);
 y.pic = 0.5 .* (pHpos + (100 - pVneg));
 end
 
+function nLL = signedConstrainedNLL(params, data, epsilon, maxSlopePctPerContrast)
+if numel(params) ~= 11 || any(~isfinite(params(:)))
+    nLL = 1e12;
+    return;
+end
+slopeDiagnostics = getWeibullSignedBX0SlopeDiagnostics(...
+    params, maxSlopePctPerContrast);
+if ~slopeDiagnostics.isValid
+    excess = slopeDiagnostics.slopeExcess;
+    excess(~isfinite(excess)) = maxSlopePctPerContrast;
+    nLL = 1e12 + 1e6 .* sum(excess .^ 2);
+    return;
+end
+nLL = signedBinomialNLL(params, data, epsilon);
+end
+
 function nLL = signedBinomialNLL(params, data, epsilon)
+if numel(params) ~= 11 || any(~isfinite(params(:)))
+    nLL = 1e12;
+    return;
+end
 effective = unpackSignedBX0Params(params);
 if ~isSignedBX0ParamsValid(effective)
     nLL = 1e12;
@@ -132,6 +163,11 @@ end
 
 function effective = unpackSignedBX0Params(params)
 params = params(:)';
+if numel(params) ~= 11
+    error('getWeibullSignedBX0ModelFuncs:InvalidParameterCount', ...
+        'weibullSignedBX0 requires exactly 11 parameters; got %d.', ...
+        numel(params));
+end
 
 effective.baseline = makeBranchParams( ...
     params(1), params(2), params(3), ...
@@ -149,6 +185,7 @@ effective.vertical = makeBranchParams( ...
 
 effective.deltaB = params(10);
 effective.deltaX0 = params(11);
+effective.parameterNames = signedBX0ParameterNames();
 end
 
 function branch = makeBranchParams(ALeft, alphaLeft, betaLeft, ...
@@ -177,7 +214,7 @@ for idx = 1:numel(conditions)
         return;
     end
     if branch.alphaLeft <= 0 || branch.alphaRight <= 0 || ...
-            branch.betaLeft <= 0 || branch.betaRight <= 0
+            branch.betaLeft <= 1 || branch.betaRight <= 1
         isValid = false;
         return;
     end
@@ -186,6 +223,13 @@ for idx = 1:numel(conditions)
         return;
     end
 end
+end
+
+function names = signedBX0ParameterNames()
+names = {'A_baseline', 'alpha_baseline', 'beta_baseline', ...
+    'A_con', 'alpha_con', 'beta_con', ...
+    'A_incon', 'alpha_incon', 'beta_incon', ...
+    'deltaB', 'deltaX0'};
 end
 
 function nLL = conditionNLL(successes, nTrials, probability)

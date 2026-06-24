@@ -288,97 +288,134 @@ function opts = applyDefaults(opts)
 end
 
 function [figureHandles, distributionData, sourceAudit, statsAudit] = plotSignedBX0ParameterDistribution(mdl, aggregateFits, opts)
+    if ~isfield(mdl, 'signedBX0') || ~isfield(mdl.signedBX0, 'panelFits') || ...
+            ~isfield(mdl.signedBX0.panelFits, 'merged') || ...
+            ~isfield(mdl.signedBX0.panelFits.merged, 'fitParams') || ...
+            ~isfield(mdl.signedBX0.panelFits.merged, 'globalDeltaX0')
+        error('plotPowerClusterFitParameters:MissingSignedBX0MergedPanelFits', ...
+            ['Signed-BX0 parameter distributions require ' ...
+            'mdl.signedBX0.panelFits.merged.fitParams and globalDeltaX0.']);
+    end
+
+    expectedClusterIDs = sort([aggregateFits.clusterID]);
+    [~, sortIdx] = sort([aggregateFits.clusterID]);
+    aggregateFits = aggregateFits(sortIdx);
     figureHandles = gobjects(numel(aggregateFits), 1);
     distributionData = repmat(struct(), numel(aggregateFits), 1);
     sourceAudit = emptyDistributionSourceAuditTable();
     statsAudit = emptyDistributionStatsAuditTable();
 
-    fieldNames = {'deltaB', 'deltaX0', 'BHorizontal', 'BVertical', ...
-        'X0Horizontal', 'X0Vertical', 'ACon', 'AIncon', ...
-        'alphaCon', 'alphaIncon', 'betaCon', 'betaIncon'};
-    fieldLabels = {'\DeltaB', '\DeltaX0', 'B_H', 'B_V', ...
-        'X0_H', 'X0_V', 'A_{con}', 'A_{incon}', ...
-        '\alpha_{con}', '\alpha_{incon}', '\beta_{con}', '\beta_{incon}'};
-    fieldColors = [ ...
-        0.35 0.10 0.65; 0.35 0.10 0.65; ...
-        0.55 0 0; 0 0.05 0.45; ...
-        0.55 0 0; 0 0.05 0.45; ...
-        0.9294 0.1098 0.1373; 0 0.0941 0.6627; ...
-        0.9294 0.1098 0.1373; 0 0.0941 0.6627; ...
-        0.9294 0.1098 0.1373; 0 0.0941 0.6627];
-    referenceValues = [0 0 50 50 0 0 nan nan nan nan nan nan];
+    conditionLabels = {'Baseline', 'Con-Opto', 'Incon-Opto'};
+    parameterLabels = {'A', 'B', '\alpha', '\beta', 'X0'};
+    conditionColors = [0 0 0; 0.9294 0.1098 0.1373; 0 0.0941 0.6627];
+    referenceValues = [nan, 50, nan, nan, 0];
 
+    panelFitParams = mdl.signedBX0.panelFits.merged.fitParams;
+    globalDeltaX0 = mdl.signedBX0.panelFits.merged.globalDeltaX0;
     fprintf('\n=== Signed-BX0 parameter distribution ===\n');
-    fprintf('  source field: mdl.signedBX0.* individual-session fitted parameters\n');
-    fprintf('  rows available: %d\n', numel(mdl.signedBX0.deltaB));
+    fprintf(['  source field: mdl.signedBX0.panelFits.merged.fitParams ' ...
+        'and globalDeltaX0\n']);
+    fprintf('  panel fit rows available: %d\n', size(panelFitParams, 1));
 
     for aggregateIdx = 1:numel(aggregateFits)
         rows = unique(aggregateFits(aggregateIdx).mdlRowIndices(:)', 'stable');
         clusterTitle = parameterTitle(aggregateFits(aggregateIdx), numel(rows));
+        clusterID = aggregateFits(aggregateIdx).clusterID;
         figureHandles(aggregateIdx) = figure(...
-            'Name', [clusterTitle ' signed-BX0 parameter distributions'], ...
+            'Name', [clusterTitle ' signed-BX0 merged parameter distributions'], ...
             'Color', 'w', ...
             'Visible', opts.figureVisible);
-        makeSubplot = @(position) subtightplot(4, 3, position, ...
-            [0.08 0.055], [0.10 0.08], [0.09 0.04]);
+        setappdata(figureHandles(aggregateIdx), 'PowerClusterID', clusterID);
+        makeSubplot = @(position) subtightplot(3, 5, position, ...
+            [0.065 0.045], [0.10 0.08], [0.08 0.03]);
 
-        distributionData(aggregateIdx).clusterID = aggregateFits(aggregateIdx).clusterID;
+        distributionData(aggregateIdx).clusterID = clusterID;
         distributionData(aggregateIdx).mdlRowIndices = rows;
-        for fieldIdx = 1:numel(fieldNames)
-            ax = makeSubplot(fieldIdx);
-            hold(ax, 'on');
-            values = getSignedBX0FieldValues(mdl, fieldNames{fieldIdx}, rows);
-            validValues = values(isfinite(values));
-            if isfinite(referenceValues(fieldIdx))
-                yline(ax, referenceValues(fieldIdx), '--', ...
-                    'Color', 0.4 .* [1 1 1], 'LineWidth', 1.2, ...
-                    'HandleVisibility', 'off');
+        valuesByCondition = reconstructSignedBX0MergedPanelValues(...
+            panelFitParams, globalDeltaX0, rows);
+        distributionData(aggregateIdx).mergedParameterValues = valuesByCondition;
+
+        for conditionIdx = 1:3
+            for parameterIdx = 1:5
+                ax = makeSubplot((conditionIdx - 1) .* 5 + parameterIdx);
+                hold(ax, 'on');
+                values = valuesByCondition(:, conditionIdx, parameterIdx);
+                validValues = values(isfinite(values));
+                if isfinite(referenceValues(parameterIdx))
+                    yline(ax, referenceValues(parameterIdx), '--', ...
+                        'Color', 0.4 .* [1 1 1], 'LineWidth', 1.2, ...
+                        'HandleVisibility', 'off');
+                end
+                if ~isempty(validValues)
+                    jitter = opts.jitterWidth .* (rand(size(validValues)) - 0.5);
+                    scatter(ax, 1 + jitter, validValues, opts.pointSize, ...
+                        conditionColors(conditionIdx, :), 'filled', ...
+                        'MarkerFaceAlpha', opts.pointAlpha, ...
+                        'MarkerEdgeColor', 'k');
+                    mu = mean(validValues, 'omitnan');
+                    sem = std(validValues, 'omitnan') ./ sqrt(sum(isfinite(validValues)));
+                    errorbar(ax, 1, mu, sem, 'ko', ...
+                        'MarkerFaceColor', 'w', 'MarkerSize', 8, ...
+                        'LineWidth', 1.5, 'HandleVisibility', 'off');
+                else
+                    text(ax, 0.5, 0.5, 'No valid values', 'Units', 'normalized', ...
+                        'HorizontalAlignment', 'center', 'Color', [0.35 0.35 0.35]);
+                end
+                xlim(ax, [0.5 1.5]);
+                set(ax, 'XTick', 1, 'XTickLabel', {conditionLabels{conditionIdx}});
+                if conditionIdx == 1
+                    title(ax, parameterLabels{parameterIdx}, 'Interpreter', 'tex');
+                end
+                if parameterIdx == 1
+                    ylabel(ax, conditionLabels{conditionIdx}, 'Interpreter', 'tex', ...
+                        'FontWeight', 'bold');
+                end
+                box(ax, 'off');
+                axis(ax, 'square');
+                fprintf('  %s %s %s: n=%d mean=%0.4g SEM=%0.4g\n', ...
+                    clusterTitle, conditionLabels{conditionIdx}, ...
+                    parameterLabels{parameterIdx}, numel(validValues), ...
+                    mean(validValues, 'omitnan'), ...
+                    std(validValues, 'omitnan') ./ sqrt(max(1, numel(validValues))));
             end
-            if ~isempty(validValues)
-                jitter = opts.jitterWidth .* (rand(size(validValues)) - 0.5);
-                scatter(ax, 1 + jitter, validValues, opts.pointSize, ...
-                    fieldColors(fieldIdx, :), 'filled', ...
-                    'MarkerFaceAlpha', opts.pointAlpha, ...
-                    'MarkerEdgeColor', 'k');
-                mu = mean(validValues, 'omitnan');
-                sem = std(validValues, 'omitnan') ./ sqrt(sum(isfinite(validValues)));
-                errorbar(ax, 1, mu, sem, 'ko', ...
-                    'MarkerFaceColor', 'w', 'MarkerSize', 8, ...
-                    'LineWidth', 1.5, 'HandleVisibility', 'off');
-            else
-                text(ax, 0.5, 0.5, 'No valid values', 'Units', 'normalized', ...
-                    'HorizontalAlignment', 'center', 'Color', [0.35 0.35 0.35]);
-            end
-            xlim(ax, [0.5 1.5]);
-            set(ax, 'XTick', 1, 'XTickLabel', {fieldLabels{fieldIdx}});
-            ylabel(ax, fieldLabels{fieldIdx}, 'Interpreter', 'tex');
-            box(ax, 'off');
-            axis(ax, 'square');
-            distributionData(aggregateIdx).(fieldNames{fieldIdx}) = values;
-            fprintf('  %s %s: n=%d mean=%0.4g SEM=%0.4g\n', ...
-                clusterTitle, fieldNames{fieldIdx}, numel(validValues), ...
-                mean(validValues, 'omitnan'), ...
-                std(validValues, 'omitnan') ./ sqrt(max(1, numel(validValues))));
         end
-        addParameterTitle([clusterTitle ' | signed-BX0 individual parameters']);
+        addParameterTitle([clusterTitle ' | signed-BX0 merged panel parameters']);
         upFontSize(16, 0.01);
     end
+
+    generatedClusterIDs = arrayfun(@(fig) getappdata(fig, 'PowerClusterID'), ...
+        figureHandles);
+    assert(numel(figureHandles) == numel(expectedClusterIDs), ...
+        'Signed-BX0 parameter figure count mismatch.');
+    assert(all(isgraphics(figureHandles)), ...
+        'Signed-BX0 parameter figures include an invalid graphics handle.');
+    assert(isequal(generatedClusterIDs(:)', expectedClusterIDs(:)'), ...
+        'Signed-BX0 parameter figure cluster IDs do not match aggregate fits.');
+    fprintf('Parameter figures expected: %d | generated: %d | cluster IDs: [%s]\n', ...
+        numel(expectedClusterIDs), numel(figureHandles), ...
+        strjoin(cellstr(string(generatedClusterIDs(:)')), ' '));
 end
 
-function values = getSignedBX0FieldValues(mdl, fieldName, rows)
-    values = nan(size(rows));
-    if ~isfield(mdl.signedBX0, fieldName)
-        warning('plotPowerClusterFitParameters:MissingSignedBX0Field', ...
-            'mdl.signedBX0.%s is missing; leaving panel empty.', fieldName);
-        return;
+function valuesByCondition = reconstructSignedBX0MergedPanelValues(panelFitParams, globalDeltaX0, rows)
+    valuesByCondition = nan(numel(rows), 3, 5);
+    for rowIdx = 1:numel(rows)
+        mdlRow = rows(rowIdx);
+        if ~isfinite(mdlRow) || mdlRow ~= round(mdlRow) || mdlRow < 1 || ...
+                mdlRow > size(panelFitParams, 1) || mdlRow > numel(globalDeltaX0)
+            continue;
+        end
+        params = panelFitParams(mdlRow, :);
+        deltaX0 = globalDeltaX0(mdlRow);
+        if numel(params) < 10 || any(~isfinite(params(1:10))) || ~isfinite(deltaX0)
+            continue;
+        end
+        valuesByCondition(rowIdx, 1, :) = [params(1), 50, params(2), params(3), 0];
+        valuesByCondition(rowIdx, 2, :) = [params(4), 50 + params(10), ...
+            params(5), params(6), -deltaX0];
+        valuesByCondition(rowIdx, 3, :) = [params(7), 50 - params(10), ...
+            params(8), params(9), +deltaX0];
     end
-    sourceValues = mdl.signedBX0.(fieldName)(:);
-    validRows = rows(isfinite(rows) & rows == round(rows) & ...
-        rows >= 1 & rows <= numel(sourceValues));
-    [~, loc] = ismember(validRows, rows);
-    values(loc) = sourceValues(validRows);
 end
-
 function [figureHandles, distributionData, sourceAudit, statsAudit] = plotSignedX0HorizontalDistribution(mdl, aggregateFits, opts)
     figureHandles = gobjects(numel(aggregateFits), 1);
     distributionData = repmat(struct(), numel(aggregateFits), 1);
