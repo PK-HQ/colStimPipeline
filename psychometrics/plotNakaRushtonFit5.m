@@ -1708,9 +1708,8 @@ function checksum = computeSignedBX0PanelSourceChecksum(panelData)
 end
 
 function fitResult = fitSignedBX0SinglePanel(panelData, globalDeltaX0, primaryParams, blockInfo)
-    [initialParams, lbFull, ubFull] = getWeibullSignedBX0InitParams();
-    lb = lbFull(1:10);
-    ub = ubFull(1:10);
+    [initialParams] = getWeibullSignedBX0InitParams();
+    [lb, ub] = getWeibullSignedBX0PanelBounds();
     params0 = initialParams(1:10);
     if numel(primaryParams) >= 10 && all(isfinite(primaryParams(1:10)))
         params0 = primaryParams(1:10);

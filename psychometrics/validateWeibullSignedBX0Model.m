@@ -16,6 +16,31 @@ assert(isequal(mdl.parameterNames, {'A_baseline', 'alpha_baseline', 'beta_baseli
     'deltaB', 'deltaX0'}), 'Unexpected parameter names/order.');
 assert(all(lb([3 6 9]) == 1.25) && all(ub([3 6 9]) == 8), ...
     'Beta bounds must remain 1.25 to 8.');
+
+[panelLb, panelUb] = getWeibullSignedBX0PanelBounds();
+
+assert(numel(panelLb) == 10 && numel(panelUb) == 10, ...
+    'Panel fits must have ten parameter bounds.');
+
+assert(all(panelLb([3 6 9]) == 2.0), ...
+    'Conditional panel beta lower bounds must be 2.0.');
+
+assert(all(panelUb([3 6 9]) == 8), ...
+    'Conditional panel beta upper bounds must remain 8.');
+
+nonBetaIdx = [1 2 4 5 7 8 10];
+assert(isequal(panelLb(nonBetaIdx), lb(nonBetaIdx)), ...
+    'Panel non-beta lower bounds must match the primary model.');
+
+assert(isequal(panelUb, ub(1:10)), ...
+    'All panel upper bounds must match the primary model.');
+
+testPanelStart = initialParams(1:10);
+testPanelStart([3 6 9]) = 1.5;
+testPanelStart = min(max(testPanelStart, panelLb), panelUb);
+assert(all(testPanelStart([3 6 9]) == 2.0), ...
+    'Panel starting beta values below 2 must clamp to 2.');
+
 assert(lb(11) < 0 && ub(11) > 0, 'deltaX0 must be a fitted signed parameter.');
 
 params = [8 16 3.2 7 14 2.4 11 18 4.1 6 5];

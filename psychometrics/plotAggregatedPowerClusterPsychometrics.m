@@ -356,9 +356,8 @@ function fitResult = fitAggregateSignedBX0Panel(viewData, xGrid, globalDeltaX0, 
         return;
     end
 
-    [initialParams, lbFull, ubFull] = getWeibullSignedBX0InitParams();
-    lb = lbFull(1:10);
-    ub = ubFull(1:10);
+    [initialParams] = getWeibullSignedBX0InitParams();
+    [lb, ub] = getWeibullSignedBX0PanelBounds();
     params0 = initialParams(1:10);
     if numel(primaryParams) >= 10 && all(isfinite(primaryParams(1:10)))
         params0 = primaryParams(1:10);
