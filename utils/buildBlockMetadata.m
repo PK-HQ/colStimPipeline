@@ -1,4 +1,4 @@
-function MetaTable = buildBlockMetadata(behavioralData, bitmapData, columnsDesired, columnsSpread, blockData, datastruct, analysisBlockID, mdlStruct)
+function MetaTable = buildBlockMetadata(behavioralData, bitmapData, columnsDesired, columnsSpread, blockData, datastruct, analysisBlockID, mdlStruct, saveOpts)
 
 if nargin < 5 || isempty(blockData)
     blockData = struct();
@@ -12,12 +12,23 @@ end
 if nargin < 8 || isempty(mdlStruct)
     mdlStruct = struct();
 end
+if nargin < 9 || isempty(saveOpts)
+    saveOpts = struct();
+end
 
 meanCol = mean(bitmapData.nColumns, 1, 'omitnan');
-selectedBlocks = 1:numel(meanCol);
-nBlocks = numel(selectedBlocks);
 nTotalBlocks = numel(meanCol);
+% analysisBlockID is used only as a metadata/datastruct label map (blockID → dsIdx).
+% bitmapData and behavioralData are always indexed by local rows 1:nTotalBlocks.
+assert(numel(analysisBlockID) >= nTotalBlocks, ...
+    'analysisBlockID has %d elements but nTotalBlocks=%d (from bitmapData.nColumns)', ...
+    numel(analysisBlockID), nTotalBlocks);
+selectedBlocks = 1:nTotalBlocks;
+nBlocks = nTotalBlocks;
+assert(all(selectedBlocks >= 1 & selectedBlocks <= nTotalBlocks), ...
+    'Selected block indices exceed 1:%d', nTotalBlocks);
 [deltaMask, deltaBias] = get_psychometric_deltas(mdlStruct, nTotalBlocks);
+psyFull = get_full_psychometrics_struct(mdlStruct, nTotalBlocks, behavioralData);
 
 rowTemplate = make_empty_metadata_row();
 rows = repmat(rowTemplate, nBlocks, 1);
@@ -51,28 +62,52 @@ for ii = 1:nBlocks
     row.vis_pos = {[row.GaborX_deg row.GaborY_deg]};
 
     % bitmap metadata summaries
-    row.gridSize_mean = mean(bitmapData.gridSize(:,blockID), 'omitnan');
-    row.nColumns_Mean = mean(bitmapData.nColumns(:,blockID), 'omitnan');
-    row.nColumns_min  = min(bitmapData.nColumns(:,blockID), [], 'omitnan');
-    row.nColumns_max  = max(bitmapData.nColumns(:,blockID), [], 'omitnan');
+    row.gridSize_mean    = safe_col_mean(bitmapData, 'gridSize',     blockID);
+    row.nColumns_Mean    = safe_col_mean(bitmapData, 'nColumns',    blockID);
+    row.nColumns_min     = safe_col_min (bitmapData, 'nColumns',    blockID);
+    row.nColumns_max     = safe_col_max (bitmapData, 'nColumns',    blockID);
+    row.sensitivity_mean = safe_col_mean(bitmapData, 'sensitivity', blockID);
+    row.adaptthresh_mean = safe_col_mean(bitmapData, 'adaptthresh', blockID);
+    row.pixelsON_mean    = safe_col_mean(bitmapData, 'pixelsON',    blockID);
 
-    row.sensitivity_mean = mean(bitmapData.sensitivity(:,blockID), 'omitnan');
-    row.adaptthresh_mean = mean(bitmapData.adaptthresh(:,blockID), 'omitnan');
-    row.pixelsON_mean    = mean(bitmapData.pixelsON(:,blockID), 'omitnan');
-
-    row.meanPowerDensityWithinROI_mWmm2_mean = mean(bitmapData.meanPowerDensityWithinROI_mWmm2(:,:,blockID), 'all', 'omitnan');
-    row.meanPowerDensityWithinROI_mWmm2_max  = max(bitmapData.meanPowerDensityWithinROI_mWmm2(:,:,blockID), [], 'all');
-
-    row.totalPowerToOnPixelsWithinROI_mW_mean = mean(bitmapData.totalPowerToOnPixelsWithinROI_mW(:,:,blockID), 'all', 'omitnan');
-    row.totalPowerToOnPixelsWithinROI_mW_max  = max(bitmapData.totalPowerToOnPixelsWithinROI_mW(:,:,blockID), [], 'all');
-
-    row.projectorPowerDensity_mWmm2_mean = mean(bitmapData.projectorPowerDensity_mWmm2(:,:,blockID), 'all', 'omitnan');
-    row.projectorPowerDensity_mWmm2_max  = max(bitmapData.projectorPowerDensity_mWmm2(:,:,blockID), [], 'all');
-
-    row.temporalDutyCycle_mean = mean(bitmapData.temporalDutyCycle(:,:,blockID), 'all', 'omitnan');
+    if isfield(bitmapData, 'meanPowerDensityWithinROI_mWmm2')
+        row.meanPowerDensityWithinROI_mWmm2_mean = mean(bitmapData.meanPowerDensityWithinROI_mWmm2(:,:,blockID), 'all', 'omitnan');
+        row.meanPowerDensityWithinROI_mWmm2_max  = max(bitmapData.meanPowerDensityWithinROI_mWmm2(:,:,blockID), [], 'all');
+    end
+    if isfield(bitmapData, 'totalPowerToOnPixelsWithinROI_mW')
+        row.totalPowerToOnPixelsWithinROI_mW_mean = mean(bitmapData.totalPowerToOnPixelsWithinROI_mW(:,:,blockID), 'all', 'omitnan');
+        row.totalPowerToOnPixelsWithinROI_mW_max  = max(bitmapData.totalPowerToOnPixelsWithinROI_mW(:,:,blockID), [], 'all');
+    end
+    if isfield(bitmapData, 'projectorPowerDensity_mWmm2')
+        row.projectorPowerDensity_mWmm2_mean = mean(bitmapData.projectorPowerDensity_mWmm2(:,:,blockID), 'all', 'omitnan');
+        row.projectorPowerDensity_mWmm2_max  = max(bitmapData.projectorPowerDensity_mWmm2(:,:,blockID), [], 'all');
+    end
+    if isfield(bitmapData, 'temporalDutyCycle')
+        row.temporalDutyCycle_mean = mean(bitmapData.temporalDutyCycle(:,:,blockID), 'all', 'omitnan');
+    end
     row = add_bitmap_metadata(row, bitmapData, blockID, nTotalBlocks);
     row.psy_deltaMask = deltaMask(blockID);
     row.psy_deltaBias = deltaBias(blockID);
+
+    row = add_psychometric_full_data(row, psyFull, blockID);
+
+    if isempty(row.session_baselineSource)
+        row.session_baselineSource = infer_baseline_source_from_row(row);
+    end
+
+    [bmpHCam, bmpVCam, bmpHProj, bmpVProj] = ...
+        get_oriented_bitmaps_for_block(bitmapData, blockID, nTotalBlocks);
+    row.bmp_horizontalCamSpace{1}  = bmpHCam;
+    row.bmp_verticalCamSpace{1}    = bmpVCam;
+    row.bmp_horizontalProjSpace{1} = bmpHProj;
+    row.bmp_verticalProjSpace{1}   = bmpVProj;
+
+    fpDate = row.date_visfootprint{1};
+    fpRun  = row.run_visfootprint{1};
+    hasFPS = ~isempty(fpDate) && ~isempty(fpRun);
+    if hasFPS && isnumeric(fpDate) && all(isnan(fpDate(:))), hasFPS = false; end
+    if hasFPS && isnumeric(fpRun)  && all(isnan(fpRun(:))),  hasFPS = false; end
+    row.session_hasVisFPS = hasFPS;
 
     rows(ii) = row;
 end
@@ -82,7 +117,7 @@ MetaTable.Properties.VariableDescriptions = get_export_header_names(MetaTable.Pr
 MetaTable = filter_metatable_by_columns(MetaTable, columnsDesired, columnsSpread);
 MetaTable = remove_metatable_output_columns(MetaTable);
 MetaTable = move_psychometric_columns_to_end(MetaTable);
-save_metatable_outputs(MetaTable, datastruct, analysisBlockID, columnsDesired);
+save_metatable_outputs(MetaTable, datastruct, analysisBlockID, columnsDesired, saveOpts);
 
 end
 
@@ -158,6 +193,43 @@ row.projectorPowerDensity_mWmm2_max = NaN;
 row.temporalDutyCycle_mean = NaN;
 row.psy_deltaMask = NaN;
 row.psy_deltaBias = NaN;
+row.psy_deltaBiasHorizontal = NaN;
+row.psy_deltaMaskHorizontal = NaN;
+row.psy_deltaBiasVertical   = NaN;
+row.psy_deltaMaskVertical   = NaN;
+row.psy_deltaBiasMerged     = NaN;
+row.psy_deltaMaskMerged     = NaN;
+row.psy_combinedBL          = false;
+row.psy_modelField          = '';
+row.session_baselineSource  = '';
+row.session_hasVisFPS       = false;
+row.psy_xBaselinePreMerge               = {[]};
+row.psy_yBaselinePreMerge               = {[]};
+row.psy_xBaselinePreMergeOrt            = {[]};
+row.psy_nTrialsBaselinePreMerge         = {[]};
+row.psy_xHorizontalOptoPreMerge         = {[]};
+row.psy_yHorizontalOptoPreMerge         = {[]};
+row.psy_xHorizontalOptoPreMergeOrt      = {[]};
+row.psy_nTrialsHorizontalOptoPreMerge   = {[]};
+row.psy_congruencyHorizontalOptoPreMerge = {[]};
+row.psy_xVerticalOptoPreMerge           = {[]};
+row.psy_yVerticalOptoPreMerge           = {[]};
+row.psy_xVerticalOptoPreMergeOrt        = {[]};
+row.psy_nTrialsVerticalOptoPreMerge     = {[]};
+row.psy_congruencyVerticalOptoPreMerge  = {[]};
+row.psy_xBaselineMerged                 = {[]};
+row.psy_yBaselineMerged                 = {[]};
+row.psy_nTrialsBaselineMerged           = {[]};
+row.psy_xConOptoMerged                  = {[]};
+row.psy_yConOptoMerged                  = {[]};
+row.psy_nTrialsConOptoMerged            = {[]};
+row.psy_xInconOptoMerged                = {[]};
+row.psy_yInconOptoMerged                = {[]};
+row.psy_nTrialsInconOptoMerged          = {[]};
+row.bmp_horizontalCamSpace  = {[]};
+row.bmp_verticalCamSpace    = {[]};
+row.bmp_horizontalProjSpace = {[]};
+row.bmp_verticalProjSpace   = {[]};
 row.bitmapFile = '';
 
 end
@@ -219,12 +291,56 @@ row.opto_projectorPowerDensity_mWmm2 = {get_bitmap_field(bitmapData, 'projectorP
 end
 
 
+function v = safe_col_mean(S, fn, bID)
+v = NaN;
+if isfield(S, fn)
+    col = S.(fn);
+    if size(col,2) >= bID
+        v = mean(col(:,bID), 'omitnan');
+    end
+end
+end
+
+function v = safe_col_min(S, fn, bID)
+v = NaN;
+if isfield(S, fn)
+    col = S.(fn);
+    if size(col,2) >= bID
+        v = min(col(:,bID), [], 'omitnan');
+    end
+end
+end
+
+function v = safe_col_max(S, fn, bID)
+v = NaN;
+if isfield(S, fn)
+    col = S.(fn);
+    if size(col,2) >= bID
+        v = max(col(:,bID), [], 'omitnan');
+    end
+end
+end
+
 function val = get_bitmap_field(bitmapData, fieldName, blockID, nTotalBlocks)
 
 val = [];
 
-if isfield(bitmapData, fieldName)
+if ~isfield(bitmapData, fieldName)
+    return
+end
+
+try
     val = get_block_slice(bitmapData.(fieldName), blockID, nTotalBlocks);
+catch
+    % Field exists but block dimension doesn't match nTotalBlocks.
+    % Try to index directly if size allows.
+    rawField = bitmapData.(fieldName);
+    if numel(rawField) >= blockID
+        try
+            val = get_block_slice(rawField, blockID, numel(rawField));
+        catch
+        end
+    end
 end
 
 end
@@ -682,7 +798,16 @@ end
 
 function MetaTable = move_psychometric_columns_to_end(MetaTable)
 
-psyNames = {'psy_deltaMask', 'psy_deltaBias'};
+psyNames = { ...
+    'psy_deltaMask', ...
+    'psy_deltaBias', ...
+    'psy_deltaBiasHorizontal', ...
+    'psy_deltaMaskHorizontal', ...
+    'psy_deltaBiasVertical', ...
+    'psy_deltaMaskVertical', ...
+    'psy_deltaBiasMerged', ...
+    'psy_deltaMaskMerged'};
+
 psyNames = psyNames(ismember(psyNames, MetaTable.Properties.VariableNames));
 if isempty(psyNames)
     return
@@ -698,31 +823,42 @@ MetaTable = movevars(MetaTable, psyNames, 'After', remainingNames{end});
 end
 
 
-function save_metatable_outputs(MetaTable, datastruct, analysisBlockID, columnsDesired)
+function save_metatable_outputs(MetaTable, datastruct, analysisBlockID, columnsDesired, saveOpts)
 
-if ~isstruct(datastruct) || isempty(datastruct) || ...
-        ~isfield(datastruct, 'monkey') || ~isfield(datastruct, 'chamber')
-    return
+if nargin < 5
+    saveOpts = struct();
 end
 
-saveEntry = datastruct(1);
-if ~isempty(analysisBlockID) && analysisBlockID(1) >= 1 && numel(datastruct) >= analysisBlockID(1)
-    saveEntry = datastruct(analysisBlockID(1));
+% Use custom paths from saveOpts when provided
+if isstruct(saveOpts) && isfield(saveOpts, 'matPath') && isfield(saveOpts, 'xlsxPath')
+    matOutPath  = saveOpts.matPath;
+    xlsxOutPath = saveOpts.xlsxPath;
+    outDir = fileparts(matOutPath);
+    if ~isempty(outDir) && ~exist(outDir, 'dir')
+        mkdir(outDir);
+    end
+else
+    % Auto-derive path from datastruct (original behaviour)
+    if ~isstruct(datastruct) || isempty(datastruct) || ...
+            ~isfield(datastruct, 'monkey') || ~isfield(datastruct, 'chamber')
+        return
+    end
+    saveEntry = datastruct(1);
+    if ~isempty(analysisBlockID) && analysisBlockID(1) >= 1 && numel(datastruct) >= analysisBlockID(1)
+        saveEntry = datastruct(analysisBlockID(1));
+    end
+    monkeyName  = saveEntry.monkey;
+    chamberStr  = saveEntry.chamber;
+    columnsStr  = num2str(columnsDesired);
+    outDir      = ['Y:/' monkeyName '/Meta/summary'];
+    if ~exist(outDir, 'dir')
+        mkdir(outDir);
+    end
+    matOutPath  = [outDir '/metaTable-' chamberStr columnsStr '.mat'];
+    xlsxOutPath = [outDir '/metaTable-' chamberStr columnsStr '.xlsx'];
 end
 
-monkeyName = saveEntry.monkey;
-chamberStr = saveEntry.chamber;
-columnsStr = num2str(columnsDesired);
-outDir = ['Y:/' monkeyName '/Meta/summary'];
-
-if ~exist(outDir, 'dir')
-    mkdir(outDir);
-end
-
-matOutPath = [outDir '/metaTable-' chamberStr columnsStr '.mat'];
-xlsxOutPath = [outDir '/metaTable-' chamberStr columnsStr '.xlsx'];
-
-save(matOutPath, 'MetaTable');
+save(matOutPath, 'MetaTable', '-v7.3');
 
 excelCell = table_to_excel_cell(MetaTable);
 if exist(xlsxOutPath, 'file')
@@ -789,7 +925,11 @@ if isnumeric(x) || islogical(x)
     end
 
     if ndims(x) <= 2
-        out = mat2str(x, 6);
+        if numel(x) <= 100
+            out = mat2str(x, 6);
+        else
+            out = sprintf('%dx%d %s', size(x,1), size(x,2), class(x));
+        end
         return
     end
 
@@ -933,6 +1073,43 @@ headerMap = {
     'opto_projectorPowerDensity_mWmm2', 'opto.projectorPowerDensity_mWmm2'
     'psy_deltaMask', 'psy.deltaMask'
     'psy_deltaBias', 'psy.deltaBias'
+    'psy_deltaBiasHorizontal', 'psy.deltaBiasHorizontal'
+    'psy_deltaMaskHorizontal', 'psy.deltaMaskHorizontal'
+    'psy_deltaBiasVertical', 'psy.deltaBiasVertical'
+    'psy_deltaMaskVertical', 'psy.deltaMaskVertical'
+    'psy_deltaBiasMerged', 'psy.deltaBiasMerged'
+    'psy_deltaMaskMerged', 'psy.deltaMaskMerged'
+    'psy_combinedBL', 'psy.combinedBL'
+    'psy_modelField', 'psy.modelField'
+    'psy_xBaselinePreMerge', 'psy.xBaselinePreMerge'
+    'psy_yBaselinePreMerge', 'psy.yBaselinePreMerge'
+    'psy_xBaselinePreMergeOrt', 'psy.xBaselinePreMergeOrt'
+    'psy_nTrialsBaselinePreMerge', 'psy.nTrialsBaselinePreMerge'
+    'psy_xHorizontalOptoPreMerge', 'psy.xHorizontalOptoPreMerge'
+    'psy_yHorizontalOptoPreMerge', 'psy.yHorizontalOptoPreMerge'
+    'psy_xHorizontalOptoPreMergeOrt', 'psy.xHorizontalOptoPreMergeOrt'
+    'psy_nTrialsHorizontalOptoPreMerge', 'psy.nTrialsHorizontalOptoPreMerge'
+    'psy_congruencyHorizontalOptoPreMerge', 'psy.congruencyHorizontalOptoPreMerge'
+    'psy_xVerticalOptoPreMerge', 'psy.xVerticalOptoPreMerge'
+    'psy_yVerticalOptoPreMerge', 'psy.yVerticalOptoPreMerge'
+    'psy_xVerticalOptoPreMergeOrt', 'psy.xVerticalOptoPreMergeOrt'
+    'psy_nTrialsVerticalOptoPreMerge', 'psy.nTrialsVerticalOptoPreMerge'
+    'psy_congruencyVerticalOptoPreMerge', 'psy.congruencyVerticalOptoPreMerge'
+    'psy_xBaselineMerged', 'psy.xBaselineMerged'
+    'psy_yBaselineMerged', 'psy.yBaselineMerged'
+    'psy_nTrialsBaselineMerged', 'psy.nTrialsBaselineMerged'
+    'psy_xConOptoMerged', 'psy.xConOptoMerged'
+    'psy_yConOptoMerged', 'psy.yConOptoMerged'
+    'psy_nTrialsConOptoMerged', 'psy.nTrialsConOptoMerged'
+    'psy_xInconOptoMerged', 'psy.xInconOptoMerged'
+    'psy_yInconOptoMerged', 'psy.yInconOptoMerged'
+    'psy_nTrialsInconOptoMerged', 'psy.nTrialsInconOptoMerged'
+    'session_baselineSource', 'session.baselineSource'
+    'session_hasVisFPS', 'session.hasVisFPS'
+    'bmp_horizontalCamSpace', 'bmp.horizontalCamSpace'
+    'bmp_verticalCamSpace', 'bmp.verticalCamSpace'
+    'bmp_horizontalProjSpace', 'bmp.horizontalProjSpace'
+    'bmp_verticalProjSpace', 'bmp.verticalProjSpace'
     };
 
 for mapID = 1:size(headerMap, 1)
@@ -940,4 +1117,628 @@ for mapID = 1:size(headerMap, 1)
     headerNames(varIdx) = headerMap(mapID, 2);
 end
 
+end
+
+
+% ---- NEW LOCAL FUNCTIONS -----------------------------------------------
+
+function psyFull = get_full_psychometrics_struct(mdlStruct, nTotalBlocks, behavioralData)
+% For every block (1..nTotalBlocks) find the model field that covers it
+% and extract all psychometric data.  Returns a struct array [nTotalBlocks x 1].
+% behavioralData must contain gaborContrasts [3x12xN] and percentageCorrect [3x12xN].
+if nargin < 3
+    behavioralData = struct();
+end
+
+emptyEntry.modelField               = '';
+emptyEntry.combinedBL               = false;
+emptyEntry.baselineSource           = '';
+emptyEntry.xBaselinePreMerge        = [];
+emptyEntry.yBaselinePreMerge        = [];
+emptyEntry.xBaselinePreMergeOrt     = [];
+emptyEntry.nTrialsBaselinePreMerge  = [];
+emptyEntry.xHorizontalOptoPreMerge  = [];
+emptyEntry.yHorizontalOptoPreMerge  = [];
+emptyEntry.xHorizontalOptoPreMergeOrt       = [];
+emptyEntry.nTrialsHorizontalOptoPreMerge    = [];
+emptyEntry.congruencyHorizontalOptoPreMerge = [];
+emptyEntry.xVerticalOptoPreMerge    = [];
+emptyEntry.yVerticalOptoPreMerge    = [];
+emptyEntry.xVerticalOptoPreMergeOrt         = [];
+emptyEntry.nTrialsVerticalOptoPreMerge      = [];
+emptyEntry.congruencyVerticalOptoPreMerge   = [];
+emptyEntry.xBaselineMerged          = [];
+emptyEntry.yBaselineMerged          = [];
+emptyEntry.nTrialsBaselineMerged    = [];
+emptyEntry.xConOptoMerged           = [];
+emptyEntry.yConOptoMerged           = [];
+emptyEntry.nTrialsConOptoMerged     = [];
+emptyEntry.xInconOptoMerged         = [];
+emptyEntry.yInconOptoMerged         = [];
+emptyEntry.nTrialsInconOptoMerged   = [];
+emptyEntry.deltaBias                = NaN;
+emptyEntry.deltaMask                = NaN;
+emptyEntry.deltaBiasHorizontal      = NaN;
+emptyEntry.deltaMaskHorizontal      = NaN;
+emptyEntry.deltaBiasVertical        = NaN;
+emptyEntry.deltaMaskVertical        = NaN;
+emptyEntry.deltaBiasMerged          = NaN;
+emptyEntry.deltaMaskMerged          = NaN;
+
+psyFull = repmat(emptyEntry, nTotalBlocks, 1);
+
+if ~isstruct(mdlStruct) || isempty(fieldnames(mdlStruct))
+    return
+end
+
+mdlFields = fieldnames(mdlStruct);
+
+for fIdx = 1:numel(mdlFields)
+    fName = mdlFields{fIdx};
+    md    = mdlStruct.(fName);
+    if ~isstruct(md) || ~isfield(md, 'clusterBlocksIdx')
+        continue
+    end
+    blockIDs = md.clusterBlocksIdx(:);
+    nK = numel(blockIDs);
+
+    for kIdx = 1:nK
+        bID = blockIDs(kIdx);
+        if bID < 1 || bID > nTotalBlocks
+            continue
+        end
+
+        e = psyFull(bID);
+        e.modelField = fName;
+
+        e = set_scalar_field(e, md, 'deltaBias',           kIdx, 1);
+        e = set_scalar_field(e, md, 'deltaMask',           kIdx, 1);
+        e = set_scalar_field(e, md, 'deltaBiasHorizontal', kIdx, 1);
+        e = set_scalar_field(e, md, 'deltaMaskHorizontal', kIdx, 1);
+        e = set_scalar_field(e, md, 'deltaBiasVertical',   kIdx, 1);
+        e = set_scalar_field(e, md, 'deltaMaskVertical',   kIdx, 1);
+        e = set_scalar_field(e, md, 'deltaBiasMerged',     kIdx, 1);
+        e = set_scalar_field(e, md, 'deltaMaskMerged',     kIdx, 1);
+
+        e = set_row_field(e, md, 'xBaselinePreMerge',                        kIdx);
+        e = set_row_field(e, md, 'yBaselinePreMerge',                        kIdx);
+        e = set_row_field_as(e, md, 'visualTagBaselinePreMerge',       'xBaselinePreMergeOrt',       kIdx);
+        e = set_row_field(e, md, 'xHorizontalOptoPreMerge',                  kIdx);
+        e = set_row_field(e, md, 'yHorizontalOptoPreMerge',                  kIdx);
+        e = set_row_field_as(e, md, 'visualTagHorizontalOptoPreMerge', 'xHorizontalOptoPreMergeOrt', kIdx);
+        e = set_row_field(e, md, 'congruencyHorizontalOptoPreMerge',         kIdx);
+        e = set_row_field(e, md, 'xVerticalOptoPreMerge',                    kIdx);
+        e = set_row_field(e, md, 'yVerticalOptoPreMerge',                    kIdx);
+        e = set_row_field_as(e, md, 'visualTagVerticalOptoPreMerge',   'xVerticalOptoPreMergeOrt',   kIdx);
+        e = set_row_field(e, md, 'congruencyVerticalOptoPreMerge',           kIdx);
+        e = set_row_field_as(e, md, 'xBaseline',   'xBaselineMerged',   kIdx);
+        e = set_row_field_as(e, md, 'yBaseline',   'yBaselineMerged',   kIdx);
+        e = set_row_field_as(e, md, 'xConOpto',    'xConOptoMerged',    kIdx);
+        e = set_row_field_as(e, md, 'yConOpto',    'yConOptoMerged',    kIdx);
+        e = set_row_field_as(e, md, 'xInconOpto',  'xInconOptoMerged',  kIdx);
+        e = set_row_field_as(e, md, 'yInconOpto',  'yInconOptoMerged',  kIdx);
+        e = compute_nominal_trial_counts(e);
+
+        if isfield(md, 'combinedBL')
+            cbl = md.combinedBL;
+            if isvector(cbl) && numel(cbl) >= kIdx
+                e.combinedBL = logical(cbl(kIdx));
+            elseif isscalar(cbl)
+                e.combinedBL = logical(cbl);
+            end
+        end
+
+        if e.combinedBL
+            e.baselineSource = 'same_block_as_opto';
+        elseif ~isempty(e.xBaselinePreMerge)
+            e.baselineSource = 'separate_block';
+        end
+
+        psyFull(bID) = e;
+    end
+end
+
+% Second pass: fill behavioral arrays from raw data for blocks not covered by any cluster.
+% behavioralData.gaborContrasts [3x12xN] = xBlocks, .percentageCorrect [3x12xN] = yBlocks.
+hasRaw = isstruct(behavioralData) && ...
+         isfield(behavioralData, 'gaborContrasts') && ...
+         isfield(behavioralData, 'percentageCorrect');
+if hasRaw
+    xBlocks = behavioralData.gaborContrasts;
+    yBlocks = behavioralData.percentageCorrect;
+    nRaw = size(xBlocks, 3);
+    for bID = 1:min(nTotalBlocks, nRaw)
+        if ~isempty(psyFull(bID).modelField)
+            continue
+        end
+        try
+            e = psyFull(bID);
+            e = fill_raw_behavioral_entry(e, xBlocks, yBlocks, bID);
+            e = compute_nominal_trial_counts(e);
+            e = compute_deltas_for_raw_entry(e);
+            e.deltaBias = e.deltaBiasMerged;
+            e.deltaMask = e.deltaMaskMerged;
+            e.modelField = 'behavioralData_raw';
+            if isempty(e.baselineSource) && ~isempty(e.xBaselineMerged)
+                e.baselineSource = 'separate_block';
+            end
+            psyFull(bID) = e;
+        catch ME
+            fprintf('WARNING: fill_raw_behavioral_entry failed for block %d: %s\n', bID, ME.message);
+        end
+    end
+end
+
+end
+
+
+function e = set_scalar_field(e, md, fname, kIdx, dim)
+% Extract scalar at position kIdx from field fname (1-D vector along dim).
+if ~isfield(md, fname)
+    return
+end
+val = md.(fname);
+if isempty(val)
+    return
+end
+if dim == 1
+    vec = val(:);
+else
+    vec = val(kIdx, :);
+end
+if numel(vec) >= kIdx
+    scalar = vec(kIdx);
+    if isnumeric(scalar) || islogical(scalar)
+        e.(fname) = scalar;
+    end
+end
+end
+
+
+function e = set_row_field(e, md, fname, kIdx)
+% Extract row kIdx from a 2-D matrix field, stripping trailing NaNs.
+if ~isfield(md, fname)
+    return
+end
+mat = md.(fname);
+if isempty(mat)
+    return
+end
+if isvector(mat)
+    row = mat(:)';
+elseif ismatrix(mat) && size(mat,1) >= kIdx
+    row = mat(kIdx, :);
+else
+    return
+end
+if isnumeric(row)
+    row = row(~isnan(row));
+end
+e.(fname) = row;
+end
+
+
+function row = add_psychometric_full_data(row, psyFull, blockID)
+% Copy all psychometric fields from psyFull(blockID) into the metatable row.
+if blockID < 1 || blockID > numel(psyFull)
+    return
+end
+e = psyFull(blockID);
+
+row.psy_modelField              = e.modelField;
+row.psy_combinedBL              = e.combinedBL;
+row.session_baselineSource      = e.baselineSource;
+
+row.psy_xBaselinePreMerge               = {e.xBaselinePreMerge};
+row.psy_yBaselinePreMerge               = {e.yBaselinePreMerge};
+row.psy_xBaselinePreMergeOrt            = {e.xBaselinePreMergeOrt};
+row.psy_nTrialsBaselinePreMerge         = {e.nTrialsBaselinePreMerge};
+row.psy_xHorizontalOptoPreMerge         = {e.xHorizontalOptoPreMerge};
+row.psy_yHorizontalOptoPreMerge         = {e.yHorizontalOptoPreMerge};
+row.psy_xHorizontalOptoPreMergeOrt      = {e.xHorizontalOptoPreMergeOrt};
+row.psy_nTrialsHorizontalOptoPreMerge   = {e.nTrialsHorizontalOptoPreMerge};
+row.psy_congruencyHorizontalOptoPreMerge = {e.congruencyHorizontalOptoPreMerge};
+row.psy_xVerticalOptoPreMerge           = {e.xVerticalOptoPreMerge};
+row.psy_yVerticalOptoPreMerge           = {e.yVerticalOptoPreMerge};
+row.psy_xVerticalOptoPreMergeOrt        = {e.xVerticalOptoPreMergeOrt};
+row.psy_nTrialsVerticalOptoPreMerge     = {e.nTrialsVerticalOptoPreMerge};
+row.psy_congruencyVerticalOptoPreMerge  = {e.congruencyVerticalOptoPreMerge};
+row.psy_xBaselineMerged                 = {e.xBaselineMerged};
+row.psy_yBaselineMerged                 = {e.yBaselineMerged};
+row.psy_nTrialsBaselineMerged           = {e.nTrialsBaselineMerged};
+row.psy_xConOptoMerged                  = {e.xConOptoMerged};
+row.psy_yConOptoMerged                  = {e.yConOptoMerged};
+row.psy_nTrialsConOptoMerged            = {e.nTrialsConOptoMerged};
+row.psy_xInconOptoMerged                = {e.xInconOptoMerged};
+row.psy_yInconOptoMerged                = {e.yInconOptoMerged};
+row.psy_nTrialsInconOptoMerged          = {e.nTrialsInconOptoMerged};
+
+row.psy_deltaBiasHorizontal = e.deltaBiasHorizontal;
+row.psy_deltaMaskHorizontal = e.deltaMaskHorizontal;
+row.psy_deltaBiasVertical   = e.deltaBiasVertical;
+row.psy_deltaMaskVertical   = e.deltaMaskVertical;
+row.psy_deltaBiasMerged     = e.deltaBiasMerged;
+row.psy_deltaMaskMerged     = e.deltaMaskMerged;
+if ~isnan(e.deltaBias)
+    row.psy_deltaBias = e.deltaBias;
+end
+if ~isnan(e.deltaMask)
+    row.psy_deltaMask = e.deltaMask;
+end
+
+end
+
+
+function [hCam, vCam, hProj, vProj] = get_oriented_bitmaps_for_block(bitmapData, blockID, nTotalBlocks)
+% Extract horizontal- and vertical-oriented bitmaps (cam-space and proj-space).
+hCam  = [];
+vCam  = [];
+hProj = [];
+vProj = [];
+
+if ~isfield(bitmapData, 'orts')
+    return
+end
+
+ortsAll = bitmapData.orts;
+% shape [1 x 2 x nBlocks]
+if ndims(ortsAll) ~= 3 || size(ortsAll,3) < blockID
+    return
+end
+ortsBlock = squeeze(ortsAll(:, :, blockID));  % [1x2] or [2x1] → vector
+ortsBlock  = ortsBlock(:);                    % ensure column [2x1]
+
+if numel(ortsBlock) < 2
+    return
+end
+
+% 0 deg = horizontal, 90 deg = vertical
+idxH = find(ortsBlock == 0,  1);
+idxV = find(ortsBlock == 90, 1);
+
+if isempty(idxH) && isempty(idxV)
+    % fallback: assign by position (index 1 = hor, index 2 = vert)
+    idxH = 1;
+    idxV = 2;
+end
+
+% Camera-space bitmaps: [H x W x 2 x nBlocks]
+if isfield(bitmapData, 'columnarbitmapTFcamspace')
+    bmpCam = bitmapData.columnarbitmapTFcamspace;
+    % find block dimension
+    szCam = size(bmpCam);
+    blockDimCam = find(szCam == nTotalBlocks, 1, 'last');
+    if ~isempty(blockDimCam)
+        idxC = repmat({':'}, 1, ndims(bmpCam));
+        idxC{blockDimCam} = blockID;
+        bmpBlock = bmpCam(idxC{:});   % [H x W x 2] or [H x W] depending on ndims
+        bmpBlock = squeeze(bmpBlock);
+        % orientation dimension: ndims of squeezed result
+        if ndims(bmpBlock) == 3
+            % 3rd dim is orientation
+            if ~isempty(idxH) && size(bmpBlock,3) >= idxH
+                hCam = bmpBlock(:,:,idxH);
+            end
+            if ~isempty(idxV) && size(bmpBlock,3) >= idxV
+                vCam = bmpBlock(:,:,idxV);
+            end
+        elseif ismatrix(bmpBlock)
+            hCam = bmpBlock;
+            vCam = bmpBlock;
+        end
+    end
+end
+
+% Projector-space bitmaps
+if isfield(bitmapData, 'columnarbitmapTFprojspace')
+    bmpProj = bitmapData.columnarbitmapTFprojspace;
+    szProj = size(bmpProj);
+    blockDimProj = find(szProj == nTotalBlocks, 1, 'last');
+    if ~isempty(blockDimProj)
+        idxP = repmat({':'}, 1, ndims(bmpProj));
+        idxP{blockDimProj} = blockID;
+        bmpPBlock = bmpProj(idxP{:});
+        bmpPBlock = squeeze(bmpPBlock);
+        if ndims(bmpPBlock) == 3
+            if ~isempty(idxH) && size(bmpPBlock,3) >= idxH
+                hProj = bmpPBlock(:,:,idxH);
+            end
+            if ~isempty(idxV) && size(bmpPBlock,3) >= idxV
+                vProj = bmpPBlock(:,:,idxV);
+            end
+        elseif ismatrix(bmpPBlock)
+            hProj = bmpPBlock;
+            vProj = bmpPBlock;
+        end
+    end
+end
+
+end
+
+
+function e = fill_raw_behavioral_entry(e, xBlocks, yBlocks, blockID)
+% Replicates processConditionsBlocks logic for one block using raw behavioral data.
+% xBlocks [3 x nContrasts x nBlocks]: row1=baseline, row2=horizontal, row3=vertical.
+% yBlocks same shape with percent-correct values.
+
+xBaselineRaw = bmd_rmnan(squeeze(xBlocks(1,:,blockID)));
+yBaselineRaw = bmd_rmnan(squeeze(yBlocks(1,:,blockID)));
+xHorizontalRaw = bmd_rmnan(squeeze(xBlocks(2,:,blockID)));
+yHorizontalRaw = bmd_rmnan(squeeze(yBlocks(2,:,blockID)));
+xVerticalRaw = bmd_rmnan(squeeze(xBlocks(3,:,blockID)));
+yVerticalRaw = bmd_rmnan(squeeze(yBlocks(3,:,blockID)));
+
+%% Baseline
+nBase = numel(xBaselineRaw);
+if nBase > 0 && mod(nBase, 2) == 0
+    tagBaselineRaw = bmd_make_visual_tag(nBase);
+    [xBaseSorted, sortIdx] = sort(xBaselineRaw);
+    yBaseSorted = yBaselineRaw(sortIdx);
+    tagBaseSorted = tagBaselineRaw(sortIdx);
+
+    % Pre-merge baseline
+    [xBPre, yBPre, tagBPre] = bmd_make_pre_merge_pct_correct(xBaseSorted, yBaseSorted, tagBaseSorted, true);
+    e.xBaselinePreMerge = xBPre(:)';
+    e.yBaselinePreMerge = yBPre(:)';
+    e.xBaselinePreMergeOrt = tagBPre(:)';
+
+    % Merged baseline (averaged symmetric halves → percent correct)
+    numVal = numel(xBaseSorted);
+    xBMerged = mean([fliplr(-xBaseSorted(1:numVal/2)); xBaseSorted(numVal/2+1:end)]);
+    yBMerged  = mean([fliplr(100 - yBaseSorted(1:numVal/2)); yBaseSorted(numVal/2+1:end)]);
+    e.xBaselineMerged = xBMerged(:)';
+    e.yBaselineMerged  = yBMerged(:)';
+end
+
+%% Horizontal opto
+nH = numel(xHorizontalRaw);
+if nH > 0 && mod(nH, 2) == 0
+    tagHRaw = bmd_make_visual_tag(nH);
+    [xHSorted, sortIdxH] = sort(xHorizontalRaw);
+    yHSorted = yHorizontalRaw(sortIdxH);
+    tagHSorted = tagHRaw(sortIdxH);
+
+    [xHPre, yHPre, tagHPre] = bmd_make_pre_merge_pct_correct(xHSorted, yHSorted, tagHSorted, false);
+    congrH = NaN(size(tagHPre));
+    congrH(tagHPre == 0) = 1;
+    congrH(tagHPre == 90) = -1;
+    e.xHorizontalOptoPreMerge = xHPre(:)';
+    e.yHorizontalOptoPreMerge = yHPre(:)';
+    e.xHorizontalOptoPreMergeOrt = tagHPre(:)';
+    e.congruencyHorizontalOptoPreMerge = congrH(:)';
+end
+
+%% Vertical opto
+nV = numel(xVerticalRaw);
+if nV > 0 && mod(nV, 2) == 0
+    tagVRaw = bmd_make_visual_tag(nV);
+    [xVSorted, sortIdxV] = sort(xVerticalRaw);
+    yVSorted = yVerticalRaw(sortIdxV);
+    tagVSorted = tagVRaw(sortIdxV);
+
+    [xVPre, yVPre, tagVPre] = bmd_make_pre_merge_pct_correct(xVSorted, yVSorted, tagVSorted, false);
+    congrV = NaN(size(tagVPre));
+    congrV(tagVPre == 0) = -1;
+    congrV(tagVPre == 90) = 1;
+    e.xVerticalOptoPreMerge = xVPre(:)';
+    e.yVerticalOptoPreMerge = yVPre(:)';
+    e.xVerticalOptoPreMergeOrt = tagVPre(:)';
+    e.congruencyVerticalOptoPreMerge = congrV(:)';
+end
+
+%% Merged con/incon (requires both H and V)
+if nH > 0 && mod(nH, 2) == 0 && nV > 0 && mod(nV, 2) == 0
+    contrastNeg = 1:numel(xHorizontalRaw)/2;
+    contrastPos = numel(xHorizontalRaw)/2+1:numel(xHorizontalRaw);
+
+    xHSorted2 = sort(xHorizontalRaw);
+    yHSorted2 = yHorizontalRaw(argsort_vec(xHorizontalRaw));
+    xVSorted2 = sort(xVerticalRaw);
+    yVSorted2 = yVerticalRaw(argsort_vec(xVerticalRaw));
+
+    yHCorrect = yHSorted2;
+    yHCorrect(contrastNeg) = 100 - yHCorrect(contrastNeg);
+    yVCorrect = yVSorted2;
+    yVCorrect(contrastNeg) = 100 - yVCorrect(contrastNeg);
+
+    xConOpto  = mean([-fliplr(xHSorted2(contrastNeg)); xVSorted2(contrastPos)]);
+    yConOpto  = mean([fliplr(yHCorrect(contrastNeg));  yVCorrect(contrastPos)]);
+    xInconOpto = mean([xHSorted2(contrastPos); -fliplr(xVSorted2(contrastNeg))]);
+    yInconOpto  = mean([yHCorrect(contrastPos); fliplr(yVCorrect(contrastNeg))]);
+
+    e.xConOptoMerged   = xConOpto(:)';
+    e.yConOptoMerged   = yConOpto(:)';
+    e.xInconOptoMerged = xInconOpto(:)';
+    e.yInconOptoMerged = yInconOpto(:)';
+end
+end
+
+
+function idx = argsort_vec(v)
+[~, idx] = sort(v);
+end
+
+
+function v = bmd_rmnan(v)
+v = v(~isnan(v));
+end
+
+
+function tag = bmd_make_visual_tag(nVal)
+tag = NaN(1, nVal);
+tag(1:nVal/2) = 0;
+tag(nVal/2+1:end) = 90;
+end
+
+
+function [xOut, yOut, tagOut] = bmd_make_pre_merge_pct_correct(xIn, yIn, tagIn, mergeDupZeros)
+xIn = xIn(:)'; yIn = yIn(:)'; tagIn = tagIn(:)';
+valid = ~isnan(xIn) & ~isnan(yIn) & ~isnan(tagIn);
+xIn = xIn(valid); yIn = yIn(valid); tagIn = tagIn(valid);
+yCorrect = yIn;
+yCorrect(tagIn == 0) = 100 - yCorrect(tagIn == 0);
+if mergeDupZeros
+    [xOut, yOut, tagOut] = bmd_merge_dup_x_for_baseline(xIn, yCorrect, tagIn);
+else
+    xOut = xIn; yOut = yCorrect; tagOut = tagIn;
+end
+end
+
+
+function [xOut, yOut, tagOut] = bmd_merge_dup_x_for_baseline(xIn, yIn, tagIn)
+xIn = xIn(:)'; yIn = yIn(:)'; tagIn = tagIn(:)';
+valid = ~isnan(xIn) & ~isnan(yIn) & ~isnan(tagIn);
+xIn = xIn(valid); yIn = yIn(valid); tagIn = tagIn(valid);
+[xOut, ~, grp] = unique(xIn, 'stable');
+yOut = nan(size(xOut)); tagOut = nan(size(xOut));
+for ii = 1:numel(xOut)
+    sel = grp == ii;
+    yOut(ii) = mean(yIn(sel), 'omitnan');
+    utags = unique(tagIn(sel));
+    utags = utags(~isnan(utags));
+    if numel(utags) == 1
+        tagOut(ii) = utags;
+    else
+        tagOut(ii) = 45;
+    end
+end
+end
+
+
+function e = set_row_field_as(e, md, srcFname, dstFname, kIdx)
+% Like set_row_field but reads from srcFname and writes to dstFname.
+if ~isfield(md, srcFname)
+    return
+end
+mat = md.(srcFname);
+if isempty(mat)
+    return
+end
+if isvector(mat)
+    row = mat(:)';
+elseif ismatrix(mat) && size(mat,1) >= kIdx
+    row = mat(kIdx, :);
+else
+    return
+end
+if isnumeric(row)
+    row = row(~isnan(row));
+end
+e.(dstFname) = row;
+end
+
+
+function e = compute_nominal_trial_counts(e)
+% Assign nominal trial counts aligned one-for-one with x/y vectors.
+% Pre-merge sides: 10 per point, 20 at abs(x)==0 (baseline after zero-merging).
+% Merged: 20 per point, 40 at abs(x)==0.
+e.nTrialsBaselinePreMerge       = bmd_make_side_weights(e.xBaselinePreMerge);
+e.nTrialsHorizontalOptoPreMerge = 10 * ones(1, numel(e.xHorizontalOptoPreMerge));
+e.nTrialsVerticalOptoPreMerge   = 10 * ones(1, numel(e.xVerticalOptoPreMerge));
+e.nTrialsBaselineMerged         = bmd_make_merged_weights(e.xBaselineMerged);
+e.nTrialsConOptoMerged          = bmd_make_merged_weights(e.xConOptoMerged);
+e.nTrialsInconOptoMerged        = bmd_make_merged_weights(e.xInconOptoMerged);
+end
+
+
+function w = bmd_make_side_weights(x)
+w = 10 * ones(1, numel(x));
+w(abs(x) == 0) = 20;
+end
+
+
+function w = bmd_make_merged_weights(x)
+w = 20 * ones(1, numel(x));
+w(abs(x) == 0) = 40;
+end
+
+
+function e = compute_deltas_for_raw_entry(e)
+% Compute all six delta scalars from x/y/ort arrays using nominal weights.
+% Formula: deltaBias = conMean - inconMean; deltaMask = baseMean - mean(con,incon).
+
+% Merged deltas
+basM = bmd_weighted_mean(e.xBaselineMerged, e.yBaselineMerged, 'merged');
+conM = bmd_weighted_mean(e.xConOptoMerged,  e.yConOptoMerged,  'merged');
+incM = bmd_weighted_mean(e.xInconOptoMerged,e.yInconOptoMerged,'merged');
+e.deltaBiasMerged = conM - incM;
+e.deltaMaskMerged = basM - (conM + incM) / 2;
+
+% Horizontal side deltas
+ort = e.xBaselinePreMergeOrt;
+xBH = e.xBaselinePreMerge(ort == 0);
+yBH = e.yBaselinePreMerge(ort == 0);
+ortH = e.xHorizontalOptoPreMergeOrt;
+xCH = e.xHorizontalOptoPreMerge(ortH == 0);
+yCH = e.yHorizontalOptoPreMerge(ortH == 0);
+xIH = e.xHorizontalOptoPreMerge(ortH == 90);
+yIH = e.yHorizontalOptoPreMerge(ortH == 90);
+basH = bmd_weighted_mean(xBH, yBH, 'sideBaseline');
+conH = bmd_weighted_mean(xCH, yCH, 'sideOpto');
+incH = bmd_weighted_mean(xIH, yIH, 'sideOpto');
+e.deltaBiasHorizontal = conH - incH;
+e.deltaMaskHorizontal = basH - (conH + incH) / 2;
+
+% Vertical side deltas
+xBV = e.xBaselinePreMerge(ort == 90);
+yBV = e.yBaselinePreMerge(ort == 90);
+ortV = e.xVerticalOptoPreMergeOrt;
+xCV = e.xVerticalOptoPreMerge(ortV == 90);
+yCV = e.yVerticalOptoPreMerge(ortV == 90);
+xIV = e.xVerticalOptoPreMerge(ortV == 0);
+yIV = e.yVerticalOptoPreMerge(ortV == 0);
+basV = bmd_weighted_mean(xBV, yBV, 'sideBaseline');
+conV = bmd_weighted_mean(xCV, yCV, 'sideOpto');
+incV = bmd_weighted_mean(xIV, yIV, 'sideOpto');
+e.deltaBiasVertical = conV - incV;
+e.deltaMaskVertical = basV - (conV + incV) / 2;
+end
+
+
+function m = bmd_weighted_mean(x, y, mode)
+x = x(:); y = y(:);
+if isempty(x) || isempty(y)
+    m = NaN;
+    return
+end
+switch mode
+    case 'sideBaseline'
+        w = 10 * ones(size(x));
+        w(abs(x) == 0) = 20;
+    case 'sideOpto'
+        w = 10 * ones(size(x));
+    case 'merged'
+        w = 20 * ones(size(x));
+        w(abs(x) == 0) = 40;
+    otherwise
+        w = ones(size(x));
+end
+wsum = sum(w);
+if wsum == 0
+    m = NaN;
+else
+    m = sum(w .* y) / wsum;
+end
+end
+
+
+function src = infer_baseline_source_from_row(row)
+src = '';
+try
+    dOpto = row.date_opto{1};
+    rOpto = row.run_opto{1};
+    dBase = row.date_baseline{1};
+    rBase = row.run_baseline{1};
+    if isempty(dOpto) || isempty(dBase)
+        return
+    end
+    if isnumeric(dOpto) && any(isnan(dOpto(:))); return; end
+    if isnumeric(dBase) && any(isnan(dBase(:))); return; end
+    if isequal(dOpto, dBase) && isequal(rOpto, rBase)
+        src = 'same_block_as_opto';
+    else
+        src = 'separate_block';
+    end
+catch
+end
 end

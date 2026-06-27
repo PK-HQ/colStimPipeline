@@ -13,15 +13,21 @@
 % 10. psyphidist***
 
 %% Change these for experiment runs
-analysisMode='psycluster';%psyphidist
+analysisMode='summary';%psyphidist
 monkeyName='Chip';%Pepper or Chip
-currentSessID=81;%for biasing expt
+currentSessID=89; %81;%for biasing expt
 
 % Saving and plotting flags
-saveFlag=1;
+saveFlag=0;
 saveFlagBMP=0;
 plotFlag=1;
 skipImaging=1;
+
+% Targets for analysisMode = 'metatable': {animalName, chamberLetter, srcFilename}
+metatableTargets = { ...
+    'Chip',   'L', 'statisticsL-final43.mat'; ...
+    'Chip',   'R', 'statisticsR-final16.mat'; ...
+    'Pepper', 'R', 'statisticsR-final40.mat'};
 
 %% Load dataStruct for the desired chamber
 [mainPath, datastruct]=setupEnv(['users/PK/colStimPipeline/exptListBiasingFull' monkeyName '.m']);
@@ -79,6 +85,43 @@ for chamberID=2
                 currentBlockStruct, 'cam2proj', blockID,...
                 pdfFilename, plotFlag, saveFlagBMP, saveFlag);
             
+        case {'metatable'}
+            % Generate metatables for all configured animal/chamber targets.
+            % Independent of chamberWanted/monkeyName/clusterIdx/modelTypes.
+            fprintf('=== metatable mode: %d targets ===\n', size(metatableTargets, 1));
+            metatableSummary = struct([]);
+            for tIdx = 1:size(metatableTargets, 1)
+                tAnimal  = metatableTargets{tIdx, 1};
+                tChamber = metatableTargets{tIdx, 2};
+                tSource  = metatableTargets{tIdx, 3};
+                fprintf('\n--- Target %d/%d: %s %s (%s) ---\n', ...
+                    tIdx, size(metatableTargets, 1), tAnimal, tChamber, tSource);
+                try
+                    tResult = runMetatableForTarget(mainPath, tAnimal, tChamber, tSource);
+                catch ME
+                    fprintf('ERROR for %s %s: %s\n', tAnimal, tChamber, ME.message);
+                    tResult = struct( ...
+                        'animal',         tAnimal, ...
+                        'chamber',        tChamber, ...
+                        'sourcePath',     '', ...
+                        'nBlocks',        0, ...
+                        'matOutputPath',  '', ...
+                        'xlsxOutputPath', '', ...
+                        'success',        false);
+                end
+                if isempty(metatableSummary)
+                    metatableSummary = tResult;
+                else
+                    metatableSummary(end+1) = tResult; %#ok<AGROW>
+                end
+            end
+            fprintf('\n=== metatable batch summary ===\n');
+            for si = 1:numel(metatableSummary)
+                s = metatableSummary(si);
+                fprintf('  %s %s | blocks=%d | success=%d | %s\n', ...
+                    s.animal, s.chamber, s.nBlocks, s.success, s.matOutputPath);
+            end
+
         case {'summary'}
             if ~exist('imagingData','var')
                 blockData=[];
@@ -87,7 +130,7 @@ for chamberID=2
                 bitmapData=[];
             end
             
-            for blockID=1:numel(analysisBlockID)
+            for blockID=26%1:numel(analysisBlockID)
                 disp(['=== Block ' num2str(blockID)  '/' nBlockStr ' (entry: ' num2str(analysisBlockID(blockID)) ')==='])
                 tic
                 if isfield(behavioralData,'auc') && size(behavioralData.auc,3)>=blockID

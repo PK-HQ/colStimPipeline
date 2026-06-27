@@ -1,0 +1,11 @@
+@AGENTS.md
+
+## Claude Code-specific instructions
+
+- Begin substantial changes in Plan mode.
+- Before editing, inspect git status, recent commits, relevant callers, and relevant saved-data structures.
+- Keep changes compatible with MATLAB R2018b.
+- Do not silently substitute legacy or folded analysis methods for signed-source models.
+- Keep changes focused on the requested task.
+- Report tests/checks performed and anything that could not be executed.
+- Do not commit or push unless explicitly asked.
