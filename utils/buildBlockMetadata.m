@@ -168,6 +168,7 @@ row.opto_gausscond = {[]};
 row.opto_gausslevel = {[]};
 row.opto_gaussmax = {[]};
 row.opto_transformParams = {[]};
+row.opto_PCAdenoisedResp = {[]};
 row.opto_bitmapCamSpace = {[]};
 row.opto_bitmapProjSpace = {[]};
 row.opto_nColumns = {[]};
@@ -278,6 +279,9 @@ row.opto_gausscond = {get_bitmap_field(bitmapData, 'gaussianCond', blockID, nTot
 row.opto_gausslevel = {get_bitmap_field(bitmapData, 'gaussianContourLevel', blockID, nTotalBlocks)};
 row.opto_gaussmax = {get_bitmap_field(bitmapData, 'gaussianContourLevelMax', blockID, nTotalBlocks)};
 row.opto_transformParams = {get_bitmap_field(bitmapData, 'transformParams', blockID, nTotalBlocks)};
+if isfield(bitmapData, 'pcadenoisedresp')
+    row.opto_PCAdenoisedResp = {bitmapData.pcadenoisedresp(:,:,:,blockID)};
+end
 row.opto_bitmapCamSpace = {get_bitmap_field(bitmapData, 'columnarbitmapTFcamspace', blockID, nTotalBlocks)};
 row.opto_bitmapProjSpace = {get_bitmap_field(bitmapData, 'columnarbitmapTFprojspace', blockID, nTotalBlocks)};
 row.opto_nColumns = {get_bitmap_field(bitmapData, 'nColumns', blockID, nTotalBlocks)};
@@ -1062,6 +1066,7 @@ headerMap = {
     'opto_gausslevel', 'opto.gausslevel'
     'opto_gaussmax', 'opto.gaussmax'
     'opto_transformParams', 'opto.transformParams'
+    'opto_PCAdenoisedResp', 'opto.PCAdenoisedResp'
     'opto_bitmapCamSpace', 'opto.bitmapCamSpace'
     'opto_bitmapProjSpace', 'opto.bitmapProjSpace'
     'opto_nColumns', 'opto.nColumns'

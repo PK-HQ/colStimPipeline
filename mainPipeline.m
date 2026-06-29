@@ -11,28 +11,30 @@
 % 8. PRF = fit and plot PRF for single sessions
 % 9. SIRF = fit and plot SIRF across sessions
 % 10. psyphidist***
+% 11. demo-optostim = 1x3 demonstration figure for a single session (PCA diff + column targeting)
 
 %% Change these for experiment runs
-analysisMode='summary';%psyphidist
+analysisMode='demo-optostim';
 monkeyName='Chip';%Pepper or Chip
 currentSessID=89; %81;%for biasing expt
 
 % Saving and plotting flags
-saveFlag=0;
+saveFlag=1;
 saveFlagBMP=0;
 plotFlag=1;
 skipImaging=1;
 
 % Targets for analysisMode = 'metatable': {animalName, chamberLetter, srcFilename}
 metatableTargets = { ...
+    'Pepper', 'R', 'statisticsR-final38.mat';...
     'Chip',   'L', 'statisticsL-final43.mat'; ...
     'Chip',   'R', 'statisticsR-final16.mat'; ...
-    'Pepper', 'R', 'statisticsR-final40.mat'};
+    };
 
 %% Load dataStruct for the desired chamber
 [mainPath, datastruct]=setupEnv(['users/PK/colStimPipeline/exptListBiasingFull' monkeyName '.m']);
 chambers={'R', 'L'};
-for chamberID=2
+for chamberID=1:2
     nColumnsWanted=[]; chamberWanted=chambers{chamberID};
     analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted);
     nBlockStr=num2str(numel(analysisBlockID));
@@ -85,6 +87,71 @@ for chamberID=2
                 currentBlockStruct, 'cam2proj', blockID,...
                 pdfFilename, plotFlag, saveFlagBMP, saveFlag);
             
+        case {'demo-optostim'}
+            %% Single-session 1x3 demonstration figure
+            % Initialize data structures
+            blockData      = [];
+            behavioralData = [];
+            imagingData    = [];
+            bitmapData     = [];
+            blockID        = 1;
+            analysisBlockID = currentSessID;
+
+            % Grab session structs directly from datastruct
+            currentBlockStruct   = datastruct(currentSessID);
+            referenceBlockStruct = datastruct(currentBlockStruct.referenceBlockNo);
+
+            % Load single-block data (7-output form matches summary/psycluster)
+            [currentBlockStruct, referenceBlockStruct, ...
+                blockData, behavioralData, imagingData, bitmapData, successFlag] = ...
+                loadBlockData(datastruct, analysisBlockID, blockData, ...
+                behavioralData, imagingData, bitmapData, blockID, analysisMode, skipImaging);
+
+            if ~successFlag
+                error('demo-optostim: failed to load block data for session %d', currentSessID);
+            end
+
+            pdfFilename = currentBlockStruct.psychneuroPDF;
+
+            % --- Suppress intermediate figures created by component functions ---
+            existingFigs = findall(0, 'Type', 'figure');
+
+            origVisible = get(groot, 'DefaultFigureVisible');
+            set(groot, 'DefaultFigureVisible', 'off');
+            try
+                % Run the same imaging + bitmap-processing chain as 'summary'
+                [bitmapData, columnarProducts] = getColumnarBitmapV4( ...
+                    currentBlockStruct, imagingData, bitmapData, blockID, ...
+                    pdfFilename, 0, 0);
+
+                bitmapData = coregisterBitmap2GreenImgV2( ...
+                    currentBlockStruct, referenceBlockStruct, ...
+                    imagingData, bitmapData, blockID, analysisMode, pdfFilename, 0, 0);
+
+                [bitmapData, demoProducts] = convertForProjectorGPT2( ...
+                    behavioralData, imagingData, bitmapData, ...
+                    currentBlockStruct, 'proj2cam', blockID, pdfFilename, 0, 0, 0);
+
+            catch ME
+                set(groot, 'DefaultFigureVisible', origVisible);
+                rethrow(ME);
+            end
+
+            % Close only the figures created during processing
+            newFigs = setdiff(findall(0, 'Type', 'figure'), existingFigs);
+            if ~isempty(newFigs)
+                delete(newFigs);
+            end
+
+            % Restore visibility before drawing the demo figure
+            set(groot, 'DefaultFigureVisible', origVisible);
+
+            % --- Build and optionally save the 1x3 demo figure ---
+            [figHandle, demoPlotData, outputFiles] = plotDemoOptostim( ...
+                currentBlockStruct, imagingData, bitmapData, ...
+                columnarProducts, demoProducts, blockID, currentSessID, ...
+                mainPath, monkeyName, chamberWanted, saveFlag);
+
         case {'metatable'}
             % Generate metatables for all configured animal/chamber targets.
             % Independent of chamberWanted/monkeyName/clusterIdx/modelTypes.
@@ -130,7 +197,7 @@ for chamberID=2
                 bitmapData=[];
             end
             
-            for blockID=26%1:numel(analysisBlockID)
+            for blockID=1:numel(analysisBlockID)
                 disp(['=== Block ' num2str(blockID)  '/' nBlockStr ' (entry: ' num2str(analysisBlockID(blockID)) ')==='])
                 tic
                 if isfield(behavioralData,'auc') && size(behavioralData.auc,3)>=blockID

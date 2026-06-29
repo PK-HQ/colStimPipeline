@@ -116,6 +116,29 @@ fprintf('\nLoading source file...\n');
 load(srcFile, 'blockData', 'bitmapData', 'behavioralData', ...
      'analysisBlockID', 'datastruct', 'dataTag', 'mdlStruct');
 
+%% 3b. Validate bitmapData.pcadenoisedresp before building
+nTotalBlocks = numel(mean(bitmapData.nColumns, 1, 'omitnan'));
+if ~isfield(bitmapData, 'pcadenoisedresp')
+    error('runMetatableForTarget:MissingPCAField', ...
+        ['bitmapData.pcadenoisedresp absent in %s %s source:\n  %s\n' ...
+         '  Regenerate using updated bitmap code (getColumnarBitmapV4).'], ...
+        animalName, chamberLetter, srcFile);
+end
+if ndims(bitmapData.pcadenoisedresp) < 4
+    error('runMetatableForTarget:PCAFieldWrongDims', ...
+        'bitmapData.pcadenoisedresp has %d dims (need >=4) for %s %s:\n  %s', ...
+        ndims(bitmapData.pcadenoisedresp), animalName, chamberLetter, srcFile);
+end
+pcaActualN = size(bitmapData.pcadenoisedresp, 4);
+if pcaActualN ~= nTotalBlocks
+    error('runMetatableForTarget:PCAFieldSizeMismatch', ...
+        ['bitmapData.pcadenoisedresp 4th dim=%d, expected nTotalBlocks=%d\n' ...
+         '  animal=%s  chamber=%s\n  source=%s\n' ...
+         '  Regenerate using updated bitmap code (getColumnarBitmapV4).'], ...
+        pcaActualN, nTotalBlocks, animalName, chamberLetter, srcFile);
+end
+fprintf('pcadenoisedresp validated: size [%s]\n', num2str(size(bitmapData.pcadenoisedresp)));
+
 %% 4. Build metatable (save handled inside buildBlockMetadata via saveOpts)
 fprintf('Building metatable...\n');
 saveOpts = struct('matPath', outMat, 'xlsxPath', outXlsx);
@@ -204,6 +227,7 @@ expectedCols = { ...
     'psy_xVerticalOptoPreMergeOrt', 'psy_congruencyVerticalOptoPreMerge', ...
     'psy_deltaBias', 'psy_deltaBiasMerged', ...
     'psy_deltaBiasHorizontal', 'psy_deltaBiasVertical', ...
+    'opto_PCAdenoisedResp', ...
     'bmp_horizontalCamSpace', 'bmp_verticalCamSpace', ...
     'session_hasVisFPS', 'session_baselineSource', ...
 };
@@ -216,6 +240,57 @@ for ci = 1:numel(expectedCols)
 end
 if nMissing == 0
     fprintf('  V10 PASS: all %d expected columns present\n', numel(expectedCols));
+end
+
+% V10b: opto_PCAdenoisedResp must immediately precede opto_bitmapCamSpace
+names_mt  = MetaTable.Properties.VariableNames;
+pcaColIdx = find(strcmp(names_mt, 'opto_PCAdenoisedResp'));
+camColIdx = find(strcmp(names_mt, 'opto_bitmapCamSpace'));
+if isempty(pcaColIdx)
+    fprintf('  V10b FAIL: opto_PCAdenoisedResp missing from MetaTable\n');
+elseif isempty(camColIdx)
+    fprintf('  V10b FAIL: opto_bitmapCamSpace missing from MetaTable\n');
+elseif pcaColIdx + 1 == camColIdx
+    fprintf('  V10b PASS: opto_PCAdenoisedResp col %d immediately before opto_bitmapCamSpace col %d\n', ...
+        pcaColIdx, camColIdx);
+else
+    fprintf('  V10b FAIL: opto_PCAdenoisedResp col %d, opto_bitmapCamSpace col %d (not adjacent)\n', ...
+        pcaColIdx, camColIdx);
+end
+
+% PCAdenoisedResp blockwise audit
+fprintf('\n--- PCAdenoisedResp audit: %s %s ---\n', animalName, chamberLetter);
+pcaSrcSz = size(bitmapData.pcadenoisedresp);
+fprintf('  source size: [%s]\n', num2str(pcaSrcSz));
+if any(strcmp(tblCols, 'opto_PCAdenoisedResp')) && nRows > 0
+    firstBID = MetaTable.blockID(1);
+    lastBID  = MetaTable.blockID(end);
+    srcFirst = bitmapData.pcadenoisedresp(:,:,:,firstBID);
+    srcLast  = bitmapData.pcadenoisedresp(:,:,:,lastBID);
+    tblFirst = MetaTable.opto_PCAdenoisedResp{1};
+    tblLast  = MetaTable.opto_PCAdenoisedResp{end};
+    fprintf('  first-block checksum: src=%.6g  tbl=%.6g\n', ...
+        sum(double(srcFirst(:)), 'omitnan'), sum(double(tblFirst(:)), 'omitnan'));
+    fprintf('  last-block  checksum: src=%.6g  tbl=%.6g\n', ...
+        sum(double(srcLast(:)), 'omitnan'), sum(double(tblLast(:)), 'omitnan'));
+    pcaOk = 0;
+    for bi = 1:nRows
+        bID      = MetaTable.blockID(bi);
+        srcSlice = bitmapData.pcadenoisedresp(:,:,:,bID);
+        tblSlice = MetaTable.opto_PCAdenoisedResp{bi};
+        if isequaln(size(tblSlice), size(srcSlice)) && isequaln(tblSlice, srcSlice)
+            pcaOk = pcaOk + 1;
+        else
+            fprintf('  MISMATCH block %d: src size [%s]  tbl size [%s]\n', ...
+                bID, num2str(size(srcSlice)), num2str(size(tblSlice)));
+        end
+    end
+    fprintf('  PCAdenoisedResp populated: %d/%d blocks\n', pcaOk, nRows);
+    if ~isempty(pcaColIdx) && ~isempty(camColIdx) && pcaColIdx + 1 == camColIdx
+        fprintf('  column position: immediately before opto_bitmapCamSpace\n');
+    end
+else
+    fprintf('  opto_PCAdenoisedResp not found in MetaTable\n');
 end
 
 % V11: modelField distribution

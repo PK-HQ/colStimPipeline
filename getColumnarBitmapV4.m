@@ -1,4 +1,4 @@
-function bitmapData=getColumnarBitmapV4(currentBlockStruct, imagingData, bitmapData, blockID, ...
+function [bitmapData, columnarProducts]=getColumnarBitmapV4(currentBlockStruct, imagingData, bitmapData, blockID, ...
   pdfFilename, plotFlag, saveFlag)
 disp('Getting column positions...')
 %% Change log
@@ -41,6 +41,14 @@ nCols=6;
 
 %% Processing
 [VERpca,normVERpca,histEqCol,gammaCol,columnarBitmap,bitmapData]=generateBitmap(selectedOrt,imagingData,bitmapData,blockID);
+
+%% Optional second output: numerical products for downstream analysis
+if nargout >= 2
+    blockOrts = imagingData.orts(:,:,blockID);
+    blockOrts  = blockOrts(:);
+    columnarProducts.VERpca = VERpca;
+    columnarProducts.orts   = blockOrts(selectedOrt)';  % 1-x-nOrts row vector
+end
 
 %% Setup for plot
 figure('name','Columnar map')

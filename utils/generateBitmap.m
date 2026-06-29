@@ -63,4 +63,5 @@ end
 optostimBitmap(:,:,1)=double(columnarBitmap(:,:,1)>columnarBitmap(:,:,2));
 optostimBitmap(:,:,2)=double(columnarBitmap(:,:,2)>columnarBitmap(:,:,1));
 bitmapData.columnarbitmap(:,:,:,blockID)=optostimBitmap;
+bitmapData.pcadenoisedresp(:,:,:,blockID)=VERpca;
 end

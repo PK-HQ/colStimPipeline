@@ -1,7 +1,20 @@
-function [bitmapData]=convertForProjectorGPT2(behavioralData, imagingData, bitmapData,...
+function [bitmapData, demoProducts]=convertForProjectorGPT2(behavioralData, imagingData, bitmapData,...
     currentBlockStruct, conversionType, blockID,...
     pdfFilename, plotFlag,saveFlagBMP,saveFlag)
 disp('Generating bitmap...')
+
+%% Optional second output: numerical products for demo-optostim mode
+if nargout >= 2
+    nBitmaps = size(bitmapData.columnarbitmapCoreg, 3);
+    imgRows  = size(bitmapData.columnarbitmapCoreg, 1);
+    imgCols  = size(bitmapData.columnarbitmapCoreg, 2);
+    demoProducts = struct();
+    demoProducts.orts                    = nan(1, nBitmaps);
+    demoProducts.targetedColumnsCamspace = zeros(imgRows, imgCols, nBitmaps);
+    demoProducts.gaussianMaskCamspace    = zeros(imgRows, imgCols, nBitmaps);
+    sourceMask = imagingData.nanmask(:,:,blockID);
+    demoProducts.roiMaskCamspace = isfinite(sourceMask) & (sourceMask ~= 0);
+end
 
 %% Generate bitmap here
 for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image in camera space
@@ -212,6 +225,16 @@ for bitmapNo = 1:size(bitmapData.columnarbitmapCoreg,3) % for each input image i
                 bitmapData.columnarbitmapTFprojspace(:,:,bitmapNo,blockID)=bitmapProjSpaceAligned(:,:,bitmapNo); %first bitmap is black bmp
                 bitmapData.columnarbitmapTFcamspace(:,:,bitmapNo,blockID)=bitmapCamspace(:,:,bitmapNo);
                 bitmapData.nColumns(bitmapNo,blockID)=numel(columnAreas);
+
+                % --- Capture demo products for demo-optostim mode ---
+                if nargout >= 2
+                    demoProducts.orts(bitmapNo) = ort;
+                    demoProducts.targetedColumnsCamspace(:,:,bitmapNo) = bitmapCamspace(:,:,bitmapNo);
+                    if ~isempty(gaussianMask) && ...
+                            size(gaussianMask,1)==imgRows && size(gaussianMask,2)==imgCols
+                        demoProducts.gaussianMaskCamspace(:,:,bitmapNo) = double(gaussianMask);
+                    end
+                end
                 bitmapData.columnAreas{bitmapNo,blockID}=columnAreas;
                 
                 %% Power density calculations

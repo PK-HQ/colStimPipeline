@@ -522,134 +522,62 @@ function diagnostics = getSignedBX0AggregatePanelSlopeDiagnostics(params, global
 end
 
 function validateSignedBX0AggregateBranchIndependence(params, globalDeltaX0, viewName)
-% Verify that each condition's shape parameters affect only that condition's
-% predicted curve.
+% Assert cross-branch independence of the 10-parameter panel prediction.
 %
-% Parameter layout (10 params):
-%   1-3  : A_baseline, alpha_baseline, beta_baseline  (baseline-only)
-%   4-6  : A_con,      alpha_con,      beta_con        (con-only)
-%   7-9  : A_incon,    alpha_incon,    beta_incon      (incon-only)
-%   10   : deltaB_panel                                (shared: con & incon)
-%
-% params(10) enters both conY (B = 50 + deltaB) and inconY (B = 50 - deltaB)
-% by design and is therefore excluded from the independence failure check.
-%
-% Perturbation: 5% of the legal parameter range, clamped to bounds, applied
-% in the direction that keeps the parameter inside its interval.  A
-% perturbation is considered "useful" only when the intended curve changes by
-% more than 1e-6 %; cross-branch contamination is reported only for useful
-% perturbations.
+% Parameter groups:
+%   baseline 1:3  — must not affect con (curve 2) or incon (curve 3)
+%   con      4:6  — must not affect incon (curve 3)
+%   incon    7:9  — must not affect con  (curve 2)
+%   deltaB   10   — shared by design; excluded from independence checks
 
-    if nargin < 3 || isempty(viewName)
-        viewName = 'unknown';
-    end
+    if nargin < 3; viewName = 'unknown'; end
 
     [lb, ub] = getWeibullSignedBX0PanelBounds();
-    paramNames = {'A_baseline', 'alpha_baseline', 'beta_baseline', ...
-                  'A_con',      'alpha_con',      'beta_con', ...
-                  'A_incon',    'alpha_incon',     'beta_incon', ...
-                  'deltaB_panel'};
-
-    c = linspace(0, 1, 51);   % normalised contrast grid for sensitivity scan
+    c        = linspace(0, 1, 51);
     [base0, con0, incon0] = predictSignedBX0AggregatePanelCurves(c, params, globalDeltaX0);
 
-    % Scale-aware step: 5% of the legal range, minimum 1e-6
-    step = max(0.05 .* (ub - lb), 1e-6 .* ones(size(lb)));
+    step      = max(0.05 .* (ub - lb), 1e-6);   % 5 % of legal range, floored
+    indTol    = 1e-9;   % cross-branch contamination threshold
+    usefulTol = 1e-6;   % own-branch change required for perturbation to be informative
 
-    % Build sensitivity matrix: row = param index, col = [dBaseline, dCon, dIncon]
-    sensMatrix = nan(10, 3);
-    for pi = 1:10
-        pPerturbed = params;
-        if params(pi) + step(pi) <= ub(pi)
-            pPerturbed(pi) = params(pi) + step(pi);
-        else
-            pPerturbed(pi) = params(pi) - step(pi);
-        end
-        pPerturbed(pi) = min(max(pPerturbed(pi), lb(pi)), ub(pi));
+    % {paramIndices, ownCurveIdx, crossCurveIndices}  (curve 1=base,2=con,3=incon)
+    groups = { 1:3, 1, [2 3]; ...
+               4:6, 2, 3;     ...
+               7:9, 3, 2      };
 
-        [baseP, conP, inconP] = ...
-            predictSignedBX0AggregatePanelCurves(c, pPerturbed, globalDeltaX0);
-        sensMatrix(pi, 1) = max(abs(baseP(:)  - base0(:)),  [], 'omitnan');
-        sensMatrix(pi, 2) = max(abs(conP(:)   - con0(:)),   [], 'omitnan');
-        sensMatrix(pi, 3) = max(abs(inconP(:) - incon0(:)), [], 'omitnan');
-    end
-
-    indTol    = 1e-9;   % cross-branch change must be below this to pass
-    usefulTol = 1e-6;   % intended curve must change by at least this
-
-    % Print diagnostic header
-    fprintf('validateSignedBX0AggregateBranchIndependence: panel=%s\n', viewName);
-    fprintf('  bestParams:    [%s]\n', num2str(params(:)', '%.4g '));
-    fprintf('  globalDeltaX0: %.6g\n', globalDeltaX0);
-    fprintf('  indTol=%.0e  usefulTol=%.0e\n', indTol, usefulTol);
-    fprintf('  %-4s  %-22s  %10s  %10s  %10s\n', ...
-        'idx', 'name', 'dBaseline', 'dCon', 'dIncon');
-    for pi = 1:10
-        fprintf('  p%-3d  %-22s  %10.3e  %10.3e  %10.3e\n', ...
-            pi, paramNames{pi}, sensMatrix(pi,1), sensMatrix(pi,2), sensMatrix(pi,3));
-    end
-
-    % Independence requirements:
-    %   baseline params (1:3) must not affect con or incon
-    %   con     params (4:6) must not affect incon
-    %   incon   params (7:9) must not affect con
-    %   param 10 (deltaB_panel) is shared — skip independence check
     violations = {};
-
-    for pi = 1:3   % baseline-only group
-        if sensMatrix(pi, 1) > usefulTol
-            if sensMatrix(pi, 2) > indTol
-                violations{end+1} = sprintf( ...
-                    'p%d (%s): baseline param contaminates Con (dCon=%.3e)', ...
-                    pi, paramNames{pi}, sensMatrix(pi,2)); %#ok<AGROW>
+    for gi = 1:size(groups, 1)
+        paramIdxs = groups{gi, 1};
+        ownIdx    = groups{gi, 2};
+        crossIdxs = groups{gi, 3};
+        for pi = paramIdxs
+            pPert = params;
+            if params(pi) + step(pi) <= ub(pi)
+                pPert(pi) = params(pi) + step(pi);
+            else
+                pPert(pi) = params(pi) - step(pi);
             end
-            if sensMatrix(pi, 3) > indTol
-                violations{end+1} = sprintf( ...
-                    'p%d (%s): baseline param contaminates Incon (dIncon=%.3e)', ...
-                    pi, paramNames{pi}, sensMatrix(pi,3)); %#ok<AGROW>
+            pPert(pi) = min(max(pPert(pi), lb(pi)), ub(pi));
+            [bP, cP, iP] = predictSignedBX0AggregatePanelCurves(c, pPert, globalDeltaX0);
+            dAll = [max(abs(bP(:) - base0(:)), [], 'omitnan'), ...
+                    max(abs(cP(:) - con0(:)),   [], 'omitnan'), ...
+                    max(abs(iP(:) - incon0(:)), [], 'omitnan')];
+            if dAll(ownIdx) < usefulTol; continue; end  % uninformative; skip
+            for ci = crossIdxs(:)'
+                if dAll(ci) > indTol
+                    violations{end+1} = sprintf( ...  %#ok<AGROW>
+                        'p%d: contaminates curve %d (d=%.2e, own=%.2e)', ...
+                        pi, ci, dAll(ci), dAll(ownIdx));
+                end
             end
         end
     end
 
-    for pi = 4:6   % con-only group
-        dCon_pi   = sensMatrix(pi, 2);
-        dIncon_pi = sensMatrix(pi, 3);
-        if dCon_pi < usefulTol && dIncon_pi > usefulTol
-            % Param moves incon but not con — wired to wrong condition
-            violations{end+1} = sprintf( ...
-                'p%d (%s): Con param moves Incon but not Con (%.3e/%.3e) — possible swap', ...
-                pi, paramNames{pi}, dIncon_pi, dCon_pi); %#ok<AGROW>
-        elseif dCon_pi > usefulTol && dIncon_pi > indTol
-            violations{end+1} = sprintf( ...
-                'p%d (%s): Con param contaminates Incon (dIncon=%.3e)', ...
-                pi, paramNames{pi}, dIncon_pi); %#ok<AGROW>
-        end
-    end
-
-    for pi = 7:9   % incon-only group
-        dCon_pi   = sensMatrix(pi, 2);
-        dIncon_pi = sensMatrix(pi, 3);
-        if dIncon_pi < usefulTol && dCon_pi > usefulTol
-            % Param moves con but not incon — wired to wrong condition
-            violations{end+1} = sprintf( ...
-                'p%d (%s): Incon param moves Con but not Incon (%.3e/%.3e) — possible swap', ...
-                pi, paramNames{pi}, dCon_pi, dIncon_pi); %#ok<AGROW>
-        elseif dIncon_pi > usefulTol && dCon_pi > indTol
-            violations{end+1} = sprintf( ...
-                'p%d (%s): Incon param contaminates Con (dCon=%.3e)', ...
-                pi, paramNames{pi}, dCon_pi); %#ok<AGROW>
-        end
-    end
-    % param 10 (deltaB_panel): shared by design; not checked for independence
-
-    if isempty(violations)
-        fprintf('  PASS: branch independence validated for panel=%s.\n\n', viewName);
-    else
-        fprintf('  VIOLATIONS:\n');
-        for vi = 1:numel(violations)
-            fprintf('    %s\n', violations{vi});
-        end
-        fprintf('\n');
+    if ~isempty(violations)
+        fprintf('validateSignedBX0AggregateBranchIndependence FAILED (panel=%s)\n', viewName);
+        fprintf('  params=[%s]  deltaX0=%.4g  indTol=%.0e  usefulTol=%.0e\n', ...
+            num2str(params, '%.4g '), globalDeltaX0, indTol, usefulTol);
+        for vi = 1:numel(violations); fprintf('  %s\n', violations{vi}); end
         error('plotAggregatedPowerClusterPsychometrics:SignedBX0BranchSwitching', ...
             'Aggregate signed-BX0 displayed branches switch con/incon shape parameters.');
     end
