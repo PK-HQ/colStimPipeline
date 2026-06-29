@@ -11,6 +11,13 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
         plotOpts = struct();
     end
     plotOpts = applyDeltaPermutationPlotDefaults(plotOpts);
+
+    % Reuse the settled whole-experiment delta-bias permutation test for
+    % individual weibullFreeAll pages. The test uses the empirical merged
+    % Con-Opto/Incon-Opto points and is independent of fitted model parameters.
+    if strcmpi(modelTypeStr, 'weibullFreeAll') && ~plotAverageFlag
+        plotOpts.showDeltaPermutationStats = true;
+    end
     if plotOpts.showDeltaPermutationStats
         fprintf('plotNakaRushtonFit5 received showDeltaPermutationStats=true (%d permutations).\n', ...
             plotOpts.nDeltaPermutations);

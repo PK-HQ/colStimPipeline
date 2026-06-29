@@ -14,7 +14,7 @@
 % 11. demo-optostim = 1x3 demonstration figure for a single session (PCA diff + column targeting)
 
 %% Change these for experiment runs
-analysisMode='psycluster';
+analysisMode='psydeltahist';
 monkeyName='Chip';%Pepper or Chip
 currentSessID=84; %81;%for biasing expt
 
@@ -994,6 +994,7 @@ for chamberID=2
         case {'psyphidist'}
                 chamberIDs=chamberID; saveFlag=1; filterColumns=1;
                 plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, filterColumns, saveFlag)
+                plotPsyPhiDist(datastruct, mainPath, monkeyName, chambers, chamberIDs, nBlockStr, filterColumns, saveFlag)
 
         case {'psydeltahist'}
                 plotMultiChamberDeltaBiasHistogram();
