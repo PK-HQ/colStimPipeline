@@ -65,8 +65,41 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
         subplot = @(m,n,p) subtightplot(m, n, p, panelGap, [hmarg hmarg], wmarg);
         if ~make_it_tight,  clear subplot;  end
        
-        figure('Name', ['Block ', blockInfo.label], ...
-            'Visible', plotOpts.figureVisible);
+        % Create a real standalone figure. Saving overrides any upstream
+        % figureVisible='off' setting because hidden/docked figures in R2018b
+        % remain at MATLAB's default 560x420 canvas and do not export WYSIWYG.
+        renderVisible = plotOpts.figureVisible;
+        if saveFlag
+            renderVisible = 'on';
+        end
+
+        oldRootUnits = get(groot, 'Units');
+        set(groot, 'Units', 'pixels');
+        screenRect = get(groot, 'ScreenSize');
+        set(groot, 'Units', oldRootUnits);
+
+        targetWidth = min(1800, max(1200, screenRect(3) - 100));
+        targetHeight = min(1050, max(750, screenRect(4) - 150));
+        targetLeft = max(1, round(screenRect(1) + ...
+            (screenRect(3) - targetWidth) / 2));
+        targetBottom = max(1, round(screenRect(2) + ...
+            (screenRect(4) - targetHeight) / 2));
+        targetFigurePosition = [targetLeft targetBottom targetWidth targetHeight];
+
+        fig = figure('Name', ['Block ', blockInfo.label], ...
+            'WindowStyle', 'normal', ...
+            'Visible', renderVisible, ...
+            'Color', 'w', ...
+            'Units', 'pixels', ...
+            'Position', targetFigurePosition, ...
+            'PaperPositionMode', 'auto');
+
+        % Reapply after creation because a docked default can otherwise win.
+        set(fig, 'WindowStyle', 'normal', ...
+            'Units', 'pixels', ...
+            'Position', targetFigurePosition, ...
+            'Visible', renderVisible);
+        drawnow;
         
         sideData = getPreMergedSideData(mdl, block);
         signedBX0DisplayParams = [];
@@ -740,16 +773,10 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
         end
         % Saving
         if saveFlag
-            forceFigureSansSerif(gcf);
+            forceFigureSansSerif(fig);
 
-            % Existing report/PDF output: one page per rendered block.
-            if isempty(reportState)
-                saveCompressedPDFPage(savefilename, monkeyName, gcf, appendPage);
-            else
-                reportState = stageReportPDFPage(reportState, gcf);
-            end
-
-            % Save one SVG for this experiment/block.
+            % Save one SVG for this experiment/block FIRST, before any PDF
+            % helper can alter PaperPosition/PaperSize or the current figure.
             monkey = valueToChar(datastruct(blockInfo.datastructIdx).monkey);
             dateStr = valueToChar(blockInfo.date);
             runStr = valueToChar(blockInfo.run);
@@ -774,14 +801,70 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
                 cluster, monkeyNo, dateStr, runStr);
             svgFile = fullfile(svgPath, svgName);
 
-            set(gcf, 'Renderer', 'painters');
-            set(findall(gcf, '-property', 'FontName'), 'FontName', 'Arial');
-            print(gcf, svgFile, '-dsvg');
+            % Force the same standalone visible geometry immediately before
+            % export. This prevents caller options or a docked default from
+            % silently reverting the figure to 560x420.
+            set(fig, 'WindowStyle', 'normal', ...
+                'Visible', 'on', ...
+                'Units', 'pixels', ...
+                'Position', targetFigurePosition, ...
+                'Renderer', 'painters');
+            set(findall(fig, '-property', 'FontName'), 'FontName', 'Arial');
+            drawnow;
+
+            figPixelsBeforeExport = getpixelposition(fig, true);
+            if figPixelsBeforeExport(3) < 1000 || figPixelsBeforeExport(4) < 700
+                error('plotNakaRushtonFit5:UnexpectedFigureCanvas', ...
+                    ['Figure canvas remained %.0f x %.0f px before SVG export. ' ...
+                    'Expected at least 1000 x 700 px.'], ...
+                    figPixelsBeforeExport(3), figPixelsBeforeExport(4));
+            end
+
+            % Force the SVG paper canvas to match the actual on-screen figure.
+            oldFigUnits = get(fig, 'Units');
+            oldPaperUnits = get(fig, 'PaperUnits');
+            oldPaperPosition = get(fig, 'PaperPosition');
+            oldPaperSize = get(fig, 'PaperSize');
+            oldPaperPositionMode = get(fig, 'PaperPositionMode');
+
+            set(fig, 'Units', 'inches');
+            figPositionInches = get(fig, 'Position');
+            set(fig, ...
+                'PaperUnits', 'inches', ...
+                'PaperPositionMode', 'manual', ...
+                'PaperPosition', [0 0 figPositionInches(3) figPositionInches(4)], ...
+                'PaperSize', figPositionInches(3:4));
+
+            figPixels = getpixelposition(fig, true);
+            fprintf(['SVG WYSIWYG export | visible=%s | screen=%.0f x %.0f px ' ...
+                '| paper=%.2f x %.2f in\n'], ...
+                get(fig, 'Visible'), figPixels(3), figPixels(4), ...
+                figPositionInches(3), figPositionInches(4));
+
+            print(fig, svgFile, '-dsvg', '-painters');
             fprintf('Saved SVG: %s\n', svgFile);
 
-            close(gcf);
-        elseif plotOpts.closeAfterRender
-            close(gcf);
+            % Restore figure properties after SVG export.
+            set(fig, ...
+                'PaperUnits', oldPaperUnits, ...
+                'PaperPosition', oldPaperPosition, ...
+                'PaperSize', oldPaperSize, ...
+                'PaperPositionMode', oldPaperPositionMode, ...
+                'Units', oldFigUnits);
+
+            % Existing report/PDF output: one page per rendered block.
+            if isempty(reportState)
+                saveCompressedPDFPage(savefilename, monkeyName, fig, appendPage);
+            else
+                reportState = stageReportPDFPage(reportState, fig);
+            end
+        end
+
+        % Do not close merely because the figure was saved.  This preserves
+        % visible WYSIWYG behavior.  The caller can still explicitly request
+        % automatic closure through plotOpts.closeAfterRender.
+        if ~saveFlag && plotOpts.closeAfterRender && isgraphics(fig)
+            close(fig);
         end
     end
 end
