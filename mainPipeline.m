@@ -14,9 +14,9 @@
 % 11. demo-optostim = 1x3 demonstration figure for a single session (PCA diff + column targeting)
 
 %% Change these for experiment runs
-analysisMode='demo-optostim';
+analysisMode='psycluster';
 monkeyName='Chip';%Pepper or Chip
-currentSessID=89; %81;%for biasing expt
+currentSessID=84; %81;%for biasing expt
 
 % Saving and plotting flags
 saveFlag=1;
@@ -34,7 +34,7 @@ metatableTargets = { ...
 %% Load dataStruct for the desired chamber
 [mainPath, datastruct]=setupEnv(['users/PK/colStimPipeline/exptListBiasingFull' monkeyName '.m']);
 chambers={'R', 'L'};
-for chamberID=1:2
+for chamberID=2
     nColumnsWanted=[]; chamberWanted=chambers{chamberID};
     analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted);
     nBlockStr=num2str(numel(analysisBlockID));
@@ -88,6 +88,15 @@ for chamberID=1:2
                 pdfFilename, plotFlag, saveFlagBMP, saveFlag);
             
         case {'demo-optostim'}
+            currentBlockStruct = datastruct(currentSessID);
+
+            if ~strcmp(chamberWanted, currentBlockStruct.chamber)
+                continue;
+            end
+            
+            referenceBlockStruct = ...
+                datastruct(currentBlockStruct.referenceBlockNo);
+
             %% Single-session 1x3 demonstration figure
             % Initialize data structures
             blockData      = [];
@@ -147,7 +156,7 @@ for chamberID=1:2
             set(groot, 'DefaultFigureVisible', origVisible);
 
             % --- Build and optionally save the 1x3 demo figure ---
-            [figHandle, demoPlotData, outputFiles] = plotDemoOptostim( ...
+            [figHandle, demoPlotData, outputFiles] = plotDemoOptostim2( ...
                 currentBlockStruct, imagingData, bitmapData, ...
                 columnarProducts, demoProducts, blockID, currentSessID, ...
                 mainPath, monkeyName, chamberWanted, saveFlag);
@@ -197,7 +206,7 @@ for chamberID=1:2
                 bitmapData=[];
             end
             
-            for blockID=1:numel(analysisBlockID)
+            for blockID=25%1:numel(analysisBlockID)
                 disp(['=== Block ' num2str(blockID)  '/' nBlockStr ' (entry: ' num2str(analysisBlockID(blockID)) ')==='])
                 tic
                 if isfield(behavioralData,'auc') && size(behavioralData.auc,3)>=blockID
@@ -328,7 +337,7 @@ for chamberID=1:2
             monkeyName=datastruct(analysisBlockID(1)).monkey;
             
             objFunc='MLE';
-            modelTypes={'bill','weibullSignedBX0'}; %'weibullfreeall'
+            modelTypes={'bill','weibullfreeAll'};%'weibullSignedBX0'}; %'weibullfreeall'
             fieldName='AICc';
             constrainedParamStr='';
             plotLine=1;
@@ -380,7 +389,7 @@ for chamberID=1:2
             fprintf(['Pre-clustering fit pass: hidden figures, no PDF, ' ...
                 'no permutation statistics.\n']);
             mdlStruct=analyzePsychometricModels(monkeyName, chamberWanted, modelTypes, mainPath, ...
-                behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, false, fitPassPlotOpts);
+                behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, saveFlag, fitPassPlotOpts);
 
             if plotFlag
                 aggregateOpts = struct('binWidth', 5, ...
@@ -926,7 +935,7 @@ for chamberID=1:2
             
             % Build the full path once (more robust than manual concatenation)
             fileName = fullfile(mainPath, monkeyName, 'Meta', 'summary', ...
-                                ['statistics' chamberWanted 'tag.mat']);
+                                ['statistics' chamberWanted '-final43.mat']);
             
             % Load only when needed:
             %   ??? `dataTag` is missing,  OR

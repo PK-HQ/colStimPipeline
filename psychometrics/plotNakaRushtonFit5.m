@@ -22,17 +22,12 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
     if plotAverageFlag==1
         nBlocks=1;
     end
-    if saveFlag && ~plotAverageFlag && isempty(clusterLabel)
-        error('plotNakaRushtonFit5:MissingClusterLabels', ...
-            ['Saved individual-page render requested without cluster labels. ' ...
-            'Expected one label per rendered block.']);
-    end
-    if ~plotAverageFlag && ~isempty(clusterLabel) && ...
-            numel(clusterLabel) ~= nBlocks
-        error('plotNakaRushtonFit5:ClusterLabelCountMismatch', ...
-            ['clusterLabel has %d entries, but %d render blocks were ' ...
-            'requested.'], numel(clusterLabel), nBlocks);
-    end
+    % Normalize cluster labels for plotting/saving.  A plotting call already
+    % represents one numeric cluster, so when the caller does not supply
+    % labels (or supplies one shared label), repeat that label for every
+    % rendered block.  This keeps saved pages annotated without forcing the
+    % caller to construct a redundant per-block label array.
+    clusterLabel = normalizeClusterLabels(clusterLabel, cluster, nBlocks);
     fprintf('plotNakaRushtonFit5 render setup: nRenderBlocks=%d | numel(clusterLabel)=%d | plotAverageFlag=%d\n', ...
         nBlocks, numel(clusterLabel), logical(plotAverageFlag));
     mdl.cluster=cluster;
@@ -743,33 +738,48 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
         if saveFlag
             assertClusterAnnotationPresent(optoStatsTextHandle, blockInfo, pageClusterLabel, block);
         end
-        %Saving
+        % Saving
         if saveFlag
             forceFigureSansSerif(gcf);
+
+            % Existing report/PDF output: one page per rendered block.
             if isempty(reportState)
                 saveCompressedPDFPage(savefilename, monkeyName, gcf, appendPage);
             else
                 reportState = stageReportPDFPage(reportState, gcf);
             end
-            close(gcf);
-            % Png/SVG
-            %{
-            monkey=datastruct(blockInfo.datastructIdx).monkey;
-            date= blockInfo.date;
-            run=blockInfo.run;
+
+            % Save one SVG for this experiment/block.
+            monkey = valueToChar(datastruct(blockInfo.datastructIdx).monkey);
+            dateStr = valueToChar(blockInfo.date);
+            runStr = valueToChar(blockInfo.run);
+            chamber = valueToChar(datastruct(blockInfo.datastructIdx).chamber);
+            monkeyNo = valueToChar(datastruct(blockInfo.datastructIdx).monkeyNo);
+
             if ispc
-              mainPath='Y:/';
-            elseif contains(getenv('HOSTNAME'),'psy.utexas.edu')
-              mainPath='/eslab/data/';
+                svgRoot = 'Y:\';
+            elseif contains(getenv('HOSTNAME'), 'psy.utexas.edu')
+                svgRoot = '/eslab/data/';
+            else
+                svgRoot = pwd;
             end
-            figPath=[mainPath monkey '\Meta\psychometrics\' datastruct(blockInfo.datastructIdx).chamber '-chamber\' modelTypeStr];
-            figName=['\C' num2str(cluster) 'M' datastruct(blockInfo.datastructIdx).monkeyNo 'D' date 'R' run];
-            set(findall(gcf, '-property', 'FontName'), 'FontName', 'SansSerif');                
-            set(gcf, 'Renderer', 'painters'); % Use painters for vector graphics
-            %print(gcf, [figPath '\png' figName '.png'], '-dpng', '-r600'); % High-res PNG
-            %savefig(gcf, [figPath '\fig' figName '.fig']);           % FIG
-            %print(gcf, [figPath '\svg' figName '.svg'], '-dsvg');        % SVG
-            %}
+
+            svgPath = fullfile(svgRoot, monkey, 'Meta', 'psychometrics', ...
+                [chamber '-chamber'], modelTypeStr, 'svg');
+            if ~exist(svgPath, 'dir')
+                mkdir(svgPath);
+            end
+
+            svgName = sprintf('C%dM%sD%sR%s.svg', ...
+                cluster, monkeyNo, dateStr, runStr);
+            svgFile = fullfile(svgPath, svgName);
+
+            set(gcf, 'Renderer', 'painters');
+            set(findall(gcf, '-property', 'FontName'), 'FontName', 'Arial');
+            print(gcf, svgFile, '-dsvg');
+            fprintf('Saved SVG: %s\n', svgFile);
+
+            close(gcf);
         elseif plotOpts.closeAfterRender
             close(gcf);
         end
@@ -2521,6 +2531,48 @@ function blockInfo = getPlotBlockInfo(datastruct, analysisBlockID, clusterBlocks
     blockInfo.date = valueToChar(datastruct(blockInfo.datastructIdx).date);
     blockInfo.run = valueToChar(datastruct(blockInfo.datastructIdx).run);
     blockInfo.label = [blockInfo.date 'R' blockInfo.run];
+end
+
+function labels = normalizeClusterLabels(labels, cluster, nBlocks)
+    if nargin < 3 || isempty(nBlocks)
+        nBlocks = 1;
+    end
+
+    defaultLabel = sprintf('Cluster: %s', valueToChar(cluster));
+
+    if nargin < 1 || isempty(labels)
+        labels = repmat({defaultLabel}, 1, nBlocks);
+        return;
+    end
+
+    % Convert supported scalar/vector inputs into a row cell array.
+    if ischar(labels)
+        labels = {labels};
+    elseif isstring(labels)
+        labels = cellstr(labels(:)');
+    elseif isnumeric(labels) || islogical(labels)
+        labels = arrayfun(@(x) valueToChar(x), labels(:)', ...
+            'UniformOutput', false);
+    elseif iscell(labels)
+        labels = labels(:)';
+        for ii = 1:numel(labels)
+            labels{ii} = valueToChar(labels{ii});
+        end
+    else
+        labels = {valueToChar(labels)};
+    end
+
+    % One shared cluster label is valid for every page in this cluster.
+    if numel(labels) == 1 && nBlocks > 1
+        labels = repmat(labels, 1, nBlocks);
+    end
+
+    if numel(labels) ~= nBlocks
+        error('plotNakaRushtonFit5:ClusterLabelCountMismatch', ...
+            ['clusterLabel has %d entries, but %d render blocks were ' ...
+            'requested. Supply either one shared label or one label per block.'], ...
+            numel(labels), nBlocks);
+    end
 end
 
 function label = getClusterLabelForRenderBlock(clusterLabel, block)

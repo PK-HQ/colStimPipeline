@@ -4,8 +4,11 @@ function B = FilterFermi3D(image, LowCutOff, HighCutOff, SizePxl)
 SizeImage = size(image);
 Height = SizeImage(1);
 Width = SizeImage(2);
-NumSlices = SizeImage(3); % Number of 2D slices
-
+if length(SizeImage)==3
+    NumSlices = SizeImage(3); % Number of 2D slices
+else
+    NumSlices=1;
+end
 % Fermi filter parameters
 ParmFermiLowPass = [1, HighCutOff, 0, HighCutOff * 0.05];
 ParmFermiHighPass = [1, LowCutOff, 0, LowCutOff * 0.05];

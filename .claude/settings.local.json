@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git ls-remote *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Read(//y/Chip/Meta/summary/**)",
+      "Read(//y/Pepper/Meta/summary/**)",
+      "Bash(matlab -batch ' *)",
+      "Bash(echo \"exit_code=$?\")",
+      "PowerShell(head -40)",
+      "Bash(grep -v \"^$\")",
+      "Bash(matlab -batch \"addpath\\(genpath\\('.'\\)\\); generateAnimalMetaTables\\(\\)\")",
+      "Bash(echo \"PID: $!\")",
+      "Bash(kill -0 4285)",
+      "Read(//tmp/**)",
+      "Bash(matlab -batch \"disp\\(which\\('struct2table'\\)\\)\")",
+      "Bash(matlab -batch \"disp\\(version\\); disp\\(which\\('struct2table'\\)\\)\" > /tmp/matlab_ver.txt 2>&1 *)",
+      "Bash(kill -0 128)",
+      "Bash(kill -0 413)",
+      "Bash(matlab -batch \"restoredefaultpath; load\\('Y:/Chip/Meta/summary/statisticsL-final43.mat','mdlStruct'\\); fnames=fieldnames\\(mdlStruct\\); fprintf\\('NF=%d\\\\n',numel\\(fnames\\)\\); for ii=1:numel\\(fnames\\); f=fnames{ii}; md=mdlStruct.\\(f\\); if isstruct\\(md\\)&&isfield\\(md,'clusterBlocksIdx'\\); blk=sort\\(md.clusterBlocksIdx\\(:\\)\\)'; fprintf\\('%s %d [%s]\\\\n',f,numel\\(blk\\),num2str\\(blk\\)\\); end; end\")",
+      "Bash(echo \"exit:$?\")",
+      "Bash(grep -q \"clusterBlocksIdx\" /tmp/c1_sizes.txt)",
+      "Bash(tasklist)",
+      "Bash(awk '{print $5}')",
+      "Bash(dir \"Y:\\\\users\\\\PK\\\\colStimPipeline\" /s /b)",
+      "Bash(cat \"C:/Users/pt8363/AppData/Local/Temp/chipR_run.log\")",
+      "Bash(dir \"Y:\\\\Pepper\\\\Meta\\\\summary\\\\statisticsR-final*.mat\")",
+      "Bash(xargs grep -l \"generateBitmap\")",
+      "Bash(xargs grep -l \"fit2Dgaussian\")"
+    ]
+  }
+}

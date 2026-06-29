@@ -23,7 +23,7 @@ for cluster=1
     neuroStruct.(['C' num2str(cluster)]).analyzeBlockIDs=clusterBlocks;
     %Skip to next cluster if none match
     if ~isempty(clusterBlocks)
-        for blockNo=1:numel(clusterBlocks)%[3 5 10 11 14]
+        for blockNo=1%1:numel(clusterBlocks)%[3 5 10 11 14]
             tic
             blockID=clusterBlocks(blockNo);
             imagingData.optoIntg=[];
