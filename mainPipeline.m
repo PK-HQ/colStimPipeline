@@ -14,12 +14,12 @@
 % 11. demo-optostim = 1x3 demonstration figure for a single session (PCA diff + column targeting)
 % x. psyphidist***
 %% Change these for experiment runs
-analysisMode='metatable';
-monkeyName='Pepper';%Pepper or Chip
+analysisMode='psycluster';
+monkeyName='Chip';%Pepper or Chip
 currentSessID=84; %81;%for biasing expt
 
 % Saving and plotting flags
-saveFlag=1;
+saveFlag=0;
 saveFlagBMP=0;
 plotFlag=1;
 skipImaging=1;
@@ -206,7 +206,7 @@ for chamberID=1
                 bitmapData=[];
             end
             
-            for blockID=25%1:numel(analysisBlockID)
+            for blockID=1:numel(analysisBlockID)
                 disp(['=== Block ' num2str(blockID)  '/' nBlockStr ' (entry: ' num2str(analysisBlockID(blockID)) ')==='])
                 tic
                 if isfield(behavioralData,'auc') && size(behavioralData.auc,3)>=blockID

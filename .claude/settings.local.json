@@ -29,7 +29,10 @@
       "Bash(cat \"C:/Users/pt8363/AppData/Local/Temp/chipR_run.log\")",
       "Bash(dir \"Y:\\\\Pepper\\\\Meta\\\\summary\\\\statisticsR-final*.mat\")",
       "Bash(xargs grep -l \"generateBitmap\")",
-      "Bash(xargs grep -l \"fit2Dgaussian\")"
+      "Bash(xargs grep -l \"fit2Dgaussian\")",
+      "PowerShell(Select-String -Pattern \"pcadenoised\" -CaseSensitive:$false)",
+      "PowerShell($matlab = Get-Command matlab -ErrorAction SilentlyContinue; if \\($matlab\\) { Write-Host $matlab.Source } else { Write-Host \"MATLAB not in PATH\" }; Get-ChildItem \"C:\\\\Program Files\\\\MATLAB\" -ErrorAction SilentlyContinue | Select-Object Name)",
+      "PowerShell($f = \"Y:\\\\Pepper\\\\Meta\\\\summary\\\\statisticsR-final38.mat\"; if \\(Test-Path $f\\) { \\(Get-Item $f\\).LastWriteTime; \\(Get-Item $f\\).Length } else { \"FILE NOT FOUND\" })"
     ]
   }
 }
