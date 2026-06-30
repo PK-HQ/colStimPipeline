@@ -1,5 +1,5 @@
-monkeyID,animal,chamber,conditionPair,includedClusterIDs,totalClusters,nRetained,meanDeltaBias,medianDeltaBias,semDeltaBias,nPositive,nNegative,nZero,testTail,postSelectionP,testValid,testNote
-M1,Chip,L,0/90,"C2, C3",3,16,25.5238095238095,24.25,2.84594780947233,16,0,0,right,0.000241201468480852,1,ok
-M1,Chip,R,0/90,"C1, C2",2,15,16.6510101010101,14,3.14556934283626,13,0,2,right,0.0001220703125,1,ok
-M2,Pepper,R,0/90,"C2, C3",3,19,6.20015948963317,5.83333333333334,1.00072507862852,18,1,0,right,9.02695695803438e-05,1,ok
-M2,Pepper,R,45/135,"C2, C3",3,0,NaN,NaN,NaN,0,0,0,both,NaN,0,insufficient finite data for signrank
+monkeyID,animal,chamber,conditionPair,includedClusterIDs,totalClusters,nRetained,meanDeltaBias,medianDeltaBias,semDeltaBias,nPositive,nNegative,nZero,testTail,postSelectionP,testValid,testNote,nExperimentPAvailable,nExperimentSignificant,fractionExperimentSignificant
+M1,Chip,L,0/90,"C2, C3",3,16,25.5238095238095,24.25,2.84594780947233,16,0,0,right,0.000241201468480852,1,ok,16,12,0.75
+M1,Chip,R,0/90,"C1, C2",2,15,16.6510101010101,14,3.14556934283626,13,0,2,right,0.0001220703125,1,ok,15,9,0.6
+M2,Pepper,R,0/90,"C2, C3",3,19,6.20015948963317,5.83333333333334,1.00072507862852,18,1,0,right,9.02695695803438e-05,1,ok,19,2,0.105263157894737
+All,All,Combined,0/90,"none",0,50,15.5189826839827,13.1666666666667,1.76530741293062,47,1,2,right,9.23220067863472e-10,1,ok,50,23,0.46

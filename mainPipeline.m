@@ -10,12 +10,12 @@
 % 7. neurometricsfix = neurometrics for columnar optostim, fixation-state
 % 8. PRF = fit and plot PRF for single sessions
 % 9. SIRF = fit and plot SIRF across sessions
-% 10. psyphidist***
+% 10. psydeltahist
 % 11. demo-optostim = 1x3 demonstration figure for a single session (PCA diff + column targeting)
-
+% x. psyphidist***
 %% Change these for experiment runs
-analysisMode='psydeltahist';
-monkeyName='Chip';%Pepper or Chip
+analysisMode='metatable';
+monkeyName='Pepper';%Pepper or Chip
 currentSessID=84; %81;%for biasing expt
 
 % Saving and plotting flags
@@ -34,7 +34,7 @@ metatableTargets = { ...
 %% Load dataStruct for the desired chamber
 [mainPath, datastruct]=setupEnv(['users/PK/colStimPipeline/exptListBiasingFull' monkeyName '.m']);
 chambers={'R', 'L'};
-for chamberID=2
+for chamberID=1
     nColumnsWanted=[]; chamberWanted=chambers{chamberID};
     analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted);
     nBlockStr=num2str(numel(analysisBlockID));
