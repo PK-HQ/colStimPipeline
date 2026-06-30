@@ -436,6 +436,8 @@ for chamberID=2
             columnsDesired=20; columnSpread=4;
             MetaTable = buildBlockMetadata(behavioralData, bitmapData, columnsDesired, columnSpread, ...
                 blockData, datastruct, analysisBlockID, mdlStruct);
+            MetaTable = addMetaTablePcaPowerCluster(MetaTable, bitmapData, mdlStruct, ...
+      datastruct, analysisBlockID, columnsDesired);
         %% Neurometrics
         case {'neurometrics'}
             clc; neuroStruct=[];
