@@ -26,16 +26,17 @@ jobs:
           from pathlib import Path
           path = Path('mainPipeline.m')
           text = path.read_text()
-          old = """            MetaTable = buildBlockMetadata(behavioralData, bitmapData, columnsDesired, columnSpread, ...
-                blockData, datastruct, analysisBlockID, mdlStruct);"""
-          addition = """
-            MetaTable = addMetaTablePcaPowerCluster(MetaTable, bitmapData, mdlStruct, ...
+          call = """            MetaTable = addMetaTablePcaPowerCluster(MetaTable, bitmapData, mdlStruct, ...
                 datastruct, analysisBlockID, columnsDesired);"""
-          if addition.strip() in text:
+          if call in text:
               raise SystemExit(0)
-          if old not in text:
-              raise SystemExit('Expected MetaTable call site was not found.')
-          path.write_text(text.replace(old, old + addition, 1))
+          needle = "                blockData, datastruct, analysisBlockID, mdlStruct);"
+          position = text.find(needle)
+          if position < 0:
+              raise SystemExit('Expected buildBlockMetadata continuation line was not found.')
+          insertion = position + len(needle)
+          text = text[:insertion] + "\n" + call + text[insertion:]
+          path.write_text(text)
           PY
       - name: Commit patch
         shell: bash
