@@ -12,11 +12,12 @@
 % 9. SIRF = fit and plot SIRF across sessions
 % 10. psydeltahist
 % 11. demo-optostim = 1x3 demonstration figure for a single session (PCA diff + column targeting)
+% 12. neurometric-optostim = condition-average DC/columnar neurometric analysis for one session
 % x. psyphidist***
 %% Change these for experiment runs
-analysisMode='psycluster';
+analysisMode='neurometric-optostim';
 monkeyName='Chip';%Pepper or Chip
-currentSessID=84; %81;%for biasing expt
+currentSessID=89; %81;%for biasing expt
 
 % Saving and plotting flags
 saveFlag=0;
@@ -34,7 +35,7 @@ metatableTargets = { ...
 %% Load dataStruct for the desired chamber
 [mainPath, datastruct]=setupEnv(['users/PK/colStimPipeline/exptListBiasingFull' monkeyName '.m']);
 chambers={'R', 'L'};
-for chamberID=1
+for chamberID=1:2
     nColumnsWanted=[]; chamberWanted=chambers{chamberID};
     analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted);
     nBlockStr=num2str(numel(analysisBlockID));
@@ -161,6 +162,16 @@ for chamberID=1
                 columnarProducts, demoProducts, blockID, currentSessID, ...
                 mainPath, monkeyName, chamberWanted, saveFlag);
 
+        case {'neurometric-optostim'}
+            currentBlockStruct = datastruct(currentSessID);
+
+            if ~strcmp(chamberWanted, currentBlockStruct.chamber)
+                continue;
+            end
+
+            neurometricOptostim = runNeurometricOptostimAnalysis( ...
+                mainPath, datastruct, currentSessID, monkeyName, ...
+                chamberWanted, saveFlag, plotFlag, skipImaging);
         case {'metatable'}
             % Generate metatables for all configured animal/chamber targets.
             % Independent of chamberWanted/monkeyName/clusterIdx/modelTypes.
@@ -199,12 +210,12 @@ for chamberID=1
             end
 
         case {'summary'}
-            if ~exist('imagingData','var')
-                blockData=[];
-                behavioralData=[];
-                imagingData=[];
-                bitmapData=[];
-            end
+            % Always start summary from a clean state.
+            % Never reuse data left in the MATLAB workspace.
+            blockData = [];
+            behavioralData = [];
+            imagingData = [];
+            bitmapData = [];
             
             for blockID=1:numel(analysisBlockID)
                 disp(['=== Block ' num2str(blockID)  '/' nBlockStr ' (entry: ' num2str(analysisBlockID(blockID)) ')==='])
@@ -253,80 +264,235 @@ for chamberID=1
                     behavioralData=clearFields(behavioralData, {'gaborContrasts', 'percentageCorrect','visualStim'});
 
             end
-            behavioralData=clearFields(behavioralData, {'gaborContrasts', 'percentageCorrect','visualStim'});
-            dataTag=chamberWanted;
-            %save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted 'tag.mat'],'-v7.3','bitmapData','behavioralData','analysisBlockID','datastruct')
-            save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-full' nBlockStr '.mat'],'blockData','bitmapData','behavioralData','imagingData','analysisBlockID','datastruct','dataTag')
+            dataTag = chamberWanted;
 
-        case {'psyclusterPre'}
+            if ~isstruct(bitmapData) || ...
+                    ~isfield(bitmapData, 'nColumns') || ...
+                    isempty(bitmapData.nColumns)
             
-            if ~exist('behavioralData','var')
-                
-                behavioralData=[];
-                imagingData=[];
-                bitmapData=[];
-                load([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-full' nBlockStr '.mat']);
+                error('summary:InvalidBitmapData', ...
+                    ['Summary did not generate bitmapData.nColumns. ' ...
+                     'The summary output will not be saved.']);
             end
             
-            for blockID=numel(analysisBlockID):-1:1
-                disp(['=== Block ' num2str(blockID)  '/' nBlockStr '==='])
-                tic
-                if isfield(behavioralData,'auc') && size(behavioralData.auc,3)>=blockID
-                     disp('(Skipping completed block)')
-                     continue
-                end
-                % === Load block data ===
-                 [currentBlockStruct,referenceBlockStruct,...
-                    blockData, behavioralData, imagingData, bitmapData, successFlag]=loadBlockData(datastruct, analysisBlockID, blockData,behavioralData, imagingData, bitmapData, blockID, analysisMode, skipImaging);
-                 if ~successFlag
-                     continue
-                 end
-                pdfFilename=currentBlockStruct.psychneuroPDF;
-
-                % === Plot behavioral biasing results ===
-                reportType='summary';
-                behavioralData=analyzeBlockPsychometrics(currentBlockStruct, behavioralData, blockID,...
-                    pdfFilename, reportType, saveFlag);
-                toc
-                
-                % === Save data ===
-                %imagingData.optoIntg=[];imagingData.baselineIntg=[]; imagingData.gaussfit(:,:,blockID)=[]; behavioralData.optoTS(blockID)=[]; behavioralData.baselineTS(blockID)=[]; behavioralData.referenceTS(blockID)=[];
-                CF; % close fig
+            if ~isfield(bitmapData, 'meanPowerDensityWithinROI_mWmm2') || ...
+                    isempty(bitmapData.meanPowerDensityWithinROI_mWmm2)
+            
+                error('summary:MissingPowerDensity', ...
+                    ['Summary did not generate ' ...
+                     'bitmapData.meanPowerDensityWithinROI_mWmm2.']);
             end
-            behavioralData=clearFields(behavioralData, {'gaborContrasts', 'percentageCorrect','visualStim'});
-            dataTag=chamberWanted;
-            save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-psychometricsPre' nBlockStr '.mat'],'blockData','bitmapData','behavioralData','analysisBlockID','datastruct','dataTag')
-
-        case {'psycluster'}
-            %% Psychometrics: Cluster blocks by binning mean energy per block
-            filterTag=true;
-            % Load only if its not loaded
-            if ~exist('dataTag')
-                load([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-psychometricsPre' nBlockStr '.mat']);
-            elseif exist('dataTag')
-                if ~strcmp(dataTag,chamberWanted)
-                    load([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-psychometricsPre' nBlockStr '.mat']);
-                end
+            
+            if ~isstruct(behavioralData) || ...
+                    ~isfield(behavioralData, 'gaborContrasts') || ...
+                    isempty(behavioralData.gaborContrasts)
+            
+                error('summary:MissingContrasts', ...
+                    'Summary did not generate behavioralData.gaborContrasts.');
             end
-            if filterTag==true
-                analysisParams.columnMean=20; % mean
-                analysisParams.columnRange=4; % stdev
+            
+            if ~isfield(behavioralData, 'percentageCorrect') || ...
+                    isempty(behavioralData.percentageCorrect)
+            
+                error('summary:MissingPercentCorrect', ...
+                    'Summary did not generate behavioralData.percentageCorrect.');
             end
-            analysisParams=[];
-            nBehaviorBlocks=size(behavioralData.gaborContrasts,3);
-            nBitmapBlocks=size(bitmapData.nColumns,2);
-            if nBehaviorBlocks ~= nBitmapBlocks
-                error(['psycluster block mismatch: behavioralData has %d blocks, ' ...
-                    'but bitmapData.nColumns has %d blocks.'], ...
+            
+            nBehaviorBlocks = size(behavioralData.gaborContrasts, 3);
+            nPercentBlocks  = size(behavioralData.percentageCorrect, 3);
+            nBitmapBlocks   = size(bitmapData.nColumns, 2);
+            nPowerBlocks    = size( ...
+                bitmapData.meanPowerDensityWithinROI_mWmm2, 3);
+            
+            if nBehaviorBlocks ~= numel(analysisBlockID)
+                error('summary:BehaviorBlockMismatch', ...
+                    ['Summary generated %d behavioral blocks, but ' ...
+                     'analysisBlockID contains %d blocks.'], ...
+                    nBehaviorBlocks, numel(analysisBlockID));
+            end
+            
+            if nPercentBlocks ~= nBehaviorBlocks
+                error('summary:PercentCorrectMismatch', ...
+                    ['gaborContrasts contains %d blocks, but ' ...
+                     'percentageCorrect contains %d blocks.'], ...
+                    nBehaviorBlocks, nPercentBlocks);
+            end
+            
+            if nBitmapBlocks ~= nBehaviorBlocks
+                error('summary:BitmapBlockMismatch', ...
+                    ['Summary generated %d behavioral blocks and ' ...
+                     '%d bitmap blocks.'], ...
                     nBehaviorBlocks, nBitmapBlocks);
             end
-            if numel(analysisBlockID) < nBehaviorBlocks
-                error(['psycluster block mismatch: analysisBlockID has %d entries, ' ...
-                    'but the loaded psychometric data have %d blocks.'], ...
-                    numel(analysisBlockID), nBehaviorBlocks);
+            
+            if nPowerBlocks ~= nBehaviorBlocks
+                error('summary:PowerBlockMismatch', ...
+                    ['Summary generated %d behavioral blocks and ' ...
+                     '%d power-density blocks.'], ...
+                    nBehaviorBlocks, nPowerBlocks);
             end
-            nBlocks=nBehaviorBlocks;
-            clusterMethod='orderedPowerEffect';
+            
+            summaryDir = fullfile(mainPath, monkeyName, 'Meta', 'summary');
+            
+            if ~exist(summaryDir, 'dir')
+                mkdir(summaryDir);
+            end
+            
+            summaryFile = fullfile(summaryDir, ...
+                ['statistics' chamberWanted '-full' nBlockStr '.mat']);
+            
+            save(summaryFile, ...
+                'blockData', ...
+                'bitmapData', ...
+                'behavioralData', ...
+                'imagingData', ...
+                'analysisBlockID', ...
+                'datastruct', ...
+                'dataTag', ...
+                '-v7.3');
+            
+            fprintf('\nSaved validated summary data:\n%s\n', summaryFile);
+
+        case {'psycluster'}
+            %% Psychometrics and power-effect clustering
+            % Always load the validated summary file.
+            % Do not use workspace variables or psyclusterPre files.
+            
+            summaryFile = fullfile( ...
+                mainPath, ...
+                monkeyName, ...
+                'Meta', ...
+                'summary', ...
+                ['statistics' chamberWanted '-full' nBlockStr '.mat']);
+            
+            if exist(summaryFile, 'file') ~= 2
+                error('psycluster:MissingSummary', ...
+                    ['Required summary file does not exist:\n%s\n\n' ...
+                     'Run analysisMode = ''summary'' first.'], ...
+                    summaryFile);
+            end
+            
+            loadedData = load(summaryFile, ...
+                'blockData', ...
+                'bitmapData', ...
+                'behavioralData', ...
+                'analysisBlockID', ...
+                'datastruct', ...
+                'dataTag');
+            
+            requiredVariables = { ...
+                'blockData', ...
+                'bitmapData', ...
+                'behavioralData', ...
+                'analysisBlockID', ...
+                'datastruct', ...
+                'dataTag'};
+            
+            for requiredID = 1:numel(requiredVariables)
+                requiredName = requiredVariables{requiredID};
+            
+                if ~isfield(loadedData, requiredName)
+                    error('psycluster:MissingVariable', ...
+                        'Summary file does not contain variable "%s":\n%s', ...
+                        requiredName, summaryFile);
+                end
+            end
+            
+            % Explicitly replace all relevant workspace variables.
+            blockData       = loadedData.blockData;
+            bitmapData      = loadedData.bitmapData;
+            behavioralData  = loadedData.behavioralData;
+            analysisBlockID = loadedData.analysisBlockID;
+            datastruct      = loadedData.datastruct;
+            dataTag         = loadedData.dataTag;
+            
+            clear loadedData
+            
+            if ~strcmp(dataTag, chamberWanted)
+                error('psycluster:WrongChamber', ...
+                    ['Loaded summary data are tagged for chamber %s, ' ...
+                     'but the requested chamber is %s.'], ...
+                    dataTag, chamberWanted);
+            end
+            
+            %% Validate behavioral data
+            
+            if ~isstruct(behavioralData) || ...
+                    ~isfield(behavioralData, 'gaborContrasts') || ...
+                    isempty(behavioralData.gaborContrasts)
+            
+                error('psycluster:MissingContrasts', ...
+                    'behavioralData.gaborContrasts is missing or empty.');
+            end
+            
+            if ~isfield(behavioralData, 'percentageCorrect') || ...
+                    isempty(behavioralData.percentageCorrect)
+            
+                error('psycluster:MissingPercentCorrect', ...
+                    'behavioralData.percentageCorrect is missing or empty.');
+            end
+            
+            %% Validate bitmap and power data
+            
+            if ~isstruct(bitmapData) || ...
+                    ~isfield(bitmapData, 'nColumns') || ...
+                    isempty(bitmapData.nColumns)
+            
+                error('psycluster:MissingColumns', ...
+                    'bitmapData.nColumns is missing or empty.');
+            end
+            
+            if ~isfield(bitmapData, 'meanPowerDensityWithinROI_mWmm2') || ...
+                    isempty(bitmapData.meanPowerDensityWithinROI_mWmm2)
+            
+                error('psycluster:MissingPowerDensity', ...
+                    ['bitmapData.meanPowerDensityWithinROI_mWmm2 ' ...
+                     'is missing or empty.']);
+            end
+            
+            %% Validate block alignment
+            
+            nBehaviorBlocks = size(behavioralData.gaborContrasts, 3);
+            nPercentBlocks  = size(behavioralData.percentageCorrect, 3);
+            nBitmapBlocks   = size(bitmapData.nColumns, 2);
+            nPowerBlocks    = size( ...
+                bitmapData.meanPowerDensityWithinROI_mWmm2, 3);
+            nMetadataBlocks = numel(analysisBlockID);
+            
+            if nPercentBlocks ~= nBehaviorBlocks
+                error('psycluster:BehaviorMismatch', ...
+                    ['gaborContrasts contains %d blocks, but ' ...
+                     'percentageCorrect contains %d blocks.'], ...
+                    nBehaviorBlocks, nPercentBlocks);
+            end
+            
+            if nBitmapBlocks ~= nBehaviorBlocks
+                error('psycluster:BitmapMismatch', ...
+                    ['behavioralData contains %d blocks, but ' ...
+                     'bitmapData.nColumns contains %d blocks.'], ...
+                    nBehaviorBlocks, nBitmapBlocks);
+            end
+            
+            if nPowerBlocks ~= nBehaviorBlocks
+                error('psycluster:PowerMismatch', ...
+                    ['behavioralData contains %d blocks, but the ' ...
+                     'power-density data contain %d blocks.'], ...
+                    nBehaviorBlocks, nPowerBlocks);
+            end
+            
+            if nMetadataBlocks ~= nBehaviorBlocks
+                error('psycluster:MetadataMismatch', ...
+                    ['analysisBlockID contains %d entries, but the ' ...
+                     'loaded data contain %d blocks.'], ...
+                    nMetadataBlocks, nBehaviorBlocks);
+            end
+            
+            nBlocks = nBehaviorBlocks;
+            clusterMethod = 'orderedPowerEffect';
+            
+            fprintf('\nLoaded validated psycluster input:\n%s\n', summaryFile);
+            fprintf('Animal: %s | Chamber: %s | Blocks: %d\n\n', ...
+                monkeyName, chamberWanted, nBlocks);
             % Fit all eligible sessions once so per-session deltaBias is
             % available for the ordered power-band segmentation below.
             clusterIdx=ones(nBlocks,1);
@@ -388,6 +554,20 @@ for chamberID=1
             fitPassPlotOpts.closeAfterRender = true;
             fprintf(['Pre-clustering fit pass: hidden figures, no PDF, ' ...
                 'no permutation statistics.\n']);
+            %% Ensure psycluster output directories exist
+            for modelID = 1:numel(modelTypes)
+                modelOutputDir = fullfile( ...
+                    mainPath, ...
+                    monkeyName, ...
+                    'Meta', ...
+                    'psychometrics', ...
+                    [chamberWanted '-chamber'], ...
+                    modelTypes{modelID});
+            
+                if ~exist(modelOutputDir, 'dir')
+                    mkdir(modelOutputDir);
+                end
+            end
             mdlStruct=analyzePsychometricModels(monkeyName, chamberWanted, modelTypes, mainPath, ...
                 behavioralData, bitmapData, datastruct, analysisBlockID, clusterIdx, plotFlag, plotLine, saveFlag, fitPassPlotOpts);
 
@@ -797,7 +977,37 @@ for chamberID=1
                 end
             end
 
-            save([mainPath '/' monkeyName '/Meta/summary/statistics' chamberWanted '-final' nBlockStr '.mat'],'blockData','bitmapData','behavioralData','analysisBlockID','datastruct','dataTag','mdlStruct')
+            %% Validate and save final psycluster output
+            if ~exist('mdlStruct', 'var') || ...
+                    ~isstruct(mdlStruct) || ...
+                    isempty(fieldnames(mdlStruct))
+            
+                error('psycluster:InvalidModelOutput', ...
+                    'psycluster did not generate a valid mdlStruct.');
+            end
+            
+            summaryDir = fullfile(mainPath, monkeyName, 'Meta', 'summary');
+            
+            if ~exist(summaryDir, 'dir')
+                mkdir(summaryDir);
+            end
+            
+            finalFile = fullfile(summaryDir, ...
+                ['statistics' chamberWanted '-final' nBlockStr '.mat']);
+            
+            save(finalFile, ...
+                'blockData', ...
+                'bitmapData', ...
+                'behavioralData', ...
+                'analysisBlockID', ...
+                'datastruct', ...
+                'dataTag', ...
+                'mdlStruct', ...
+                'clusterMethod', ...
+                '-v7.3');
+            
+            fprintf('\nSaved final psycluster results:\n%s\n', finalFile);
+            
             %{
             %% 20 column power x biasing
             figure
@@ -947,7 +1157,6 @@ for chamberID=1
             analysisBlockID = organizeBlocks(datastruct, chamberWanted, nColumnsWanted); %RESET
 
             %[bins, clusterIdx] = clusterEnergy(squeeze(bitmapData.totalPowerToOnPixelsWithinROI_mW), 'bin', 2);
-            analysisParams=[];
             [bins, binEdges, clusterIdx] =  clusterEnergy(squeeze(bitmapData.totalPowerToOnPixelsWithinROI_mW), squeeze(bitmapData.nColumns), 'bin', 5, analysisParams);
 
             monkeyName='Chip';
@@ -1489,3 +1698,145 @@ function reportState = stageAndCloseReportFigure(figHandle, reportState)
     close(figHandle);
 end
 
+function bitmapData = attach_pca_denoised_response( ...
+    bitmapData, sourcePath)
+% Ensure bitmapData.pcadenoisedresp is available.
+%
+% Preference:
+%   1. Use the field already present in statistics*-final*.mat.
+%   2. Otherwise load only that field from the corresponding
+%      statistics*-psychometricsPre*.mat file.
+%
+% This does not rerun bitmap generation or power clustering.
+
+if isfield(bitmapData, 'pcadenoisedresp') && ...
+        ~isempty(bitmapData.pcadenoisedresp)
+
+    fprintf(['PCA denoised response already present in ' ...
+        'the final source file.\n']);
+
+    return
+end
+
+[sourceFolder, sourceName, ~] = fileparts(sourcePath);
+
+% Examples:
+% statisticsR-final16
+%     -> statisticsR-psychometricsPre16
+%
+% statisticsL-final43
+%     -> statisticsL-psychometricsPre43
+
+preName = regexprep( ...
+    sourceName, ...
+    '-final(\d+)$', ...
+    '-psychometricsPre$1');
+
+if strcmp(preName, sourceName)
+
+    error('MetaTable:UnexpectedFinalFilename', ...
+        ['Could not derive a psychometricsPre filename from:\n' ...
+         '  %s'], ...
+        sourcePath);
+
+end
+
+prePath = fullfile( ...
+    sourceFolder, ...
+    [preName '.mat']);
+
+fprintf('PCA fallback source: %s\n', prePath);
+
+if exist(prePath, 'file') ~= 2
+
+    error('MetaTable:MissingPsychometricsPre', ...
+        ['bitmapData.pcadenoisedresp is absent from:\n' ...
+         '  %s\n\n' ...
+         'The expected fallback file also does not exist:\n' ...
+         '  %s'], ...
+        sourcePath, prePath);
+
+end
+
+preData = load(prePath, 'bitmapData');
+
+if ~isfield(preData, 'bitmapData')
+
+    error('MetaTable:NoBitmapDataInPsychometricsPre', ...
+        ['The fallback file does not contain bitmapData:\n' ...
+         '  %s'], ...
+        prePath);
+
+end
+
+if ~isfield(preData.bitmapData, 'pcadenoisedresp') || ...
+        isempty(preData.bitmapData.pcadenoisedresp)
+
+    error('MetaTable:NoPcaInPsychometricsPre', ...
+        ['The fallback file does not contain ' ...
+         'bitmapData.pcadenoisedresp:\n' ...
+         '  %s'], ...
+        prePath);
+
+end
+
+pcaData = preData.bitmapData.pcadenoisedresp;
+
+if ~isfield(bitmapData, 'nColumns')
+
+    error('MetaTable:MissingNColumns', ...
+        ['The final bitmapData does not contain nColumns, so the ' ...
+         'number of experiments cannot be verified.']);
+
+end
+
+nBlocks = size(bitmapData.nColumns, 2);
+pcaSize = size(pcaData);
+
+% Find the dimension corresponding to experiment/block number.
+blockDim = find(pcaSize == nBlocks, 1, 'last');
+
+if isempty(blockDim)
+
+    error('MetaTable:PcaBlockCountMismatch', ...
+        ['pcadenoisedresp size is [%s], but the final bitmapData ' ...
+         'contains %d blocks.'], ...
+        num2str(pcaSize), nBlocks);
+
+end
+
+% buildBlockMetadata can already locate the block dimension, but placing
+% blocks last keeps the normal format:
+%
+%   height x width x orientation x block
+
+if blockDim ~= ndims(pcaData)
+
+    dimensionOrder = [ ...
+        setdiff(1:ndims(pcaData), blockDim, 'stable'), ...
+        blockDim];
+
+    pcaData = permute( ...
+        pcaData, dimensionOrder);
+
+end
+
+if size(pcaData, ndims(pcaData)) ~= nBlocks
+
+    error('MetaTable:PcaFinalBlockCountMismatch', ...
+        ['After arranging dimensions, pcadenoisedresp contains %d ' ...
+         'blocks but bitmapData.nColumns contains %d blocks.'], ...
+        size(pcaData, ndims(pcaData)), nBlocks);
+
+end
+
+bitmapData.pcadenoisedresp = pcaData;
+
+fprintf(['Loaded bitmapData.pcadenoisedresp from:\n' ...
+    '  %s\n'], ...
+    prePath);
+
+fprintf('pcadenoisedresp size: [%s]\n', ...
+    num2str(size(bitmapData.pcadenoisedresp)));
+
+end
