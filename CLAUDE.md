@@ -2,23 +2,6 @@
 
 # Agent Execution Rules
 
-- Never edit MATLAB source using PowerShell string replacement, regex replacement,
-  here-strings, ReadAllLines/WriteAllLines function-region replacement, or equivalent
-  whole-block textual surgery.
-
-- Use apply_patch or the native editor patch mechanism only.
-
-- If apply_patch cannot access the network repository, stop and provide the proposed
-  patch to the user. Do not invent a PowerShell workaround.
-
-- After one failed edit command, do not attempt a second editing mechanism without
-  explicit user approval.
-
-- A request for “surgical edits only” means no helper-region replacement spanning
-  more than 20 lines.
-
-- Static inspection may use at most three targeted file-reading commands before
-  returning control to the user.
 ## Priority: fast interactive iteration
 
 This repository is on a slow network/UNC filesystem and MATLAB startup is expensive. Optimize for short edit-test cycles and avoid unattended validation loops.

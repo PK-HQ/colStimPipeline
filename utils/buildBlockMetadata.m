@@ -28,6 +28,9 @@ nBlocks = nTotalBlocks;
 assert(all(selectedBlocks >= 1 & selectedBlocks <= nTotalBlocks), ...
     'Selected block indices exceed 1:%d', nTotalBlocks);
 [deltaMask, deltaBias] = get_psychometric_deltas(mdlStruct, nTotalBlocks);
+
+[powerClusterID, powerClusterSignificant] = ...
+    get_power_cluster_metadata(mdlStruct, nTotalBlocks);
 psyFull = get_full_psychometrics_struct(mdlStruct, nTotalBlocks, behavioralData);
 
 rowTemplate = make_empty_metadata_row();
@@ -88,6 +91,9 @@ for ii = 1:nBlocks
     row = add_bitmap_metadata(row, bitmapData, blockID, nTotalBlocks);
     row.psy_deltaMask = deltaMask(blockID);
     row.psy_deltaBias = deltaBias(blockID);
+    
+    row.psy_powerClusterID = powerClusterID(blockID);
+    row.psy_powerClusterSignificant = powerClusterSignificant(blockID);
 
     row = add_psychometric_full_data(row, psyFull, blockID);
 
@@ -194,6 +200,8 @@ row.projectorPowerDensity_mWmm2_max = NaN;
 row.temporalDutyCycle_mean = NaN;
 row.psy_deltaMask = NaN;
 row.psy_deltaBias = NaN;
+row.psy_powerClusterID = NaN;
+row.psy_powerClusterSignificant = NaN;
 row.psy_deltaBiasHorizontal = NaN;
 row.psy_deltaMaskHorizontal = NaN;
 row.psy_deltaBiasVertical   = NaN;
@@ -278,11 +286,23 @@ row.opto_ort = {get_bitmap_field(bitmapData, 'orts', blockID, nTotalBlocks)};
 row.opto_gausscond = {get_bitmap_field(bitmapData, 'gaussianCond', blockID, nTotalBlocks)};
 row.opto_gausslevel = {get_bitmap_field(bitmapData, 'gaussianContourLevel', blockID, nTotalBlocks)};
 row.opto_gaussmax = {get_bitmap_field(bitmapData, 'gaussianContourLevelMax', blockID, nTotalBlocks)};
-row.opto_transformParams = {get_bitmap_field(bitmapData, 'transformParams', blockID, nTotalBlocks)};
-if isfield(bitmapData, 'pcadenoisedresp')
-    row.opto_PCAdenoisedResp = {bitmapData.pcadenoisedresp(:,:,:,blockID)};
-end
-row.opto_bitmapCamSpace = {get_bitmap_field(bitmapData, 'columnarbitmapTFcamspace', blockID, nTotalBlocks)};
+row.opto_transformParams = ...
+    {get_bitmap_field( ...
+        bitmapData, ...
+        'transformParams', ...
+        blockID, ...
+        nTotalBlocks)};
+
+% Normally 512 x 512 x 2 for one experiment.
+row.opto_PCAdenoisedResp = ...
+    {get_bitmap_field( ...
+        bitmapData, ...
+        'pcadenoisedresp', ...
+        blockID, ...
+        nTotalBlocks)};
+
+row.opto_bitmapCamSpace = ...
+    {get_bitmap_field(bitmapData, 'columnarbitmapTFcamspace', blockID, nTotalBlocks)};
 row.opto_bitmapProjSpace = {get_bitmap_field(bitmapData, 'columnarbitmapTFprojspace', blockID, nTotalBlocks)};
 row.opto_nColumns = {get_bitmap_field(bitmapData, 'nColumns', blockID, nTotalBlocks)};
 row.opto_columnArea = {combine_column_areas(get_bitmap_field(bitmapData, 'columnAreas', blockID, nTotalBlocks))};
@@ -802,27 +822,29 @@ end
 
 function MetaTable = move_psychometric_columns_to_end(MetaTable)
 
-psyNames = { ...
-    'psy_deltaMask', ...
-    'psy_deltaBias', ...
-    'psy_deltaBiasHorizontal', ...
-    'psy_deltaMaskHorizontal', ...
-    'psy_deltaBiasVertical', ...
-    'psy_deltaMaskVertical', ...
-    'psy_deltaBiasMerged', ...
-    'psy_deltaMaskMerged'};
+psyNames = {
+    'psy_deltaMask'
+    'psy_deltaBias'
+    'psy_powerClusterID'
+    'psy_powerClusterSignificant'
+    };
 
-psyNames = psyNames(ismember(psyNames, MetaTable.Properties.VariableNames));
+psyNames = psyNames(ismember(psyNames, ...
+    MetaTable.Properties.VariableNames));
+
 if isempty(psyNames)
     return
 end
 
-remainingNames = setdiff(MetaTable.Properties.VariableNames, psyNames, 'stable');
+remainingNames = setdiff( ...
+    MetaTable.Properties.VariableNames, psyNames, 'stable');
+
 if isempty(remainingNames)
     return
 end
 
-MetaTable = movevars(MetaTable, psyNames, 'After', remainingNames{end});
+MetaTable = movevars( ...
+    MetaTable, psyNames, 'After', remainingNames{end});
 
 end
 
@@ -1078,6 +1100,8 @@ headerMap = {
     'opto_projectorPowerDensity_mWmm2', 'opto.projectorPowerDensity_mWmm2'
     'psy_deltaMask', 'psy.deltaMask'
     'psy_deltaBias', 'psy.deltaBias'
+    'psy_powerClusterID', 'psy.powerClusterID'
+    'psy_powerClusterSignificant', 'psy.powerClusterSignificant'
     'psy_deltaBiasHorizontal', 'psy.deltaBiasHorizontal'
     'psy_deltaMaskHorizontal', 'psy.deltaMaskHorizontal'
     'psy_deltaBiasVertical', 'psy.deltaBiasVertical'
@@ -1746,4 +1770,337 @@ try
     end
 catch
 end
+end
+function [clusterByBlock, significantByBlock] = ...
+    get_power_cluster_metadata(mdlStruct, nTotalBlocks)
+% Read the power-cluster assignments already saved by psycluster.
+%
+% This function deliberately does NOT rerun clusterOrderedPowerEffect.
+% Therefore, the cluster IDs in MetaTable remain identical to those used
+% for the existing power-cluster plots.
+%
+% Significance is tested against zero in the positive direction:
+%
+%   H0: delta bias <= 0
+%   H1: delta bias > 0
+%
+% A cluster is marked significant when either:
+%   1. its mean is significantly greater than zero by a right-tailed
+%      one-sample t-test, or
+%   2. its median is significantly greater than zero by a right-tailed
+%      signed-rank test.
+%
+% clusterByBlock:
+%   1, 2, 3, ... = saved ordered power-cluster assignment
+%   NaN          = no saved assignment
+%
+% significantByBlock:
+%   1   = cluster mean or median is significantly greater than zero
+%   0   = cluster was tested but was not significantly greater than zero
+%   NaN = no saved cluster assignment
+
+clusterByBlock = NaN(nTotalBlocks, 1);
+significantByBlock = NaN(nTotalBlocks, 1);
+
+if ~isstruct(mdlStruct) || isempty(fieldnames(mdlStruct))
+
+    warning('MetaTable:NoMdlStruct', ...
+        ['mdlStruct is empty. Saved power-cluster assignments ' ...
+         'cannot be loaded.']);
+
+    return
+
+end
+
+[modelData, modelField] = ...
+    get_preferred_power_cluster_model(mdlStruct);
+
+if isempty(modelField)
+
+    warning('MetaTable:NoPsychometricModel', ...
+        ['Could not find a psychometric model containing ' ...
+         'clusterBlocksIdx and deltaBias.']);
+
+    return
+
+end
+
+% Model rows are not necessarily identical to all bitmap block rows.
+% Map delta bias back to the original bitmap block IDs.
+blockIDs = modelData.clusterBlocksIdx(:);
+deltaBias = modelData.deltaBias(:);
+
+nValues = min(numel(blockIDs), numel(deltaBias));
+
+blockIDs = blockIDs(1:nValues);
+deltaBias = deltaBias(1:nValues);
+
+validRows = ...
+    isfinite(blockIDs) & ...
+    blockIDs >= 1 & ...
+    blockIDs <= nTotalBlocks & ...
+    blockIDs == round(blockIDs);
+
+blockIDs = round(blockIDs(validRows));
+deltaBias = deltaBias(validRows);
+
+deltaBiasByBlock = NaN(nTotalBlocks, 1);
+deltaBiasByBlock(blockIDs) = deltaBias;
+
+% Load only the cluster assignments already saved by psycluster.
+clusterByBlock = get_saved_power_cluster_labels( ...
+    mdlStruct, modelField, nTotalBlocks);
+
+if all(~isfinite(clusterByBlock))
+
+    warning('MetaTable:NoSavedPowerClusters', ...
+        ['No saved power-cluster assignments were found for %s. ' ...
+         'Clusters will not be recalculated. Run psycluster with ' ...
+         'cluster saving enabled, then rerun MetaTable.'], ...
+        modelField);
+
+    return
+
+end
+
+fprintf(['MetaTable: loaded saved power-cluster assignments ' ...
+    'associated with %s.\n'], modelField);
+
+clusterIDs = unique( ...
+    clusterByBlock(isfinite(clusterByBlock)))';
+
+for clusterID = clusterIDs
+
+    clusterRows = ...
+        clusterByBlock == clusterID & ...
+        isfinite(deltaBiasByBlock);
+
+    values = deltaBiasByBlock(clusterRows);
+    values = values(isfinite(values));
+
+    if isempty(values)
+        continue
+    end
+
+    hMean = false;
+    hMedian = false;
+
+    pMean = NaN;
+    pMedian = NaN;
+
+    % Right-tailed t-test:
+    % Is the cluster mean delta bias significantly greater than zero?
+    try
+
+        [hMean, pMean] = ttest( ...
+            values, ...
+            0, ...
+            'Tail', 'right', ...
+            'Alpha', 0.05);
+
+    catch ME
+
+        warning('MetaTable:ClusterTTest', ...
+            'T-test failed for cluster %g: %s', ...
+            clusterID, ME.message);
+
+    end
+
+    % Right-tailed signed-rank test:
+    % Is the cluster median delta bias significantly greater than zero?
+    try
+
+        [pMedian, hMedian] = signrank( ...
+            values, ...
+            0, ...
+            'tail', 'right', ...
+            'alpha', 0.05);
+
+    catch ME
+
+        warning('MetaTable:ClusterSignrank', ...
+            'Signed-rank test failed for cluster %g: %s', ...
+            clusterID, ME.message);
+
+    end
+
+    isSignificant = ...
+        logical(hMean) || logical(hMedian);
+
+    significantByBlock( ...
+        clusterByBlock == clusterID) = ...
+        double(isSignificant);
+
+    fprintf([ ...
+        'Power cluster %g: n=%d, mean=%.4g, median=%.4g, ' ...
+        'right-tailed mean p=%.4g, ' ...
+        'right-tailed median p=%.4g, significant=%d\n'], ...
+        clusterID, ...
+        numel(values), ...
+        mean(values, 'omitnan'), ...
+        median(values, 'omitnan'), ...
+        pMean, ...
+        pMedian, ...
+        isSignificant);
+
+end
+
+end
+
+
+function [modelData, modelField] = ...
+    get_preferred_power_cluster_model(mdlStruct)
+% Prefer the Weibull-free-all C1 model because that is what psycluster
+% currently uses to construct the ordered power clusters.
+
+modelData = struct();
+modelField = '';
+
+fieldNames = fieldnames(mdlStruct);
+
+% First pass: explicitly prefer weibullfreeAll C1.
+for fieldID = 1:numel(fieldNames)
+
+    fieldName = fieldNames{fieldID};
+    candidate = mdlStruct.(fieldName);
+
+    if ~isstruct(candidate) || ...
+            ~isfield(candidate, 'clusterBlocksIdx') || ...
+            ~isfield(candidate, 'deltaBias')
+        continue
+    end
+
+    if endsWith(fieldName, 'weibullfreeAllC1')
+        modelData = candidate;
+        modelField = fieldName;
+        return
+    end
+
+end
+
+% Fallback: use the first model that contains the required fields.
+for fieldID = 1:numel(fieldNames)
+
+    fieldName = fieldNames{fieldID};
+    candidate = mdlStruct.(fieldName);
+
+    if isstruct(candidate) && ...
+            isfield(candidate, 'clusterBlocksIdx') && ...
+            isfield(candidate, 'deltaBias')
+
+        modelData = candidate;
+        modelField = fieldName;
+        return
+    end
+
+end
+
+end
+
+
+function labelsByBlock = get_saved_power_cluster_labels( ...
+    mdlStruct, modelField, nTotalBlocks)
+
+labelsByBlock = NaN(nTotalBlocks, 1);
+
+% Example:
+% RweibullfreeAllC1
+% becomes
+% RweibullfreeAllPowerClusterAggregateLabelsByBlock
+
+aggregateBase = regexprep( ...
+    modelField, 'C1$', 'PowerClusterAggregate');
+
+labelsField = [aggregateBase 'LabelsByBlock'];
+
+if isfield(mdlStruct, labelsField)
+
+    values = mdlStruct.(labelsField);
+
+    if isnumeric(values) && numel(values) == nTotalBlocks
+        labelsByBlock = values(:);
+        return
+    end
+
+end
+
+% Fallback to the saved cluster summary.
+summaryField = [aggregateBase 'Summary'];
+
+if isfield(mdlStruct, summaryField)
+
+    clusterSummary = mdlStruct.(summaryField);
+
+    if isstruct(clusterSummary)
+
+        for summaryID = 1:numel(clusterSummary)
+
+            if ~isfield(clusterSummary(summaryID), 'clusterID') || ...
+                    ~isfield(clusterSummary(summaryID), 'blockIndices')
+                continue
+            end
+
+            blocks = clean_power_cluster_blocks( ...
+                clusterSummary(summaryID).blockIndices, ...
+                nTotalBlocks);
+
+            labelsByBlock(blocks) = ...
+                clusterSummary(summaryID).clusterID;
+
+        end
+
+        if any(isfinite(labelsByBlock))
+            return
+        end
+
+    end
+
+end
+
+% Older aggregate structure fallback.
+aggregateField = aggregateBase;
+
+if isfield(mdlStruct, aggregateField)
+
+    aggregateData = mdlStruct.(aggregateField);
+
+    if isstruct(aggregateData)
+
+        for aggregateID = 1:numel(aggregateData)
+
+            if ~isfield(aggregateData(aggregateID), 'clusterID') || ...
+                    ~isfield(aggregateData(aggregateID), ...
+                    'sourceBlockIndices')
+                continue
+            end
+
+            blocks = clean_power_cluster_blocks( ...
+                aggregateData(aggregateID).sourceBlockIndices, ...
+                nTotalBlocks);
+
+            labelsByBlock(blocks) = ...
+                aggregateData(aggregateID).clusterID;
+
+        end
+
+    end
+
+end
+
+end
+
+
+function blocks = clean_power_cluster_blocks( ...
+    blocks, nTotalBlocks)
+
+blocks = blocks(:);
+
+valid = ...
+    isfinite(blocks) & ...
+    blocks >= 1 & ...
+    blocks <= nTotalBlocks & ...
+    blocks == round(blocks);
+
+blocks = round(blocks(valid));
+
 end

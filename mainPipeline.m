@@ -15,12 +15,12 @@
 % 12. neurometric-optostim = condition-average DC/columnar neurometric analysis for one session
 % x. psyphidist***
 %% Change these for experiment runs
-analysisMode='neurometric-optostim';
+analysisMode='psycluster';
 monkeyName='Chip';%Pepper or Chip
 currentSessID=89; %81;%for biasing expt
 
 % Saving and plotting flags
-saveFlag=0;
+saveFlag=1;
 saveFlagBMP=0;
 plotFlag=1;
 skipImaging=1;
@@ -172,6 +172,30 @@ for chamberID=1:2
             neurometricOptostim = runNeurometricOptostimAnalysis( ...
                 mainPath, datastruct, currentSessID, monkeyName, ...
                 chamberWanted, saveFlag, plotFlag, skipImaging);
+
+        case 'neurometric-optostim-decoder'
+    
+            currentBlockStruct = datastruct(currentSessID);
+    
+            sessionLabel = sprintf('%s%sR%s', ...
+                currentBlockStruct.monkey, ...
+                currentBlockStruct.date, ...
+                currentBlockStruct.run);
+    
+            repoRoot = fileparts(mfilename('fullpath'));
+    
+            neurometricInputFile = fullfile( ...
+                repoRoot, ...
+                'outputs', ...
+                'neurometric-optostim', ...
+                sprintf('%s_neurometricOptostim.mat', ...
+                sessionLabel));
+    
+            decoderResult = runNeurometricOptostimDecoder( ...
+                neurometricInputFile, ...
+                saveFlag, ...
+                plotFlag);
+
         case {'metatable'}
             % Generate metatables for all configured animal/chamber targets.
             % Independent of chamberWanted/monkeyName/clusterIdx/modelTypes.
