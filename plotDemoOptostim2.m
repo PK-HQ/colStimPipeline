@@ -59,10 +59,8 @@ if isfield(demoPlotData, 'bandpassSFcyclesPerMM') && ...
     bandpassSF = double(demoPlotData.bandpassSFcyclesPerMM(:)');
 end
 
-% The baseline visual run and optostim run were acquired in the same
-% current-session camera frame. Reuse the selected activity transform from
-% the validated optostim registration path so all displayed maps share the
-% Panel-A camera coordinates.
+% Reuse the selected activity transform from the validated optostim path so
+% Panel B is displayed in the same Panel-A camera coordinates as Panels C/D.
 activityTform = affine2d(double(demoPlotData.activityTransformMatrix));
 visualDifferenceBandpassUnaligned = bandpassMap( ...
     visualDifferenceRaw, bandpassSF, visualInfo.imagingSizePxl);
