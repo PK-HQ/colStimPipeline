@@ -5,14 +5,15 @@ function [figHandle, demoPlotData, outputFiles] = plotDemoOptostim2( ...
 %PLOTDEMOOPTOSTIM2 Four-panel visual/opto demonstration figure.
 %
 % A: PCA-denoised visual response, 90 deg - 0 deg.
-% B: Highest-contrast visual-only response, 90 deg - 0 deg.
+% B: Highest-contrast visual-only response, 90 deg - 0 deg, loaded from
+%    the baseline run specified by currentBlockStruct.baselineTS.
 % C: Zero-contrast opto response, OptoStim 90 deg - OptoStim 0 deg.
 % D: Fitted model of Panel C.
 %
 % The validated calculation/registration path is retained verbatim in the
 % +demoLegacy package. This wrapper adds Panel B and redraws the output.
 
-fprintf('Running plotDemoOptostim2 version 2026-07-30-four-panel-visual-v1\n');
+fprintf('Running plotDemoOptostim2 version 2026-07-30-four-panel-visual-v2\n');
 
 originalVisibility = get(groot, 'DefaultFigureVisible');
 set(groot, 'DefaultFigureVisible', 'off');
@@ -35,8 +36,15 @@ if ~isempty(legacyFig) && ishghandle(legacyFig)
     delete(legacyFig);
 end
 
+[visualTrialStructureFile, visualIntegratedResponseFile, visualSourceInfo] = ...
+    resolveBaselineVisualFiles( ...
+        currentBlockStruct, ...
+        demoPlotData.trialStructureFile, ...
+        demoPlotData.integratedResponseFile);
+
 [visualDifferenceRaw, visualInfo] = loadHighestContrastVisualDifference( ...
-    demoPlotData.trialStructureFile, demoPlotData.integratedResponseFile);
+    visualTrialStructureFile, visualIntegratedResponseFile);
+visualInfo.source = visualSourceInfo;
 
 referenceSize = size(demoPlotData.pcaDifference);
 if ~isequal(size(visualDifferenceRaw), referenceSize)
@@ -51,6 +59,10 @@ if isfield(demoPlotData, 'bandpassSFcyclesPerMM') && ...
     bandpassSF = double(demoPlotData.bandpassSFcyclesPerMM(:)');
 end
 
+% The baseline visual run and optostim run were acquired in the same
+% current-session camera frame. Reuse the selected activity transform from
+% the validated optostim registration path so all displayed maps share the
+% Panel-A camera coordinates.
 activityTform = affine2d(double(demoPlotData.activityTransformMatrix));
 visualDifferenceBandpassUnaligned = bandpassMap( ...
     visualDifferenceRaw, bandpassSF, visualInfo.imagingSizePxl);
@@ -75,6 +87,9 @@ comparisonMask = logical(demoPlotData.gaussianMaskLargestCurrent);
 [~, r2CD, nCD] = mapCorrelation( ...
     optoDifferenceBandpass, modelDifferenceBandpass, comparisonMask);
 
+demoPlotData.visualTrialStructureFile = visualTrialStructureFile;
+demoPlotData.visualIntegratedResponseFile = visualIntegratedResponseFile;
+demoPlotData.visualSourceInfo = visualSourceInfo;
 demoPlotData.highestContrastVisualConditionInfo = visualInfo;
 demoPlotData.highestContrastVisualDifferenceUnaligned = visualDifferenceRaw;
 demoPlotData.highestContrastVisualDifferenceBandpassUnaligned = ...
@@ -93,6 +108,12 @@ demoPlotData.fourPanelCorrelations = struct( ...
     'rSquaredCD_optoModel', r2CD, 'nCD_optoModel', nCD);
 
 fprintf('\n--- Four-panel demo additions ---\n');
+fprintf('Visual baseline run:              %s\n', ...
+    visualSourceInfo.baselineRun);
+fprintf('Visual TS file:                   %s\n', ...
+    visualTrialStructureFile);
+fprintf('Visual integrated-response file:  %s\n', ...
+    visualIntegratedResponseFile);
 fprintf('Highest visual contrast:          %.6g\n', ...
     visualInfo.highestCommonContrast);
 fprintf('Visual 0-deg condition(s):        [%s]\n', ...
@@ -136,10 +157,10 @@ colorbarLabels = { ...
      ' - OptoStim 0' char(176)]};
 titles = { ...
     ['PCA-denoised response: 90' char(176) ' - 0' char(176)], ...
-    sprintf(['Highest-contrast visual: 90%c - 0%c ' ...
+    sprintf(['Highest-contrast visual (run %s): 90%c - 0%c ' ...
              '(contrast %.4g; %.1f-%.1f cycles/mm)'], ...
-        char(176), char(176), visualInfo.highestCommonContrast, ...
-        bandpassSF(1), bandpassSF(2)), ...
+        visualSourceInfo.baselineRun, char(176), char(176), ...
+        visualInfo.highestCommonContrast, bandpassSF(1), bandpassSF(2)), ...
     sprintf(['0%% contrast: OptoStim 90%c - OptoStim 0%c ' ...
              '(%.1f-%.1f cycles/mm)'], ...
         char(176), char(176), bandpassSF(1), bandpassSF(2)), ...
@@ -207,6 +228,9 @@ if saveFlag == 1
     savedData = load(outputFiles.mat, 'mapData', 'stimulationSummary');
     mapData = savedData.mapData;
     stimulationSummary = savedData.stimulationSummary;
+    mapData.visualBaselineRun = visualSourceInfo.baselineRun;
+    mapData.visualTrialStructureFile = visualTrialStructureFile;
+    mapData.visualIntegratedResponseFile = visualIntegratedResponseFile;
     mapData.visualHighestContrast = visualInfo.highestCommonContrast;
     mapData.visualConditionIndices0 = visualInfo.conditionIndices0;
     mapData.visualConditionIndices90 = visualInfo.conditionIndices90;
@@ -216,6 +240,7 @@ if saveFlag == 1
         visualDifferenceCoregRaw;
     mapData.visualActivityDifference90Minus0CoregBandpass = ...
         visualDifferenceBandpass;
+    stimulationSummary.visualBaselineRun = visualSourceInfo.baselineRun;
     stimulationSummary.highestVisualContrast = ...
         visualInfo.highestCommonContrast;
     stimulationSummary.fourPanelCorrelations = ...
@@ -226,10 +251,128 @@ end
 end
 
 
+function [tsFile, responseFile, info] = resolveBaselineVisualFiles( ...
+        currentBlockStruct, optoTsFile, optoResponseFile)
+% Resolve the visual-only TS/DataCond pair from the baseline run recorded in
+% the experiment metadata. For 20230906R2, baselineTS='1', so this resolves
+% the visual source to 20230906R1 while leaving the optostim source at R2.
+
+requiredFields = {'monkeyNo', 'date', 'run', 'baselineTS'};
+for fieldIndex = 1:numel(requiredFields)
+    fieldName = requiredFields{fieldIndex};
+    if ~isfield(currentBlockStruct, fieldName) || ...
+            isempty(currentBlockStruct.(fieldName))
+        error('plotDemoOptostim:MissingBaselineMetadata', ...
+            'currentBlockStruct.%s is required to resolve the visual run.', ...
+            fieldName);
+    end
+end
+
+monkeyNo = scalarText(currentBlockStruct.monkeyNo, 'monkeyNo');
+sessionDate = scalarText(currentBlockStruct.date, 'date');
+currentRun = scalarText(currentBlockStruct.run, 'run');
+baselineRun = scalarText(currentBlockStruct.baselineTS, 'baselineTS');
+
+optoRunDirectory = fileparts(optoTsFile);
+sessionDirectory = fileparts(optoRunDirectory);
+baselineDirectory = fullfile(sessionDirectory, ['run' baselineRun]);
+if exist(baselineDirectory, 'dir') ~= 7
+    error('plotDemoOptostim:MissingBaselineRunDirectory', ...
+        'Baseline visual run directory does not exist: %s', ...
+        baselineDirectory);
+end
+
+baselinePrefix = sprintf('M%sD%sR%s', ...
+    monkeyNo, sessionDate, baselineRun);
+currentPrefix = sprintf('M%sD%sR%s', ...
+    monkeyNo, sessionDate, currentRun);
+
+tsExact = fullfile(baselineDirectory, [baselinePrefix 'TS.mat']);
+tsFile = resolveSingleBaselineFile( ...
+    tsExact, fullfile(baselineDirectory, [baselinePrefix '*TS.mat']), ...
+    'trial-structure');
+
+[~, optoResponseBase, optoResponseExtension] = fileparts(optoResponseFile);
+if strncmp(optoResponseBase, currentPrefix, numel(currentPrefix))
+    responseSuffix = optoResponseBase(numel(currentPrefix)+1:end);
+else
+    responseSuffix = 'StabIntgS004E023';
+end
+responseExact = fullfile(baselineDirectory, ...
+    [baselinePrefix responseSuffix optoResponseExtension]);
+responseFile = resolveSingleBaselineFile( ...
+    responseExact, ...
+    fullfile(baselineDirectory, [baselinePrefix 'StabIntg*.mat']), ...
+    'integrated-response');
+
+info = struct();
+info.currentRun = currentRun;
+info.baselineRun = baselineRun;
+info.baselineDirectory = baselineDirectory;
+info.trialStructureFile = tsFile;
+info.integratedResponseFile = responseFile;
+end
+
+
+function filePath = resolveSingleBaselineFile(exactPath, fallbackPattern, label)
+if exist(exactPath, 'file') == 2
+    filePath = exactPath;
+    return;
+end
+
+matches = dir(fallbackPattern);
+matches = matches(~[matches.isdir]);
+if isempty(matches)
+    error('plotDemoOptostim:MissingBaselineVisualFile', ...
+        ['Could not find the baseline visual %s file. Tried:\n%s\n' ...
+         'Fallback pattern:\n%s'], ...
+        label, exactPath, fallbackPattern);
+end
+if numel(matches) > 1
+    names = {matches.name};
+    error('plotDemoOptostim:AmbiguousBaselineVisualFile', ...
+        ['Found multiple baseline visual %s files matching:\n%s\n' ...
+         'Matches: %s'], ...
+        label, fallbackPattern, strjoin(names, ', '));
+end
+filePath = fullfile(matches(1).folder, matches(1).name);
+end
+
+
+function value = scalarText(rawValue, fieldName)
+if iscell(rawValue)
+    if numel(rawValue) ~= 1
+        error('plotDemoOptostim:InvalidBaselineMetadata', ...
+            'currentBlockStruct.%s must be scalar.', fieldName);
+    end
+    rawValue = rawValue{1};
+end
+if isnumeric(rawValue)
+    if ~isscalar(rawValue) || ~isfinite(rawValue)
+        error('plotDemoOptostim:InvalidBaselineMetadata', ...
+            'currentBlockStruct.%s must be a finite scalar.', fieldName);
+    end
+    value = num2str(rawValue);
+elseif ischar(rawValue)
+    value = strtrim(rawValue);
+elseif isstring(rawValue) && isscalar(rawValue)
+    value = strtrim(char(rawValue));
+else
+    error('plotDemoOptostim:InvalidBaselineMetadata', ...
+        'Unsupported currentBlockStruct.%s value.', fieldName);
+end
+if isempty(value)
+    error('plotDemoOptostim:InvalidBaselineMetadata', ...
+        'currentBlockStruct.%s is empty.', fieldName);
+end
+end
+
+
 function [differenceMap, info] = ...
         loadHighestContrastVisualDifference(tsFile, responseFile)
-% Match getUsableTrials conventions: visual-only ProjImg contains 'Dot',
-% GaborOrt selects 0/90, and TypeCond is 3 when that field is available.
+% Match the visual-only conventions used by the neurometric analysis:
+% ProjImg contains 'Dot', GaborOrt selects 0/90, and TypeCond is 3 when
+% that field is available. The files passed here come from baselineTS.
 
 loadedTS = load(tsFile, 'TS');
 loadedResponse = load(responseFile, 'DataCond');
@@ -260,7 +403,9 @@ commonContrasts = intersect( ...
     unique(contrast(is90 & isfinite(contrast))));
 if isempty(commonContrasts)
     error('plotDemoOptostim:MissingMatchedVisualContrast', ...
-        'No visual-only contrast is shared by 0- and 90-degree conditions.');
+        ['No visual-only contrast is shared by 0- and 90-degree ' ...
+         'conditions in baseline files:\nTS: %s\nDataCond: %s'], ...
+        tsFile, responseFile);
 end
 highestContrast = max(commonContrasts);
 tolerance = max(1e-10, abs(highestContrast) * 1e-10);
@@ -277,6 +422,8 @@ info.conditionIndices90 = indices90(:)';
 info.response0 = response0;
 info.response90 = response90;
 info.imagingSizePxl = double(TS.Header.Imaging.SizePxl);
+info.trialStructureFile = tsFile;
+info.integratedResponseFile = responseFile;
 end
 
 
