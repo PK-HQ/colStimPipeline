@@ -1122,8 +1122,22 @@ for chamberID=1:2
                     end
                     aggregateField = [chamberWanted, aggregateModelType, ...
                         'PowerClusterAggregate'];
+                    relevanceOpts = struct();
+                    relevanceOpts.sourceMdlField = sourceMdlField;
+                    relevanceOpts.aggregateField = aggregateField;
+                    relevanceOpts.chamberWanted = chamberWanted;
+                    relevanceOpts.monkeyName = monkeyName;
+                    relevanceOpts.mainPath = mainPath;
+                    relevanceOpts.saveFlag = saveFlag;
+                    relevanceOpts.nBootstrap = 1000;
+                    relevanceOpts.makeFigures = plotFlag;
+                    relevanceStruct = analyzePowerClusterRelevance( ...
+                        clusterMdl, powerEffectCluster, bitmapData, ...
+                        relevanceOpts);
                     mdlStruct.(aggregateField) = aggregatePsychometrics;
                     mdlStruct.([aggregateField, 'Fit']) = aggregatePsychometricFits;
+                    mdlStruct.([aggregateField, 'Relevance']) = ...
+                        relevanceStruct;
                     mdlStruct.([aggregateField, 'MeanDistributions']) = ...
                         meanDistributionData;
                     mdlStruct.([aggregateField, 'ParameterDistributions']) = ...
