@@ -60,6 +60,9 @@ function relevanceStruct = analyzePowerClusterRelevance( ...
     summaryTables = struct();
     summaryTables.parameterShapley = buildParameterShapleySummaryTable( ...
         parameter.allBlocks, paramNames);
+    summaryTables.stimulationPredictorDiagnostics = stim.diagnostics;
+    fprintf('Stimulation predictor diagnostics:\n');
+    disp(summaryTables.stimulationPredictorDiagnostics);
 
     relevanceStruct = struct();
     relevanceStruct.sourceMdlField = opts.sourceMdlField;
@@ -234,7 +237,9 @@ function status = modelStatus(X, y)
     n = size(X, 1);
     p = size(X, 2);
     status = 'ok';
-    if n < 3
+    if p == 0
+        status = 'no valid predictors';
+    elseif n < 3
         status = 'too few valid rows';
     elseif n <= p + 1
         status = 'underpowered';
@@ -418,10 +423,8 @@ function stim = buildStimulationPredictors(bitmapData, blockIDs)
         end
     end
 
-    present = any(isfinite(values), 1);
-    values = values(:, present);
-    predictorNames = fields(present, 1)';
-    predictorFamilies = fields(present, 2)';
+    predictorNames = fields(:, 1)';
+    predictorFamilies = fields(:, 2)';
     familyNames = unique(predictorFamilies, 'stable');
     familyIndex = nan(1, numel(predictorFamilies));
     for familyIdx = 1:numel(familyNames)
@@ -432,14 +435,13 @@ function stim = buildStimulationPredictors(bitmapData, blockIDs)
     stim = struct();
     stim.values = values;
     stim.predictorNames = predictorNames;
+    stim.predictorFamilies = predictorFamilies;
     stim.familyNames = familyNames;
     stim.familyIndex = familyIndex;
-    if isempty(predictorNames)
-        stim.table = table(blockIDs(:), 'VariableNames', {'blockID'});
-    else
-        stim.table = array2table(values, 'VariableNames', predictorNames);
-        stim.table.blockID = blockIDs(:);
-    end
+    stim.diagnostics = buildStimulationPredictorDiagnostics( ...
+        values, predictorNames, predictorFamilies);
+    stim.table = array2table(values, 'VariableNames', predictorNames);
+    stim.table.blockID = blockIDs(:);
 end
 
 function value = extractBlockScalar(bitmapData, fieldName, blockID)
@@ -521,31 +523,95 @@ end
 
 function result = analyzeStimulationSet(X, y, predictorNames, ...
     familyIndex, familyNames, nBootstrap, rngSeed)
-    usable = any(isfinite(X), 1);
-    X = X(:, usable);
-    predictorNames = predictorNames(usable);
-    familyIndex = familyIndex(usable);
-    [familyIndex, familyNames] = compactFamilyIndex(familyIndex, familyNames);
+    predictorFamilies = cell(size(predictorNames));
+    for predictorIdx = 1:numel(predictorNames)
+        predictorFamilies{predictorIdx} = familyNames{familyIndex(predictorIdx)};
+    end
+    rawDiagnostics = buildStimulationPredictorDiagnostics( ...
+        X, predictorNames, predictorFamilies);
+    validPredictor = rawDiagnostics.NFiniteRows >= 5 & ...
+        rawDiagnostics.NUniqueFiniteValues >= 2 & ...
+        isfinite(rawDiagnostics.Std) & rawDiagnostics.Std > 0;
 
-    result = analyzePredictorSet(X, y, predictorNames, nBootstrap, rngSeed);
-    result.familyNames = familyNames;
-    result.familyIndex = familyIndex;
-    validY = y(result.validRows);
-    validX = X(result.validRows, :);
-    result.groupedShapleyR2 = shapleyR2Grouped(validX, validY, familyIndex);
-    result.groupedPercentOfModelR2 = percentContribution( ...
-        result.groupedShapleyR2);
-    result.groupedBootstrapPercentCI = bootstrapShapleyPercentCI( ...
-        validX, validY, nBootstrap, rngSeed + 67, familyIndex);
+    [familyScores, familyScoreNames, retainedPredictors] = ...
+        buildFamilyScorePredictors(X, predictorNames, familyIndex, ...
+        familyNames, validPredictor);
+
+    result = analyzePredictorSet(familyScores, y, familyScoreNames, ...
+        nBootstrap, rngSeed);
+    result.familyNames = familyScoreNames;
+    result.familyIndex = 1:numel(familyScoreNames);
+    result.retainedRawPredictors = retainedPredictors;
+    result.rawPredictorDiagnostics = rawDiagnostics;
+    result.groupedShapleyR2 = result.shapleyR2;
+    result.groupedPercentOfModelR2 = result.percentOfModelR2;
+    result.groupedBootstrapPercentCI = result.bootstrapPercentCI;
 end
 
-function [newIndex, newNames] = compactFamilyIndex(familyIndex, familyNames)
-    familyIDs = unique(familyIndex, 'stable');
-    newIndex = nan(size(familyIndex));
-    newNames = cell(1, numel(familyIDs));
-    for idx = 1:numel(familyIDs)
-        newIndex(familyIndex == familyIDs(idx)) = idx;
-        newNames{idx} = familyNames{familyIDs(idx)};
+function diagnostics = buildStimulationPredictorDiagnostics( ...
+    values, predictorNames, predictorFamilies)
+    nPredictors = numel(predictorNames);
+    nFiniteRows = zeros(nPredictors, 1);
+    nUniqueFiniteValues = zeros(nPredictors, 1);
+    minValue = nan(nPredictors, 1);
+    maxValue = nan(nPredictors, 1);
+    stdValue = nan(nPredictors, 1);
+
+    for predictorIdx = 1:nPredictors
+        finiteValues = values(:, predictorIdx);
+        finiteValues = finiteValues(isfinite(finiteValues));
+        nFiniteRows(predictorIdx) = numel(finiteValues);
+        nUniqueFiniteValues(predictorIdx) = numel(unique(finiteValues));
+        if ~isempty(finiteValues)
+            minValue(predictorIdx) = min(finiteValues);
+            maxValue(predictorIdx) = max(finiteValues);
+            stdValue(predictorIdx) = std(finiteValues, 0);
+        end
+    end
+
+    diagnostics = table(predictorNames(:), predictorFamilies(:), ...
+        nFiniteRows, nUniqueFiniteValues, minValue, maxValue, stdValue, ...
+        'VariableNames', {'PredictorName', 'Family', 'NFiniteRows', ...
+        'NUniqueFiniteValues', 'Min', 'Max', 'Std'});
+end
+
+function [familyScores, familyScoreNames, retainedPredictors] = ...
+    buildFamilyScorePredictors(X, predictorNames, familyIndex, ...
+    familyNames, validPredictor)
+    familyScores = nan(size(X, 1), 0);
+    familyScoreNames = {};
+    retainedPredictors = struct('family', {}, 'predictorNames', {});
+
+    for familyIdx = 1:numel(familyNames)
+        familyPredictors = find(validPredictor(:)' & familyIndex == familyIdx);
+        if isempty(familyPredictors)
+            continue
+        end
+
+        zValues = nan(size(X, 1), numel(familyPredictors));
+        for localIdx = 1:numel(familyPredictors)
+            predictorValues = X(:, familyPredictors(localIdx));
+            finiteRows = isfinite(predictorValues);
+            mu = mean(predictorValues(finiteRows));
+            sigma = std(predictorValues(finiteRows), 0);
+            zValues(finiteRows, localIdx) = ...
+                (predictorValues(finiteRows) - mu) ./ sigma;
+        end
+
+        score = mean(zValues, 2, 'omitnan');
+        scoreDiagnostics = buildStimulationPredictorDiagnostics( ...
+            score, familyNames(familyIdx), familyNames(familyIdx));
+        if scoreDiagnostics.NFiniteRows < 5 || ...
+                scoreDiagnostics.NUniqueFiniteValues < 2 || ...
+                ~isfinite(scoreDiagnostics.Std) || ...
+                scoreDiagnostics.Std == 0
+            continue
+        end
+
+        familyScores(:, end + 1) = score; %#ok<AGROW>
+        familyScoreNames{end + 1} = familyNames{familyIdx}; %#ok<AGROW>
+        retainedPredictors(end + 1).family = familyNames{familyIdx}; %#ok<AGROW>
+        retainedPredictors(end).predictorNames = predictorNames(familyPredictors);
     end
 end
 
@@ -592,8 +658,10 @@ function figureHandles = makeRelevanceFigures(relevanceStruct, opts)
         relevanceStruct, opts);
     figureHandles(end + 1) = plotStimulationGroupedShapleyFigure( ...
         relevanceStruct, opts);
-    figureHandles(end + 1) = plotParameterPairwiseFigure( ...
-        relevanceStruct, opts);
+    figureHandles(end + 1) = plotParameterScatterFigure( ...
+        relevanceStruct, opts, 1);
+    figureHandles(end + 1) = plotParameterScatterFigure( ...
+        relevanceStruct, opts, 2);
 end
 
 function shapleyTable = buildParameterShapleySummaryTable(allBlocks, ...
@@ -601,26 +669,32 @@ function shapleyTable = buildParameterShapleySummaryTable(allBlocks, ...
     outcome = {'DeltaBias'; 'DeltaMask'};
     n = [allBlocks.bias.n; allBlocks.mask.n];
     totalModelR2 = [allBlocks.bias.OLS.R2; allBlocks.mask.OLS.R2];
-    values = [allBlocks.bias.percentOfModelR2; ...
+    percentValues = [allBlocks.bias.percentOfModelR2; ...
         allBlocks.mask.percentOfModelR2];
-    rowSumPercent = sum(values, 2, 'omitnan');
+    absoluteValues = [allBlocks.bias.shapleyR2; ...
+        allBlocks.mask.shapleyR2];
+    rowSumPercent = sum(percentValues, 2, 'omitnan');
+    rowSumShapleyR2 = sum(absoluteValues, 2, 'omitnan');
 
-    shapleyTable = table(outcome, n, totalModelR2, rowSumPercent, ...
+    shapleyTable = table(outcome, n, totalModelR2, ...
+        rowSumShapleyR2, rowSumPercent, ...
         'VariableNames', {'Outcome', 'N', 'TotalModelR2', ...
-        'RowSumPercent'});
+        'RowSumShapleyR2', 'RowSumPercent'});
     for predictorIdx = 1:numel(predictorNames)
-        variableName = matlab.lang.makeValidName( ...
+        absoluteName = matlab.lang.makeValidName( ...
+            [predictorNames{predictorIdx}, 'ShapleyR2']);
+        percentName = matlab.lang.makeValidName( ...
             [predictorNames{predictorIdx}, 'PercentModelR2']);
-        shapleyTable.(variableName) = values(:, predictorIdx);
+        shapleyTable.(absoluteName) = absoluteValues(:, predictorIdx);
+        shapleyTable.(percentName) = percentValues(:, predictorIdx);
     end
 end
 
-function fig = plotParameterPairwiseFigure(relevanceStruct, opts)
+function fig = plotParameterScatterFigure(relevanceStruct, opts, outcomeIdx)
     parameter = relevanceStruct.parameter;
     clusterLabels = relevanceStruct.powerEffectCluster;
     clusterIDs = unique(clusterLabels(:), 'stable');
     colors = lines(max(1, numel(clusterIDs)));
-    predictorNames = parameter.predictorNames;
     predictorLabels = {'\DeltaA', '\DeltaB', '\Delta\alpha', ...
         '\Delta\beta'};
     xLimits = [-0.15, 0.05; -0.15, 0.30; -10, 10; -4, 4];
@@ -632,51 +706,53 @@ function fig = plotParameterPairwiseFigure(relevanceStruct, opts)
     yCell = {relevanceStruct.outcomes.deltaBias, ...
         relevanceStruct.outcomes.deltaMask};
 
-    fig = figure('Color', 'w', 'Name', 'Parameter-behavior relevance');
-    set(fig, 'Position', [100, 100, 1050, 1200]);
-    tlo = tiledlayout(numel(predictorNames), numel(outcomes), ...
-        'TileSpacing', 'compact', 'Padding', 'compact');
-    for predictorIdx = 1:numel(predictorNames)
-        for outcomeIdx = 1:numel(outcomes)
-            ax = nexttile;
-            hold(ax, 'on');
-            xline(ax, 0, '-', 'Color', 0.70 .* [1 1 1], ...
-                'LineWidth', 1.0, 'HandleVisibility', 'off');
-            yline(ax, 0, '-', 'Color', 0.70 .* [1 1 1], ...
-                'LineWidth', 1.0, 'HandleVisibility', 'off');
-            for clusterIdx = 1:numel(clusterIDs)
-                keep = clusterLabels == clusterIDs(clusterIdx);
-                scatter(ax, XCell{outcomeIdx}(keep, predictorIdx), ...
-                    yCell{outcomeIdx}(keep), 36, ...
-                    colors(clusterIdx, :), 's', 'filled', ...
-                    'MarkerEdgeColor', 'k', 'MarkerFaceAlpha', 0.80);
-            end
-            addVisualOLSLine(ax, XCell{outcomeIdx}(:, predictorIdx), ...
-                yCell{outcomeIdx}, xLimits(predictorIdx, :));
-            pairwise = relevanceStruct.parameter.allBlocks.( ...
-                outcomeFields{outcomeIdx}).pairwise(predictorIdx);
-            title(ax, sprintf('%s - %s', predictorLabels{predictorIdx}, ...
-                outcomes{outcomeIdx}), 'FontName', 'Arial', ...
-                'FontSize', 13, 'FontWeight', 'normal');
-            xlabel(ax, predictorLabels{predictorIdx}, 'FontName', 'Arial', ...
-                'FontSize', 13);
-            ylabel(ax, yLabels{outcomeIdx}, 'FontName', 'Arial', ...
-                'FontSize', 13);
-            text(ax, 0.04, 0.94, sprintf('n=%d\nrho=%.2f\np=%.3g', ...
-                pairwise.n, pairwise.spearmanRho, pairwise.spearmanP), ...
-                'Units', 'normalized', 'VerticalAlignment', 'top', ...
-                'FontName', 'Arial', 'FontSize', 11);
-            xlim(ax, xLimits(predictorIdx, :));
-            ylim(ax, yLimits(outcomeIdx, :));
-            box(ax, 'off');
-            set(ax, 'FontName', 'Arial', 'FontSize', 12, ...
-                'LineWidth', 1.0);
+    fig = figure('Color', 'w', ...
+        'Name', ['Parameter-' lower(outcomes{outcomeIdx}) ...
+        ' scatter diagnostics']);
+    set(fig, 'Position', [100, 100, 720, 680]);
+
+    for predictorIdx = 1:numel(predictorLabels)
+        ax = subplot(2, 2, predictorIdx, 'Parent', fig);
+        hold(ax, 'on');
+        xline(ax, 0, '-', 'Color', 0.70 .* [1 1 1], ...
+            'LineWidth', 1.0, 'HandleVisibility', 'off');
+        yline(ax, 0, '-', 'Color', 0.70 .* [1 1 1], ...
+            'LineWidth', 1.0, 'HandleVisibility', 'off');
+        for clusterIdx = 1:numel(clusterIDs)
+            keep = clusterLabels == clusterIDs(clusterIdx);
+            scatter(ax, XCell{outcomeIdx}(keep, predictorIdx), ...
+                yCell{outcomeIdx}(keep), 36, ...
+                colors(clusterIdx, :), 's', 'filled', ...
+                'MarkerEdgeColor', 'k', 'MarkerFaceAlpha', 0.80);
         end
+        addVisualOLSLine(ax, XCell{outcomeIdx}(:, predictorIdx), ...
+            yCell{outcomeIdx}, xLimits(predictorIdx, :));
+        pairwise = relevanceStruct.parameter.allBlocks.( ...
+            outcomeFields{outcomeIdx}).pairwise(predictorIdx);
+        title(ax, predictorLabels{predictorIdx}, 'FontName', 'Arial', ...
+            'FontSize', 13, 'FontWeight', 'normal');
+        xlabel(ax, predictorLabels{predictorIdx}, 'FontName', 'Arial', ...
+            'FontSize', 13);
+        ylabel(ax, yLabels{outcomeIdx}, 'FontName', 'Arial', ...
+            'FontSize', 13);
+        text(ax, 0.04, 0.94, sprintf('n=%d\nrho=%.2f\np=%.3g', ...
+            pairwise.n, pairwise.spearmanRho, pairwise.spearmanP), ...
+            'Units', 'normalized', 'VerticalAlignment', 'top', ...
+            'FontName', 'Arial', 'FontSize', 11);
+        xlim(ax, xLimits(predictorIdx, :));
+        ylim(ax, yLimits(outcomeIdx, :));
+        pbaspect(ax, [1 1 1]);
+        box(ax, 'off');
+        set(ax, 'FontName', 'Arial', 'FontSize', 12, ...
+            'LineWidth', 1.0);
     end
 
-    title(tlo, sprintf('%s %s parameter-behavior scatter diagnostics', ...
-        opts.monkeyName, opts.chamberWanted), 'FontName', 'Arial', ...
-        'FontSize', 16, 'FontWeight', 'bold');
+    annotation(fig, 'textbox', [0, 0.955, 1, 0.04], ...
+        'String', sprintf('%s %s parameter-%s scatter diagnostics', ...
+        opts.monkeyName, opts.chamberWanted, lower(outcomes{outcomeIdx})), ...
+        'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
+        'EdgeColor', 'none', 'FontName', 'Arial', 'FontSize', 16, ...
+        'FontWeight', 'bold');
 end
 
 function fig = plotParameterShapleyFigure(relevanceStruct, opts)
@@ -684,61 +760,78 @@ function fig = plotParameterShapleyFigure(relevanceStruct, opts)
         relevanceStruct.parameter.allBlocks.bias.percentOfModelR2;
         relevanceStruct.parameter.allBlocks.mask.percentOfModelR2];
     rowSums = sum(values, 2, 'omitnan');
+    looBias = relevanceStruct.parameter.allBlocks.bias.leaveOneOutPredictiveR2;
+    looMask = relevanceStruct.parameter.allBlocks.mask.leaveOneOutPredictiveR2;
     fprintf(['Parameter Shapley row-sum sanity check | ' ...
-        'DeltaBias=%.3f%% | DeltaMask=%.3f%%\n'], rowSums(1), rowSums(2));
+        'DeltaBias=%.3f%% | DeltaMask=%.3f%% | ' ...
+        'LOO predictive R2: bias=%.3f, mask=%.3f\n'], ...
+        rowSums(1), rowSums(2), looBias, looMask);
 
     fig = figure('Color', 'w', 'Name', 'Parameter Shapley relevance');
-    set(fig, 'Position', [100, 100, 900, 420]);
+    set(fig, 'Position', [100, 100, 520, 380]);
     ax = axes('Parent', fig);
     imagesc(ax, values);
+    axis(ax, 'image');
+    caxis(ax, [0, 100]);
     colormap(parula);
     cb = colorbar(ax);
     ylabel(cb, '% of model R^2', 'FontName', 'Arial', 'FontSize', 13);
-    xticks(1:numel(relevanceStruct.parameter.predictorNames));
-    xticklabels({'A', 'B', '\alpha', '\beta'});
-    yticks(1:2);
-    yticklabels({'\DeltaBias', '\DeltaMask'});
+    xticks(ax, 1:numel(relevanceStruct.parameter.predictorNames));
+    xticklabels(ax, {'A', 'B', '\alpha', '\beta'});
+    yticks(ax, 1:2);
+    yticklabels(ax, {'\DeltaBias', '\DeltaMask'});
     set(ax, 'FontName', 'Arial', 'FontSize', 13, 'LineWidth', 1.0);
     title(ax, sprintf(['Parameter Shapley relevance | n=%d | ' ...
-        'total R^2: bias=%.2f, mask=%.2f'], ...
+        'total R^2: bias=%.2f, mask=%.2f | ' ...
+        'LOO R^2: bias=%.2f, mask=%.2f'], ...
         relevanceStruct.parameter.allBlocks.bias.n, ...
         relevanceStruct.parameter.allBlocks.bias.OLS.R2, ...
-        relevanceStruct.parameter.allBlocks.mask.OLS.R2), ...
-        'FontName', 'Arial', 'FontSize', 15, 'FontWeight', 'bold');
+        relevanceStruct.parameter.allBlocks.mask.OLS.R2, ...
+        looBias, looMask), ...
+        'FontName', 'Arial', 'FontSize', 13, 'FontWeight', 'bold');
     addHeatmapText(values);
 end
 
 function fig = plotStimulationGroupedShapleyFigure(relevanceStruct, opts)
     familyNames = relevanceStruct.stimulation.allBlocks.bias.familyNames;
-    if isempty(familyNames)
-        fig = figure('Color', 'w', ...
-            'Name', 'Stimulation-family Shapley relevance');
-        axis off
-        text(0.5, 0.5, 'No stimulation predictors available', ...
-            'HorizontalAlignment', 'center', 'FontName', 'Arial');
-        return
-    end
     values = [
         relevanceStruct.stimulation.allBlocks.bias.groupedPercentOfModelR2;
         relevanceStruct.stimulation.allBlocks.mask.groupedPercentOfModelR2];
+    totalR2 = [relevanceStruct.stimulation.allBlocks.bias.OLS.R2, ...
+        relevanceStruct.stimulation.allBlocks.mask.OLS.R2];
+    unavailable = isempty(familyNames) || all(~isfinite(values(:))) || ...
+        any(~isfinite(totalR2));
+
     fig = figure('Color', 'w', 'Name', 'Stimulation-family Shapley relevance');
-    imagesc(values);
+    set(fig, 'Position', [100, 100, 520, 380]);
+    ax = axes('Parent', fig);
+    if unavailable
+        axis(ax, 'off');
+        text(ax, 0.5, 0.5, ['Stimulation-family model unavailable: ' ...
+            'insufficient complete finite predictors.'], ...
+            'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
+            'FontName', 'Arial', 'FontSize', 13);
+        return
+    end
+
+    imagesc(ax, values);
+    axis(ax, 'image');
+    caxis(ax, [0, 100]);
     colormap(parula);
-    colorbar;
-    xticks(1:numel(familyNames));
-    xticklabels(familyNames);
-    yticks(1:2);
-    yticklabels({'Delta bias', 'Delta mask'});
-    set(gca, 'FontName', 'Arial');
-    title(sprintf(['Stimulation-family Shapley percent model R2 | n=%d | ' ...
-        'R2 bias=%.2f mask=%.2f'], ...
+    cb = colorbar(ax);
+    ylabel(cb, '% of model R^2', 'FontName', 'Arial', 'FontSize', 13);
+    xticks(ax, 1:numel(familyNames));
+    xticklabels(ax, familyNames);
+    yticks(ax, 1:2);
+    yticklabels(ax, {'\DeltaBias', '\DeltaMask'});
+    set(ax, 'FontName', 'Arial', 'FontSize', 13, 'LineWidth', 1.0);
+    title(ax, sprintf(['Stimulation-family Shapley relevance | n=%d | ' ...
+        'total R^2: bias=%.2f, mask=%.2f'], ...
         relevanceStruct.stimulation.allBlocks.bias.n, ...
         relevanceStruct.stimulation.allBlocks.bias.OLS.R2, ...
         relevanceStruct.stimulation.allBlocks.mask.OLS.R2), ...
-        'FontName', 'Arial');
+        'FontName', 'Arial', 'FontSize', 13, 'FontWeight', 'bold');
     addHeatmapText(values);
-    sgtitle(sprintf('%s %s %s', opts.monkeyName, opts.chamberWanted, ...
-        opts.aggregateField), 'FontName', 'Arial');
 end
 
 function addHeatmapText(values)
@@ -773,7 +866,8 @@ function outputPaths = saveRelevanceOutputs(relevanceStruct, opts)
     save(outputPaths.mat, 'relevanceStruct');
 
     figureNames = {'parameterShapley', 'stimulationGroupedShapley', ...
-        'parameterPairwiseDiagnostic'};
+        'parameterBiasingScatterDiagnostic', ...
+        'parameterMaskingScatterDiagnostic'};
     outputPaths.figures = struct([]);
     for figIdx = 1:numel(figureHandles)
         baseName = fullfile(outputDir, ...
