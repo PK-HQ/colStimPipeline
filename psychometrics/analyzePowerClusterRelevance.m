@@ -60,10 +60,19 @@ function relevanceStruct = analyzePowerClusterRelevance( ...
     summaryTables = struct();
     summaryTables.parameterShapley = buildParameterShapleySummaryTable( ...
         parameter.allBlocks, paramNames);
+    summaryTables.parameterShapleyByCluster = ...
+        buildParameterClusterShapleySummaryTable(parameter.byCluster, ...
+        paramNames);
+    summaryTables.parameterClusterDiagnostic = ...
+        buildParameterClusterDiagnosticSummary(parameter, paramNames);
     summaryTables.stimulationPredictorDiagnostics = stim.diagnostics;
     summaryTables.stimulationFamilyScores = stim.familyScoreTable;
+    summaryTables.stimulationFamilyScoreDiagnostics = ...
+        stim.familyScoreDiagnostics;
     summaryTables.stimulationFamilyShapley = ...
         buildStimulationFamilyShapleySummaryTable(stimulation.allBlocks);
+    summaryTables.stimulationFamilyShapleyByCluster = ...
+        buildStimulationClusterShapleySummaryTable(stimulation.byCluster);
     fprintf('Stimulation predictor diagnostics:\n');
     disp(summaryTables.stimulationPredictorDiagnostics);
     fprintf('Stimulation family-score diagnostics:\n');
@@ -263,8 +272,8 @@ function canCompute = canComputeLOO(X, y)
 end
 
 function fitStats = ordinaryR2FromOLS(X, y)
-    fitStats = struct('R2', NaN, 'coefficients', [], ...
-        'intercept', NaN, 'rank', 0);
+    fitStats = struct('R2', NaN, 'adjustedR2', NaN, ...
+        'coefficients', [], 'intercept', NaN, 'rank', 0);
 
     if size(X, 1) < 2 || isempty(X) || ...
             sum((y - mean(y)).^2) <= eps
@@ -277,8 +286,14 @@ function fitStats = ordinaryR2FromOLS(X, y)
     yHat = design * beta;
     totalSS = sum((y - mean(y)).^2);
     residualSS = sum((y - yHat).^2);
+    n = size(Xz, 1);
+    p = size(Xz, 2);
 
     fitStats.R2 = max(0, 1 - residualSS / totalSS);
+    if n > p + 1
+        fitStats.adjustedR2 = 1 - (1 - fitStats.R2) * ...
+            (n - 1) / (n - p - 1);
+    end
     fitStats.coefficients = beta(2:end);
     fitStats.intercept = beta(1);
     fitStats.rank = rank(Xz);
@@ -416,12 +431,12 @@ function stim = buildStimulationPredictors(bitmapData, blockIDs)
         'meanPowerDensityWithinROI_mWmm2', 'Energy'; ...
         'totalPowerToOnPixelsWithinROI_mW', 'Energy'; ...
         'projectorPowerDensity_mWmm2', 'Energy'; ...
-        'nColumns', 'Spatial'; ...
-        'pixelsON', 'Spatial'; ...
-        'areaFinalROI', 'Spatial'; ...
-        'areaPixelsONWithinROI', 'Spatial'; ...
-        'spatialDutyCycleWithinROI', 'Spatial'; ...
-        'temporalDutyCycle', 'Temporal'; ...
+        'nColumns', 'Spatial factors'; ...
+        'pixelsON', 'Spatial factors'; ...
+        'areaFinalROI', 'Spatial factors'; ...
+        'areaPixelsONWithinROI', 'Spatial factors'; ...
+        'spatialDutyCycleWithinROI', 'Spatial factors'; ...
+        'temporalDutyCycle', 'Temporal factors'; ...
         'sensitivity', 'QC'; ...
         'adaptthresh', 'QC'};
 
@@ -451,9 +466,7 @@ function stim = buildStimulationPredictors(bitmapData, blockIDs)
     stim.familyIndex = familyIndex;
     stim.diagnostics = buildStimulationPredictorDiagnostics( ...
         values, predictorNames, predictorFamilies);
-    validPredictor = stim.diagnostics.NFiniteRows >= 5 & ...
-        stim.diagnostics.NUniqueFiniteValues >= 2 & ...
-        isfinite(stim.diagnostics.Std) & stim.diagnostics.Std > 0;
+    validPredictor = validStimulationPredictorMask(stim.diagnostics);
     [familyScores, familyScoreNames, retainedPredictors] = ...
         buildFamilyScorePredictors(values, predictorNames, familyIndex, ...
         familyNames, validPredictor);
@@ -526,9 +539,7 @@ function result = analyzeStimulationOutcomes(X, yBias, yMask, ...
         familyNames);
     rawDiagnostics = buildStimulationPredictorDiagnostics( ...
         X, predictorNames, predictorFamilies);
-    validPredictor = rawDiagnostics.NFiniteRows >= 5 & ...
-        rawDiagnostics.NUniqueFiniteValues >= 2 & ...
-        isfinite(rawDiagnostics.Std) & rawDiagnostics.Std > 0;
+    validPredictor = validStimulationPredictorMask(rawDiagnostics);
     [familyScores, familyScoreNames, retainedPredictors] = ...
         buildFamilyScorePredictors(X, predictorNames, familyIndex, ...
         familyNames, validPredictor);
@@ -581,9 +592,17 @@ function result = analyzeStimulationSet(familyScores, y, familyScoreNames, ...
     result.familyIndex = 1:numel(familyScoreNames);
     result.retainedRawPredictors = retainedPredictors;
     result.rawPredictorDiagnostics = rawDiagnostics;
+    validPredictor = validStimulationPredictorMask(rawDiagnostics);
+    result.excludedRawPredictors = rawDiagnostics(~validPredictor, :);
     result.groupedShapleyR2 = result.shapleyR2;
     result.groupedPercentOfModelR2 = result.percentOfModelR2;
     result.groupedBootstrapPercentCI = result.bootstrapPercentCI;
+end
+
+function validPredictor = validStimulationPredictorMask(diagnostics)
+    validPredictor = diagnostics.NFiniteRows >= 5 & ...
+        diagnostics.NUniqueFiniteValues >= 2 & ...
+        isfinite(diagnostics.Std) & diagnostics.Std > 0;
 end
 
 function predictorFamilies = mapPredictorFamilies(predictorNames, ...
@@ -702,6 +721,8 @@ function figureHandles = makeRelevanceFigures(relevanceStruct, opts)
     figureHandles = gobjects(0);
     figureHandles(end + 1) = plotParameterShapleyFigure( ...
         relevanceStruct, opts);
+    figureHandles(end + 1) = plotParameterClusterSummaryFigure( ...
+        relevanceStruct);
     figureHandles(end + 1) = plotStimulationGroupedShapleyFigure( ...
         relevanceStruct, opts);
     figureHandles(end + 1) = plotParameterScatterFigure( ...
@@ -712,28 +733,240 @@ end
 
 function shapleyTable = buildParameterShapleySummaryTable(allBlocks, ...
     predictorNames)
+    shapleyTable = buildShapleySummaryRows([], allBlocks.bias, ...
+        allBlocks.mask, predictorNames, false);
+end
+
+function shapleyTable = buildParameterClusterShapleySummaryTable( ...
+    byCluster, predictorNames)
+    shapleyTable = table();
+    for clusterIdx = 1:numel(byCluster)
+        clusterTable = buildShapleySummaryRows( ...
+            byCluster(clusterIdx).clusterID, byCluster(clusterIdx).bias, ...
+            byCluster(clusterIdx).mask, predictorNames, false);
+        shapleyTable = [shapleyTable; clusterTable]; %#ok<AGROW>
+    end
+end
+
+function summaryTable = buildParameterClusterDiagnosticSummary( ...
+    parameter, predictorNames)
+    p = numel(predictorNames);
+    rowLabels = {'All pooled'; 'Power cluster 1'; 'Power cluster 2'; ...
+        'Power cluster 3'};
+    clusterIDs = [NaN; 1; 2; 3];
+    nRows = numel(rowLabels);
+
+    rowStatus = cell(nRows, 1);
+    n = nan(nRows, 1);
+    biasInSampleR2 = nan(nRows, 1);
+    biasPredictiveR2 = nan(nRows, 1);
+    biasTopParameter = cell(nRows, 1);
+    biasTopParameterPercent = nan(nRows, 1);
+    maskInSampleR2 = nan(nRows, 1);
+    maskPredictiveR2 = nan(nRows, 1);
+    maskTopParameter = cell(nRows, 1);
+    maskTopParameterPercent = nan(nRows, 1);
+
+    clusterIDValues = [];
+    if ~isempty(parameter.byCluster)
+        clusterIDValues = [parameter.byCluster.clusterID];
+    end
+
+    for rowIdx = 1:nRows
+        if rowIdx == 1
+            biasStats = parameter.allBlocks.bias;
+            maskStats = parameter.allBlocks.mask;
+        else
+            matchIdx = find(clusterIDValues == clusterIDs(rowIdx), 1);
+            if isempty(matchIdx)
+                biasStats = missingParameterOutcomeStats(p);
+                maskStats = missingParameterOutcomeStats(p);
+            else
+                biasStats = parameter.byCluster(matchIdx).bias;
+                maskStats = parameter.byCluster(matchIdx).mask;
+            end
+        end
+
+        n(rowIdx) = min([biasStats.n, maskStats.n]);
+        rowStatus{rowIdx} = 'ok';
+        if parameterClusterRowUnderpowered(biasStats, maskStats, p)
+            rowStatus{rowIdx} = 'underpowered';
+        end
+
+        [biasInSampleR2(rowIdx), biasPredictiveR2(rowIdx), ...
+            biasTopParameter{rowIdx}, biasTopParameterPercent(rowIdx)] = ...
+            parameterOutcomeDiagnosticValues(biasStats, predictorNames);
+        [maskInSampleR2(rowIdx), maskPredictiveR2(rowIdx), ...
+            maskTopParameter{rowIdx}, maskTopParameterPercent(rowIdx)] = ...
+            parameterOutcomeDiagnosticValues(maskStats, predictorNames);
+    end
+
+    summaryTable = table(rowLabels, clusterIDs, rowStatus, n, ...
+        biasInSampleR2, biasPredictiveR2, biasTopParameter, ...
+        biasTopParameterPercent, maskInSampleR2, maskPredictiveR2, ...
+        maskTopParameter, maskTopParameterPercent, 'VariableNames', ...
+        {'RowLabel', 'ClusterID', 'RowStatus', 'N', ...
+        'BiasInSampleR2', 'BiasPredictiveR2', 'BiasTopParameter', ...
+        'BiasTopParameterPercent', 'MaskInSampleR2', ...
+        'MaskPredictiveR2', 'MaskTopParameter', ...
+        'MaskTopParameterPercent'});
+end
+
+function stats = missingParameterOutcomeStats(p)
+    stats = struct();
+    stats.n = 0;
+    stats.status = 'underpowered';
+    stats.OLS = struct('R2', NaN, 'adjustedR2', NaN);
+    stats.leaveOneOutPredictiveR2 = NaN;
+    stats.percentOfModelR2 = nan(1, p);
+end
+
+function isUnderpowered = parameterClusterRowUnderpowered( ...
+    biasStats, maskStats, p)
+    isUnderpowered = parameterOutcomeUnderpowered(biasStats, p) || ...
+        parameterOutcomeUnderpowered(maskStats, p);
+end
+
+function isUnderpowered = parameterOutcomeUnderpowered(stats, p)
+    isUnderpowered = ~isfinite(stats.n) || stats.n <= p + 1 || ...
+        ~strcmp(stats.status, 'ok');
+end
+
+function [inSampleR2, predictiveR2, topParameter, topPercent] = ...
+    parameterOutcomeDiagnosticValues(stats, predictorNames)
+    inSampleR2 = stats.OLS.R2;
+    predictiveR2 = stats.leaveOneOutPredictiveR2;
+    topParameter = 'n/a';
+    topPercent = NaN;
+
+    percentValues = stats.percentOfModelR2;
+    finiteIdx = find(isfinite(percentValues));
+    if isempty(finiteIdx)
+        return
+    end
+
+    [topPercent, localIdx] = max(percentValues(finiteIdx));
+    topIdx = finiteIdx(localIdx);
+    topParameter = compactParameterLabel(predictorNames{topIdx});
+end
+
+function label = compactParameterLabel(parameterName)
+    switch parameterName
+        case 'A'
+            label = '\DeltaA';
+        case 'B'
+            label = '\DeltaB';
+        case 'alpha'
+            label = '\Delta\alpha';
+        case 'beta'
+            label = '\Delta\beta';
+        otherwise
+            label = ['\Delta', parameterName];
+    end
+end
+
+function shapleyTable = buildStimulationFamilyShapleySummaryTable(allBlocks)
+    familyNames = canonicalStimulationFamilyNames();
+    shapleyTable = buildShapleySummaryRows([], allBlocks.bias, ...
+        allBlocks.mask, familyNames, true);
+end
+
+function shapleyTable = buildStimulationClusterShapleySummaryTable(byCluster)
+    shapleyTable = table();
+    familyNames = canonicalStimulationFamilyNames();
+    for clusterIdx = 1:numel(byCluster)
+        clusterTable = buildShapleySummaryRows( ...
+            byCluster(clusterIdx).clusterID, byCluster(clusterIdx).bias, ...
+            byCluster(clusterIdx).mask, familyNames, true);
+        shapleyTable = [shapleyTable; clusterTable]; %#ok<AGROW>
+    end
+end
+
+function familyNames = canonicalStimulationFamilyNames()
+    familyNames = {'Energy', 'Spatial factors', 'Temporal factors', 'QC'};
+end
+
+function shapleyTable = buildShapleySummaryRows(clusterID, biasStats, ...
+    maskStats, predictorNames, useGroupedFields)
     outcome = {'DeltaBias'; 'DeltaMask'};
-    n = [allBlocks.bias.n; allBlocks.mask.n];
-    status = {allBlocks.bias.status; allBlocks.mask.status};
-    totalInSampleR2 = [allBlocks.bias.OLS.R2; allBlocks.mask.OLS.R2];
+    n = [biasStats.n; maskStats.n];
+    status = {biasStats.status; maskStats.status};
+    totalInSampleR2 = [biasStats.OLS.R2; maskStats.OLS.R2];
+    adjustedR2 = [biasStats.OLS.adjustedR2; maskStats.OLS.adjustedR2];
     leaveOneOutPredictiveR2 = [ ...
-        allBlocks.bias.leaveOneOutPredictiveR2; ...
-        allBlocks.mask.leaveOneOutPredictiveR2];
-    percentValues = [allBlocks.bias.percentOfModelR2; ...
-        allBlocks.mask.percentOfModelR2];
-    absoluteValues = [allBlocks.bias.shapleyR2; ...
-        allBlocks.mask.shapleyR2];
+        biasStats.leaveOneOutPredictiveR2; ...
+        maskStats.leaveOneOutPredictiveR2];
+    if useGroupedFields
+        sourceNames = biasStats.familyNames;
+        sourcePercentValues = [biasStats.groupedPercentOfModelR2; ...
+            maskStats.groupedPercentOfModelR2];
+        sourceAbsoluteValues = [biasStats.groupedShapleyR2; ...
+            maskStats.groupedShapleyR2];
+        sourceCiBias = biasStats.groupedBootstrapPercentCI;
+        sourceCiMask = maskStats.groupedBootstrapPercentCI;
+    else
+        sourceNames = biasStats.predictorNames;
+        sourcePercentValues = [biasStats.percentOfModelR2; ...
+            maskStats.percentOfModelR2];
+        sourceAbsoluteValues = [biasStats.shapleyR2; maskStats.shapleyR2];
+        sourceCiBias = biasStats.bootstrapPercentCI;
+        sourceCiMask = maskStats.bootstrapPercentCI;
+    end
+
+    nPredictors = numel(predictorNames);
+    percentValues = nan(2, nPredictors);
+    absoluteValues = nan(2, nPredictors);
+    ciLow = nan(2, nPredictors);
+    ciHigh = nan(2, nPredictors);
+    for predictorIdx = 1:nPredictors
+        sourceIdx = find(strcmp(sourceNames, predictorNames{predictorIdx}), 1);
+        if isempty(sourceIdx)
+            continue;
+        end
+        if sourceIdx <= size(sourcePercentValues, 2)
+            percentValues(:, predictorIdx) = sourcePercentValues(:, sourceIdx);
+        end
+        if sourceIdx <= size(sourceAbsoluteValues, 2)
+            absoluteValues(:, predictorIdx) = sourceAbsoluteValues(:, sourceIdx);
+        end
+        if sourceIdx <= size(sourceCiBias, 1)
+            ciLow(1, predictorIdx) = sourceCiBias(sourceIdx, 1);
+            ciHigh(1, predictorIdx) = sourceCiBias(sourceIdx, 2);
+        end
+        if sourceIdx <= size(sourceCiMask, 1)
+            ciLow(2, predictorIdx) = sourceCiMask(sourceIdx, 1);
+            ciHigh(2, predictorIdx) = sourceCiMask(sourceIdx, 2);
+        end
+    end
+
+    approximateAbsoluteFromPercent = ...
+        repmat(totalInSampleR2, 1, nPredictors) .* percentValues ./ 100;
     rowSumPercent = rowSumOmitNan(percentValues);
     rowSumShapleyR2 = rowSumOmitNan(absoluteValues);
 
-    shapleyTable = table(outcome, n, status, totalInSampleR2, ...
-        leaveOneOutPredictiveR2, rowSumShapleyR2, rowSumPercent, ...
-        'VariableNames', {'Outcome', 'N', 'ModelStatus', ...
-        'TotalInSampleR2', 'LeaveOneOutPredictiveR2', ...
-        'RowSumShapleyR2', 'RowSumPercent'});
+    if isempty(clusterID)
+        shapleyTable = table(outcome, n, status, totalInSampleR2, ...
+            adjustedR2, leaveOneOutPredictiveR2, rowSumShapleyR2, ...
+            rowSumPercent, 'VariableNames', {'Outcome', 'N', ...
+            'ModelStatus', 'TotalInSampleR2', 'AdjustedR2', ...
+            'LeaveOneOutPredictiveR2', 'RowSumShapleyR2', ...
+            'RowSumPercent'});
+    else
+        clusterIDColumn = repmat(clusterID, 2, 1);
+        shapleyTable = table(clusterIDColumn, outcome, n, status, ...
+            totalInSampleR2, adjustedR2, leaveOneOutPredictiveR2, ...
+            rowSumShapleyR2, rowSumPercent, 'VariableNames', ...
+            {'ClusterID', 'Outcome', 'N', 'ModelStatus', ...
+            'TotalInSampleR2', 'AdjustedR2', ...
+            'LeaveOneOutPredictiveR2', 'RowSumShapleyR2', ...
+            'RowSumPercent'});
+    end
+
     for predictorIdx = 1:numel(predictorNames)
         absoluteName = matlab.lang.makeValidName( ...
             [predictorNames{predictorIdx}, 'ShapleyR2']);
+        approximateName = matlab.lang.makeValidName( ...
+            [predictorNames{predictorIdx}, 'ApproxContributionR2']);
         percentName = matlab.lang.makeValidName( ...
             [predictorNames{predictorIdx}, 'PercentModelR2']);
         ciLowName = matlab.lang.makeValidName( ...
@@ -741,54 +974,11 @@ function shapleyTable = buildParameterShapleySummaryTable(allBlocks, ...
         ciHighName = matlab.lang.makeValidName( ...
             [predictorNames{predictorIdx}, 'PercentModelR2CI975']);
         shapleyTable.(absoluteName) = absoluteValues(:, predictorIdx);
+        shapleyTable.(approximateName) = ...
+            approximateAbsoluteFromPercent(:, predictorIdx);
         shapleyTable.(percentName) = percentValues(:, predictorIdx);
-        shapleyTable.(ciLowName) = [ ...
-            allBlocks.bias.bootstrapPercentCI(predictorIdx, 1); ...
-            allBlocks.mask.bootstrapPercentCI(predictorIdx, 1)];
-        shapleyTable.(ciHighName) = [ ...
-            allBlocks.bias.bootstrapPercentCI(predictorIdx, 2); ...
-            allBlocks.mask.bootstrapPercentCI(predictorIdx, 2)];
-    end
-end
-
-function shapleyTable = buildStimulationFamilyShapleySummaryTable(allBlocks)
-    familyNames = allBlocks.bias.familyNames;
-    outcome = {'DeltaBias'; 'DeltaMask'};
-    n = [allBlocks.bias.n; allBlocks.mask.n];
-    status = {allBlocks.bias.status; allBlocks.mask.status};
-    totalInSampleR2 = [allBlocks.bias.OLS.R2; allBlocks.mask.OLS.R2];
-    leaveOneOutPredictiveR2 = [ ...
-        allBlocks.bias.leaveOneOutPredictiveR2; ...
-        allBlocks.mask.leaveOneOutPredictiveR2];
-    percentValues = [allBlocks.bias.groupedPercentOfModelR2; ...
-        allBlocks.mask.groupedPercentOfModelR2];
-    absoluteValues = [allBlocks.bias.groupedShapleyR2; ...
-        allBlocks.mask.groupedShapleyR2];
-    rowSumPercent = rowSumOmitNan(percentValues);
-    rowSumShapleyR2 = rowSumOmitNan(absoluteValues);
-
-    shapleyTable = table(outcome, n, status, totalInSampleR2, ...
-        leaveOneOutPredictiveR2, rowSumShapleyR2, rowSumPercent, ...
-        'VariableNames', {'Outcome', 'N', 'ModelStatus', ...
-        'TotalInSampleR2', 'LeaveOneOutPredictiveR2', ...
-        'RowSumShapleyR2', 'RowSumPercent'});
-    for familyIdx = 1:numel(familyNames)
-        absoluteName = matlab.lang.makeValidName( ...
-            [familyNames{familyIdx}, 'ShapleyR2']);
-        percentName = matlab.lang.makeValidName( ...
-            [familyNames{familyIdx}, 'PercentModelR2']);
-        ciLowName = matlab.lang.makeValidName( ...
-            [familyNames{familyIdx}, 'PercentModelR2CI025']);
-        ciHighName = matlab.lang.makeValidName( ...
-            [familyNames{familyIdx}, 'PercentModelR2CI975']);
-        shapleyTable.(absoluteName) = absoluteValues(:, familyIdx);
-        shapleyTable.(percentName) = percentValues(:, familyIdx);
-        shapleyTable.(ciLowName) = [ ...
-            allBlocks.bias.groupedBootstrapPercentCI(familyIdx, 1); ...
-            allBlocks.mask.groupedBootstrapPercentCI(familyIdx, 1)];
-        shapleyTable.(ciHighName) = [ ...
-            allBlocks.bias.groupedBootstrapPercentCI(familyIdx, 2); ...
-            allBlocks.mask.groupedBootstrapPercentCI(familyIdx, 2)];
+        shapleyTable.(ciLowName) = ciLow(:, predictorIdx);
+        shapleyTable.(ciHighName) = ciHigh(:, predictorIdx);
     end
 end
 
@@ -861,13 +1051,16 @@ function fig = plotParameterShapleyFigure(relevanceStruct, opts)
     values = [
         relevanceStruct.parameter.allBlocks.bias.percentOfModelR2;
         relevanceStruct.parameter.allBlocks.mask.percentOfModelR2];
+    totalR2 = [relevanceStruct.parameter.allBlocks.bias.OLS.R2; ...
+        relevanceStruct.parameter.allBlocks.mask.OLS.R2];
+    predictiveR2 = [ ...
+        relevanceStruct.parameter.allBlocks.bias.leaveOneOutPredictiveR2; ...
+        relevanceStruct.parameter.allBlocks.mask.leaveOneOutPredictiveR2];
     rowSums = rowSumOmitNan(values);
-    looBias = relevanceStruct.parameter.allBlocks.bias.leaveOneOutPredictiveR2;
-    looMask = relevanceStruct.parameter.allBlocks.mask.leaveOneOutPredictiveR2;
     fprintf(['Parameter Shapley row-sum sanity check | ' ...
         'DeltaBias=%.3f%% | DeltaMask=%.3f%% | ' ...
-        'LOO predictive R2: bias=%.3f, mask=%.3f\n'], ...
-        rowSums(1), rowSums(2), looBias, looMask);
+        'predictive R2: bias=%.3f, mask=%.3f\n'], ...
+        rowSums(1), rowSums(2), predictiveR2(1), predictiveR2(2));
 
     fig = figure('Color', 'w', 'Name', 'Parameter Shapley relevance');
     set(fig, 'Position', [100, 100, 520, 380]);
@@ -884,14 +1077,118 @@ function fig = plotParameterShapleyFigure(relevanceStruct, opts)
     yticklabels(ax, {'\DeltaBias', '\DeltaMask'});
     set(ax, 'FontName', 'Arial', 'FontSize', 13, 'LineWidth', 1.0);
     title(ax, sprintf(['Parameter Shapley relevance | n=%d | ' ...
-        'in-sample R^2: bias=%.2f, mask=%.2f | ' ...
-        'LOO R^2: bias=%.2f, mask=%.2f'], ...
-        relevanceStruct.parameter.allBlocks.bias.n, ...
-        relevanceStruct.parameter.allBlocks.bias.OLS.R2, ...
-        relevanceStruct.parameter.allBlocks.mask.OLS.R2, ...
-        looBias, looMask), ...
-        'FontName', 'Arial', 'FontSize', 13, 'FontWeight', 'bold');
-    addHeatmapText(values);
+        'in-sample R^2: bias=%.2f, mask=%.2f'], ...
+        relevanceStruct.parameter.allBlocks.bias.n, totalR2(1), ...
+        totalR2(2)), 'FontName', 'Arial', 'FontSize', 13, ...
+        'FontWeight', 'bold');
+    xlabel(ax, sprintf('predictive R^2: bias=%.2f, mask=%.2f', ...
+        predictiveR2(1), predictiveR2(2)), 'FontName', 'Arial', ...
+        'FontSize', 10);
+    addHeatmapText(values, totalR2, predictiveR2, true);
+end
+
+function fig = plotParameterClusterSummaryFigure(relevanceStruct)
+    summaryTable = relevanceStruct.summaryTables.parameterClusterDiagnostic;
+    headers = {'', 'n', sprintf('\\DeltaBias\nin-sample R^2'), ...
+        sprintf('\\DeltaBias\npredictive R^2'), ...
+        sprintf('\\DeltaBias\ntop param'), ...
+        sprintf('\\DeltaBias\ntop param %%'), ...
+        sprintf('\\DeltaMask\nin-sample R^2'), ...
+        sprintf('\\DeltaMask\npredictive R^2'), ...
+        sprintf('\\DeltaMask\ntop param'), ...
+        sprintf('\\DeltaMask\ntop param %%')};
+    colWidths = [1.35, 0.45, 0.95, 0.95, 0.78, 0.88, ...
+        0.95, 0.95, 0.78, 0.88];
+    xEdges = [0, cumsum(colWidths)];
+    tableWidth = xEdges(end);
+    nRows = height(summaryTable);
+
+    fig = figure('Color', 'w', ...
+        'Name', 'Parameter by-power-cluster summary');
+    set(fig, 'Position', [100, 100, 980, 340]);
+    ax = axes('Parent', fig, 'Position', [0.04, 0.08, 0.92, 0.76]);
+    hold(ax, 'on');
+    axis(ax, 'off');
+    set(ax, 'XLim', [0, tableWidth], 'YLim', [0, nRows + 1], ...
+        'YDir', 'reverse');
+
+    title(ax, ['Parameter relevance by power cluster | ' ...
+        'diagnostic summary'], 'FontName', 'Arial', 'FontSize', 13, ...
+        'FontWeight', 'bold');
+
+    for colIdx = 1:numel(headers)
+        xCenter = mean(xEdges(colIdx:(colIdx + 1)));
+        text(ax, xCenter, 0.50, headers{colIdx}, ...
+            'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
+            'FontName', 'Arial', 'FontSize', 9, 'FontWeight', 'bold', ...
+            'Interpreter', 'tex');
+    end
+
+    for rowIdx = 1:nRows
+        yCenter = rowIdx + 0.50;
+        rowColor = [0 0 0];
+        rowLabel = summaryTable.RowLabel{rowIdx};
+        if strcmp(summaryTable.RowStatus{rowIdx}, 'underpowered')
+            rowColor = 0.50 .* [1 1 1];
+            rowLabel = sprintf('%s\nunderpowered', rowLabel);
+        end
+
+        rowValues = {rowLabel, formatIntegerCell(summaryTable.N(rowIdx)), ...
+            formatR2Cell(summaryTable.BiasInSampleR2(rowIdx)), ...
+            formatR2Cell(summaryTable.BiasPredictiveR2(rowIdx)), ...
+            summaryTable.BiasTopParameter{rowIdx}, ...
+            formatPercentCell(summaryTable.BiasTopParameterPercent(rowIdx)), ...
+            formatR2Cell(summaryTable.MaskInSampleR2(rowIdx)), ...
+            formatR2Cell(summaryTable.MaskPredictiveR2(rowIdx)), ...
+            summaryTable.MaskTopParameter{rowIdx}, ...
+            formatPercentCell(summaryTable.MaskTopParameterPercent(rowIdx))};
+
+        for colIdx = 1:numel(rowValues)
+            xCenter = mean(xEdges(colIdx:(colIdx + 1)));
+            horizontalAlignment = 'center';
+            if colIdx == 1
+                xCenter = xEdges(colIdx) + 0.06;
+                horizontalAlignment = 'left';
+            end
+            text(ax, xCenter, yCenter, rowValues{colIdx}, ...
+                'HorizontalAlignment', horizontalAlignment, ...
+                'VerticalAlignment', 'middle', 'FontName', 'Arial', ...
+                'FontSize', 9, 'Color', rowColor, 'Interpreter', 'tex');
+        end
+    end
+
+    for rowEdge = 0:(nRows + 1)
+        line(ax, [0, tableWidth], [rowEdge, rowEdge], ...
+            'Color', 0.82 .* [1 1 1], 'LineWidth', 0.75);
+    end
+    for colEdge = 1:numel(xEdges)
+        line(ax, [xEdges(colEdge), xEdges(colEdge)], [0, nRows + 1], ...
+            'Color', 0.88 .* [1 1 1], 'LineWidth', 0.75);
+    end
+end
+
+function textValue = formatIntegerCell(value)
+    if isfinite(value)
+        textValue = sprintf('%d', value);
+    else
+        textValue = 'n/a';
+    end
+end
+
+function textValue = formatR2Cell(value)
+    if isfinite(value)
+        textValue = sprintf('%.2f', value);
+    else
+        textValue = 'n/a';
+    end
+end
+
+function textValue = formatPercentCell(value)
+    if isfinite(value)
+        textValue = sprintf('%.0f%%', value);
+    else
+        textValue = 'n/a';
+    end
 end
 
 function fig = plotStimulationGroupedShapleyFigure(relevanceStruct, opts)
@@ -899,20 +1196,21 @@ function fig = plotStimulationGroupedShapleyFigure(relevanceStruct, opts)
     values = [
         relevanceStruct.stimulation.allBlocks.bias.groupedPercentOfModelR2;
         relevanceStruct.stimulation.allBlocks.mask.groupedPercentOfModelR2];
-    totalR2 = [relevanceStruct.stimulation.allBlocks.bias.OLS.R2, ...
+    totalR2 = [relevanceStruct.stimulation.allBlocks.bias.OLS.R2; ...
         relevanceStruct.stimulation.allBlocks.mask.OLS.R2];
     unavailable = isempty(familyNames) || all(~isfinite(values(:))) || ...
         any(~isfinite(totalR2));
 
     fig = figure('Color', 'w', 'Name', 'Stimulation-family Shapley relevance');
-    set(fig, 'Position', [100, 100, 520, 380]);
-    ax = axes('Parent', fig);
+    set(fig, 'Position', [100, 100, 580, 500]);
+    ax = axes('Parent', fig, 'Position', [0.16, 0.30, 0.62, 0.56]);
     if unavailable
         axis(ax, 'off');
         text(ax, 0.5, 0.5, ['Stimulation-family model unavailable: ' ...
             'insufficient complete finite predictors.'], ...
             'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
             'FontName', 'Arial', 'FontSize', 13);
+        addStimulationPredictorFooter(fig, relevanceStruct);
         return
     end
 
@@ -929,23 +1227,91 @@ function fig = plotStimulationGroupedShapleyFigure(relevanceStruct, opts)
     set(ax, 'FontName', 'Arial', 'FontSize', 13, 'LineWidth', 1.0);
     title(ax, sprintf(['Stimulation-family Shapley relevance | n=%d | ' ...
         'family-score in-sample R^2: bias=%.2f, mask=%.2f'], ...
-        relevanceStruct.stimulation.allBlocks.bias.n, ...
-        relevanceStruct.stimulation.allBlocks.bias.OLS.R2, ...
-        relevanceStruct.stimulation.allBlocks.mask.OLS.R2), ...
-        'FontName', 'Arial', 'FontSize', 13, 'FontWeight', 'bold');
-    addHeatmapText(values);
+        relevanceStruct.stimulation.allBlocks.bias.n, totalR2(1), ...
+        totalR2(2)), 'FontName', 'Arial', 'FontSize', 13, ...
+        'FontWeight', 'bold');
+    addHeatmapText(values, totalR2, totalR2, false);
+    addStimulationPredictorFooter(fig, relevanceStruct);
 end
 
-function addHeatmapText(values)
+function addHeatmapText(values, totalR2, predictiveR2, requirePredictiveR2)
+    approximateR2 = totalR2 .* values ./ 100;
     for rowIdx = 1:size(values, 1)
+        textColor = heatmapTextColor(totalR2(rowIdx), ...
+            predictiveR2(rowIdx), requirePredictiveR2);
         for colIdx = 1:size(values, 2)
             if isfinite(values(rowIdx, colIdx))
-                text(colIdx, rowIdx, sprintf('%.0f', values(rowIdx, colIdx)), ...
+                text(colIdx, rowIdx, sprintf('%.0f%%\nR^2=%.2f', ...
+                    values(rowIdx, colIdx), approximateR2(rowIdx, colIdx)), ...
                     'HorizontalAlignment', 'center', ...
-                    'Color', 'w', 'FontWeight', 'bold', ...
-                    'FontName', 'Arial');
+                    'VerticalAlignment', 'middle', 'Color', textColor, ...
+                    'FontWeight', 'bold', 'FontName', 'Arial', ...
+                    'FontSize', 10);
             end
         end
+    end
+end
+
+function textColor = heatmapTextColor(totalR2, predictiveR2, ...
+    requirePredictiveR2)
+    if requirePredictiveR2
+        strongModel = isfinite(totalR2) && totalR2 >= 0.25 && ...
+            isfinite(predictiveR2) && predictiveR2 >= 0.10;
+    else
+        strongModel = isfinite(totalR2) && totalR2 >= 0.25;
+    end
+
+    if strongModel
+        textColor = [0 0 0];
+    else
+        textColor = 0.50 .* [1 1 1];
+    end
+end
+
+function addStimulationPredictorFooter(fig, relevanceStruct)
+    [includedLine, excludedLine] = stimulationPredictorFooterText( ...
+        relevanceStruct);
+    footerText = includedLine;
+    if ~isempty(excludedLine)
+        footerText = sprintf('%s\n%s', includedLine, excludedLine);
+    end
+    annotation(fig, 'textbox', [0.05, 0.02, 0.90, 0.16], ...
+        'String', footerText, 'EdgeColor', 'none', ...
+        'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom', ...
+        'FontName', 'Arial', 'FontSize', 10, 'Interpreter', 'none');
+end
+
+function [includedLine, excludedLine] = stimulationPredictorFooterText( ...
+    relevanceStruct)
+    families = {'Energy', 'Spatial factors', 'Temporal factors', 'QC'};
+    retained = relevanceStruct.stimulation.allBlocks.bias.retainedRawPredictors;
+    includedParts = cell(1, numel(families));
+    for familyIdx = 1:numel(families)
+        predictorList = {};
+        for retainedIdx = 1:numel(retained)
+            if strcmp(retained(retainedIdx).family, families{familyIdx})
+                predictorList = retained(retainedIdx).predictorNames;
+                break
+            end
+        end
+        if isempty(predictorList)
+            predictorText = 'none';
+        else
+            predictorText = strjoin(predictorList, ', ');
+        end
+        includedParts{familyIdx} = sprintf('%s = %s', ...
+            families{familyIdx}, predictorText);
+    end
+    includedLine = strjoin(includedParts, ' | ');
+
+    diagnostics = relevanceStruct.stimulation.allBlocks.bias.rawPredictorDiagnostics;
+    validPredictor = validStimulationPredictorMask(diagnostics);
+    excludedNames = diagnostics.PredictorName(~validPredictor);
+    if isempty(excludedNames)
+        excludedLine = '';
+    else
+        excludedLine = ['Excluded from family scores = ', ...
+            strjoin(excludedNames(:)', ', ')];
     end
 end
 
@@ -967,8 +1333,8 @@ function outputPaths = saveRelevanceOutputs(relevanceStruct, opts)
     relevanceStruct = relevanceStructForSave;
     save(outputPaths.mat, 'relevanceStruct');
 
-    figureNames = {'parameterShapley', 'stimulationGroupedShapley', ...
-        'parameterBiasingScatterDiagnostic', ...
+    figureNames = {'parameterShapley', 'parameterClusterSummary', ...
+        'stimulationGroupedShapley', 'parameterBiasingScatterDiagnostic', ...
         'parameterMaskingScatterDiagnostic'};
     outputPaths.figures = struct([]);
     for figIdx = 1:numel(figureHandles)
