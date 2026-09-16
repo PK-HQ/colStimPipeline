@@ -94,8 +94,8 @@ function relevanceStruct = analyzePowerClusterRelevance( ...
         'Parameter Shapley values partition in-sample multivariable R2.'; ...
         ['Stimulation-family Shapley values use family-level z-score ' ...
          'summaries to reduce over-interpretation of collinear raw predictors.']; ...
-        ['In-sample R2 can be optimistic; use leave-one-out predictive R2 ' ...
-         'when it is finite.']};
+        ['In-sample R2 can be optimistic; use bootstrap ' ...
+         'optimism-corrected R2 as the primary predictive diagnostic.']};
 
     if opts.makeFigures
         relevanceStruct.figureHandles = makeRelevanceFigures( ...
@@ -203,6 +203,10 @@ function result = analyzePredictorSet(X, y, predictorNames, ...
     fitStats = ordinaryR2FromOLS(Xv, yv);
     result.OLS = fitStats;
     result.status = modelStatus(Xv, yv);
+    result.optimismCorrected = bootstrapOptimismCorrectedR2( ...
+        Xv, yv, nBootstrap, rngSeed + 503);
+    result.optimismCorrectedR2 = ...
+        result.optimismCorrected.optimismCorrectedR2;
 
     shapleyR2 = shapleyR2Individual(Xv, yv);
     result.shapleyR2 = shapleyR2;
@@ -275,28 +279,134 @@ function fitStats = ordinaryR2FromOLS(X, y)
     fitStats = struct('R2', NaN, 'adjustedR2', NaN, ...
         'coefficients', [], 'intercept', NaN, 'rank', 0);
 
-    if size(X, 1) < 2 || isempty(X) || ...
-            sum((y - mean(y)).^2) <= eps
+    model = fitStandardizedOLS(X, y);
+    fitStats.rank = model.rank;
+    if strcmp(model.status, 'too few valid rows') || ...
+            strcmp(model.status, 'no valid predictors') || ...
+            strcmp(model.status, 'zero outcome variance')
         return
     end
 
-    Xz = centerAndScale(X);
-    design = [ones(size(Xz, 1), 1), Xz];
-    beta = pinv(design) * y;
-    yHat = design * beta;
-    totalSS = sum((y - mean(y)).^2);
-    residualSS = sum((y - yHat).^2);
-    n = size(Xz, 1);
-    p = size(Xz, 2);
+    yHat = predictStandardizedOLS(model, X);
+    n = size(X, 1);
+    p = size(X, 2);
 
-    fitStats.R2 = max(0, 1 - residualSS / totalSS);
+    fitStats.R2 = max(0, r2ForPrediction(y, yHat));
     if n > p + 1
         fitStats.adjustedR2 = 1 - (1 - fitStats.R2) * ...
             (n - 1) / (n - p - 1);
     end
-    fitStats.coefficients = beta(2:end);
-    fitStats.intercept = beta(1);
-    fitStats.rank = rank(Xz);
+    fitStats.coefficients = model.coefficients;
+    fitStats.intercept = model.intercept;
+end
+
+function optimism = bootstrapOptimismCorrectedR2(X, y, nBootstrap, rngSeed)
+    optimism = struct('apparentR2', NaN, 'meanOptimism', NaN, ...
+        'optimismCorrectedR2', NaN, 'bootstrapOptimismCI', [NaN NaN], ...
+        'nBootstrapUsed', 0, 'status', 'not computed');
+
+    status = modelStatus(X, y);
+    apparentFit = ordinaryR2FromOLS(X, y);
+    optimism.apparentR2 = apparentFit.R2;
+    if ~strcmp(status, 'ok')
+        optimism.status = status;
+        return
+    end
+    if nBootstrap <= 0 || ~isfinite(apparentFit.R2)
+        optimism.status = 'no bootstrap iterations';
+        return
+    end
+
+    stream = RandStream('mt19937ar', 'Seed', rngSeed);
+    n = size(X, 1);
+    optimismValues = nan(nBootstrap, 1);
+    for bootIdx = 1:nBootstrap
+        rowIdx = randi(stream, n, n, 1);
+        XBoot = X(rowIdx, :);
+        yBoot = y(rowIdx);
+        bootModel = fitStandardizedOLS(XBoot, yBoot);
+        if ~strcmp(bootModel.status, 'ok')
+            continue
+        end
+
+        yBootHat = predictStandardizedOLS(bootModel, XBoot);
+        yOriginalHat = predictStandardizedOLS(bootModel, X);
+        bootApparentR2 = r2ForPrediction(yBoot, yBootHat);
+        bootTestR2 = r2ForPrediction(y, yOriginalHat);
+        if isfinite(bootApparentR2) && isfinite(bootTestR2)
+            optimismValues(bootIdx) = bootApparentR2 - bootTestR2;
+        end
+    end
+
+    finiteOptimism = optimismValues(isfinite(optimismValues));
+    optimism.nBootstrapUsed = numel(finiteOptimism);
+    minBootstrapUsed = max(3, ceil(0.20 * nBootstrap));
+    if optimism.nBootstrapUsed < minBootstrapUsed
+        optimism.status = 'too few valid bootstrap samples';
+        return
+    end
+
+    optimism.meanOptimism = mean(finiteOptimism, 'omitnan');
+    optimism.optimismCorrectedR2 = ...
+        optimism.apparentR2 - optimism.meanOptimism;
+    optimism.bootstrapOptimismCI = prctile(finiteOptimism, [2.5 97.5]);
+    optimism.status = 'ok';
+end
+
+function model = fitStandardizedOLS(Xtrain, ytrain)
+    ytrain = ytrain(:);
+    n = size(Xtrain, 1);
+    p = size(Xtrain, 2);
+    model = struct('coefficients', nan(p, 1), 'intercept', NaN, ...
+        'mu', nan(1, p), 'sigma', nan(1, p), 'rank', 0, ...
+        'status', 'ok');
+
+    if p == 0 || isempty(Xtrain)
+        model.status = 'no valid predictors';
+        return
+    elseif n < 2
+        model.status = 'too few valid rows';
+        return
+    elseif sum((ytrain - mean(ytrain)).^2) <= eps
+        model.status = 'zero outcome variance';
+        return
+    end
+
+    model.mu = mean(Xtrain, 1, 'omitnan');
+    model.sigma = std(Xtrain, 0, 1, 'omitnan');
+    model.sigma(~isfinite(model.sigma) | model.sigma == 0) = 1;
+    XtrainZ = (Xtrain - model.mu) ./ model.sigma;
+    model.rank = rank(XtrainZ);
+    beta = pinv([ones(n, 1), XtrainZ]) * ytrain;
+    model.intercept = beta(1);
+    model.coefficients = beta(2:end);
+    if model.rank < p
+        model.status = 'rank deficient';
+    end
+end
+
+function yHat = predictStandardizedOLS(model, Xtest)
+    XtestZ = (Xtest - model.mu) ./ model.sigma;
+    yHat = [ones(size(XtestZ, 1), 1), XtestZ] * ...
+        [model.intercept; model.coefficients];
+end
+
+function r2 = r2ForPrediction(yTrue, yHat)
+    yTrue = yTrue(:);
+    yHat = yHat(:);
+    validRows = isfinite(yTrue) & isfinite(yHat);
+    if nnz(validRows) < 2
+        r2 = NaN;
+        return
+    end
+
+    yValid = yTrue(validRows);
+    totalSS = sum((yValid - mean(yValid)).^2);
+    if totalSS <= eps
+        r2 = NaN;
+    else
+        r2 = 1 - sum((yValid - yHat(validRows)).^2) / totalSS;
+    end
 end
 
 function Xz = centerAndScale(X)
@@ -723,6 +833,10 @@ function figureHandles = makeRelevanceFigures(relevanceStruct, opts)
         relevanceStruct, opts);
     figureHandles(end + 1) = plotParameterClusterSummaryFigure( ...
         relevanceStruct);
+    figureHandles(end + 1) = plotParameterByClusterShapleyFigure( ...
+        relevanceStruct, opts, 'bias');
+    figureHandles(end + 1) = plotParameterByClusterShapleyFigure( ...
+        relevanceStruct, opts, 'mask');
     figureHandles(end + 1) = plotStimulationGroupedShapleyFigure( ...
         relevanceStruct, opts);
     figureHandles(end + 1) = plotParameterScatterFigure( ...
@@ -757,13 +871,17 @@ function summaryTable = buildParameterClusterDiagnosticSummary( ...
     nRows = numel(rowLabels);
 
     rowStatus = cell(nRows, 1);
+    biasStatus = cell(nRows, 1);
+    maskStatus = cell(nRows, 1);
     n = nan(nRows, 1);
     biasInSampleR2 = nan(nRows, 1);
-    biasPredictiveR2 = nan(nRows, 1);
+    biasOptimismCorrectedR2 = nan(nRows, 1);
+    biasLeaveOneOutPredictiveR2 = nan(nRows, 1);
     biasTopParameter = cell(nRows, 1);
     biasTopParameterPercent = nan(nRows, 1);
     maskInSampleR2 = nan(nRows, 1);
-    maskPredictiveR2 = nan(nRows, 1);
+    maskOptimismCorrectedR2 = nan(nRows, 1);
+    maskLeaveOneOutPredictiveR2 = nan(nRows, 1);
     maskTopParameter = cell(nRows, 1);
     maskTopParameterPercent = nan(nRows, 1);
 
@@ -788,27 +906,33 @@ function summaryTable = buildParameterClusterDiagnosticSummary( ...
         end
 
         n(rowIdx) = min([biasStats.n, maskStats.n]);
-        rowStatus{rowIdx} = 'ok';
-        if parameterClusterRowUnderpowered(biasStats, maskStats, p)
-            rowStatus{rowIdx} = 'underpowered';
-        end
+        biasStatus{rowIdx} = parameterOutcomeInterpretability(biasStats, p);
+        maskStatus{rowIdx} = parameterOutcomeInterpretability(maskStats, p);
+        rowStatus{rowIdx} = combineInterpretabilityStatus( ...
+            biasStatus{rowIdx}, maskStatus{rowIdx});
 
-        [biasInSampleR2(rowIdx), biasPredictiveR2(rowIdx), ...
+        [biasInSampleR2(rowIdx), biasOptimismCorrectedR2(rowIdx), ...
+            biasLeaveOneOutPredictiveR2(rowIdx), ...
             biasTopParameter{rowIdx}, biasTopParameterPercent(rowIdx)] = ...
             parameterOutcomeDiagnosticValues(biasStats, predictorNames);
-        [maskInSampleR2(rowIdx), maskPredictiveR2(rowIdx), ...
+        [maskInSampleR2(rowIdx), maskOptimismCorrectedR2(rowIdx), ...
+            maskLeaveOneOutPredictiveR2(rowIdx), ...
             maskTopParameter{rowIdx}, maskTopParameterPercent(rowIdx)] = ...
             parameterOutcomeDiagnosticValues(maskStats, predictorNames);
     end
 
-    summaryTable = table(rowLabels, clusterIDs, rowStatus, n, ...
-        biasInSampleR2, biasPredictiveR2, biasTopParameter, ...
-        biasTopParameterPercent, maskInSampleR2, maskPredictiveR2, ...
+    summaryTable = table(rowLabels, clusterIDs, rowStatus, biasStatus, ...
+        maskStatus, n, biasInSampleR2, biasOptimismCorrectedR2, ...
+        biasLeaveOneOutPredictiveR2, biasTopParameter, ...
+        biasTopParameterPercent, maskInSampleR2, ...
+        maskOptimismCorrectedR2, maskLeaveOneOutPredictiveR2, ...
         maskTopParameter, maskTopParameterPercent, 'VariableNames', ...
-        {'RowLabel', 'ClusterID', 'RowStatus', 'N', ...
-        'BiasInSampleR2', 'BiasPredictiveR2', 'BiasTopParameter', ...
-        'BiasTopParameterPercent', 'MaskInSampleR2', ...
-        'MaskPredictiveR2', 'MaskTopParameter', ...
+        {'RowLabel', 'ClusterID', 'RowStatus', 'BiasStatus', ...
+        'MaskStatus', 'N', 'BiasInSampleR2', ...
+        'BiasOptimismCorrectedR2', 'BiasLeaveOneOutPredictiveR2', ...
+        'BiasTopParameter', 'BiasTopParameterPercent', ...
+        'MaskInSampleR2', 'MaskOptimismCorrectedR2', ...
+        'MaskLeaveOneOutPredictiveR2', 'MaskTopParameter', ...
         'MaskTopParameterPercent'});
 end
 
@@ -817,25 +941,45 @@ function stats = missingParameterOutcomeStats(p)
     stats.n = 0;
     stats.status = 'underpowered';
     stats.OLS = struct('R2', NaN, 'adjustedR2', NaN);
+    stats.optimismCorrected = struct('apparentR2', NaN, ...
+        'meanOptimism', NaN, 'optimismCorrectedR2', NaN, ...
+        'bootstrapOptimismCI', [NaN NaN], 'nBootstrapUsed', 0, ...
+        'status', 'underpowered');
+    stats.optimismCorrectedR2 = NaN;
     stats.leaveOneOutPredictiveR2 = NaN;
     stats.percentOfModelR2 = nan(1, p);
+    stats.shapleyR2 = nan(1, p);
+    stats.bootstrapPercentCI = nan(p, 2);
 end
 
-function isUnderpowered = parameterClusterRowUnderpowered( ...
-    biasStats, maskStats, p)
-    isUnderpowered = parameterOutcomeUnderpowered(biasStats, p) || ...
-        parameterOutcomeUnderpowered(maskStats, p);
+function status = parameterOutcomeInterpretability(stats, p)
+    if ~isfinite(stats.n) || stats.n <= p + 1
+        status = 'underpowered';
+    elseif ~strcmp(stats.status, 'ok') || ...
+            ~isfinite(stats.optimismCorrectedR2) || ...
+            stats.optimismCorrectedR2 < 0
+        status = 'unstable/overfit';
+    elseif stats.optimismCorrectedR2 < 0.10
+        status = 'weak/descriptive';
+    else
+        status = 'ok';
+    end
 end
 
-function isUnderpowered = parameterOutcomeUnderpowered(stats, p)
-    isUnderpowered = ~isfinite(stats.n) || stats.n <= p + 1 || ...
-        ~strcmp(stats.status, 'ok');
+function status = combineInterpretabilityStatus(statusA, statusB)
+    priority = {'ok', 'weak/descriptive', 'unstable/overfit', ...
+        'underpowered'};
+    idxA = find(strcmp(priority, statusA), 1);
+    idxB = find(strcmp(priority, statusB), 1);
+    status = priority{max([idxA, idxB])};
 end
 
-function [inSampleR2, predictiveR2, topParameter, topPercent] = ...
-    parameterOutcomeDiagnosticValues(stats, predictorNames)
+function [inSampleR2, optimismCorrectedR2, leaveOneOutR2, ...
+    topParameter, topPercent] = parameterOutcomeDiagnosticValues( ...
+    stats, predictorNames)
     inSampleR2 = stats.OLS.R2;
-    predictiveR2 = stats.leaveOneOutPredictiveR2;
+    optimismCorrectedR2 = stats.optimismCorrectedR2;
+    leaveOneOutR2 = stats.leaveOneOutPredictiveR2;
     topParameter = 'n/a';
     topPercent = NaN;
 
@@ -893,6 +1037,12 @@ function shapleyTable = buildShapleySummaryRows(clusterID, biasStats, ...
     status = {biasStats.status; maskStats.status};
     totalInSampleR2 = [biasStats.OLS.R2; maskStats.OLS.R2];
     adjustedR2 = [biasStats.OLS.adjustedR2; maskStats.OLS.adjustedR2];
+    apparentR2 = [biasStats.optimismCorrected.apparentR2; ...
+        maskStats.optimismCorrected.apparentR2];
+    optimismCorrectedR2 = [biasStats.optimismCorrectedR2; ...
+        maskStats.optimismCorrectedR2];
+    meanOptimism = [biasStats.optimismCorrected.meanOptimism; ...
+        maskStats.optimismCorrected.meanOptimism];
     leaveOneOutPredictiveR2 = [ ...
         biasStats.leaveOneOutPredictiveR2; ...
         maskStats.leaveOneOutPredictiveR2];
@@ -945,21 +1095,24 @@ function shapleyTable = buildShapleySummaryRows(clusterID, biasStats, ...
     rowSumShapleyR2 = rowSumOmitNan(absoluteValues);
 
     if isempty(clusterID)
-        shapleyTable = table(outcome, n, status, totalInSampleR2, ...
-            adjustedR2, leaveOneOutPredictiveR2, rowSumShapleyR2, ...
+        shapleyTable = table(outcome, n, status, apparentR2, ...
+            totalInSampleR2, adjustedR2, optimismCorrectedR2, ...
+            meanOptimism, leaveOneOutPredictiveR2, rowSumShapleyR2, ...
             rowSumPercent, 'VariableNames', {'Outcome', 'N', ...
-            'ModelStatus', 'TotalInSampleR2', 'AdjustedR2', ...
+            'ModelStatus', 'ApparentR2', 'TotalInSampleR2', ...
+            'AdjustedR2', 'OptimismCorrectedR2', 'MeanOptimism', ...
             'LeaveOneOutPredictiveR2', 'RowSumShapleyR2', ...
             'RowSumPercent'});
     else
         clusterIDColumn = repmat(clusterID, 2, 1);
         shapleyTable = table(clusterIDColumn, outcome, n, status, ...
-            totalInSampleR2, adjustedR2, leaveOneOutPredictiveR2, ...
+            apparentR2, totalInSampleR2, adjustedR2, ...
+            optimismCorrectedR2, meanOptimism, leaveOneOutPredictiveR2, ...
             rowSumShapleyR2, rowSumPercent, 'VariableNames', ...
-            {'ClusterID', 'Outcome', 'N', 'ModelStatus', ...
-            'TotalInSampleR2', 'AdjustedR2', ...
-            'LeaveOneOutPredictiveR2', 'RowSumShapleyR2', ...
-            'RowSumPercent'});
+            {'ClusterID', 'Outcome', 'N', 'ModelStatus', 'ApparentR2', ...
+            'TotalInSampleR2', 'AdjustedR2', 'OptimismCorrectedR2', ...
+            'MeanOptimism', 'LeaveOneOutPredictiveR2', ...
+            'RowSumShapleyR2', 'RowSumPercent'});
     end
 
     for predictorIdx = 1:numel(predictorNames)
@@ -1013,7 +1166,7 @@ function fig = plotParameterScatterFigure(relevanceStruct, opts, outcomeIdx)
         for clusterIdx = 1:numel(clusterIDs)
             keep = clusterLabels == clusterIDs(clusterIdx);
             scatter(ax, XCell{outcomeIdx}(keep, predictorIdx), ...
-                yCell{outcomeIdx}(keep), 36, ...
+                yCell{outcomeIdx}(keep), 90, ...
                 colors(clusterIdx, :), 's', 'filled', ...
                 'MarkerEdgeColor', 'k', 'MarkerFaceAlpha', 0.80);
         end
@@ -1030,7 +1183,8 @@ function fig = plotParameterScatterFigure(relevanceStruct, opts, outcomeIdx)
         text(ax, 0.04, 0.94, sprintf('n=%d\nrho=%.2f\np=%.3g', ...
             pairwise.n, pairwise.spearmanRho, pairwise.spearmanP), ...
             'Units', 'normalized', 'VerticalAlignment', 'top', ...
-            'FontName', 'Arial', 'FontSize', 11);
+            'FontName', 'Arial', 'FontSize', 11, ...
+            'Color', spearmanAnnotationColor(pairwise.spearmanP));
         xlim(ax, xLimits(predictorIdx, :));
         ylim(ax, yLimits(outcomeIdx, :));
         pbaspect(ax, [1 1 1]);
@@ -1054,12 +1208,12 @@ function fig = plotParameterShapleyFigure(relevanceStruct, opts)
     totalR2 = [relevanceStruct.parameter.allBlocks.bias.OLS.R2; ...
         relevanceStruct.parameter.allBlocks.mask.OLS.R2];
     predictiveR2 = [ ...
-        relevanceStruct.parameter.allBlocks.bias.leaveOneOutPredictiveR2; ...
-        relevanceStruct.parameter.allBlocks.mask.leaveOneOutPredictiveR2];
+        relevanceStruct.parameter.allBlocks.bias.optimismCorrectedR2; ...
+        relevanceStruct.parameter.allBlocks.mask.optimismCorrectedR2];
     rowSums = rowSumOmitNan(values);
     fprintf(['Parameter Shapley row-sum sanity check | ' ...
         'DeltaBias=%.3f%% | DeltaMask=%.3f%% | ' ...
-        'predictive R2: bias=%.3f, mask=%.3f\n'], ...
+        'optimism-corrected R2: bias=%.3f, mask=%.3f\n'], ...
         rowSums(1), rowSums(2), predictiveR2(1), predictiveR2(2));
 
     fig = figure('Color', 'w', 'Name', 'Parameter Shapley relevance');
@@ -1081,31 +1235,31 @@ function fig = plotParameterShapleyFigure(relevanceStruct, opts)
         relevanceStruct.parameter.allBlocks.bias.n, totalR2(1), ...
         totalR2(2)), 'FontName', 'Arial', 'FontSize', 13, ...
         'FontWeight', 'bold');
-    xlabel(ax, sprintf('predictive R^2: bias=%.2f, mask=%.2f', ...
-        predictiveR2(1), predictiveR2(2)), 'FontName', 'Arial', ...
-        'FontSize', 10);
+    xlabel(ax, sprintf(['optimism-corrected R^2: bias=%.2f, ' ...
+        'mask=%.2f'], predictiveR2(1), predictiveR2(2)), ...
+        'FontName', 'Arial', 'FontSize', 10);
     addHeatmapText(values, totalR2, predictiveR2, true);
 end
 
 function fig = plotParameterClusterSummaryFigure(relevanceStruct)
     summaryTable = relevanceStruct.summaryTables.parameterClusterDiagnostic;
     headers = {'', 'n', sprintf('\\DeltaBias\nin-sample R^2'), ...
-        sprintf('\\DeltaBias\npredictive R^2'), ...
+        sprintf('\\DeltaBias\noptimism-corrected R^2'), ...
         sprintf('\\DeltaBias\ntop param'), ...
         sprintf('\\DeltaBias\ntop param %%'), ...
         sprintf('\\DeltaMask\nin-sample R^2'), ...
-        sprintf('\\DeltaMask\npredictive R^2'), ...
+        sprintf('\\DeltaMask\noptimism-corrected R^2'), ...
         sprintf('\\DeltaMask\ntop param'), ...
         sprintf('\\DeltaMask\ntop param %%')};
-    colWidths = [1.35, 0.45, 0.95, 0.95, 0.78, 0.88, ...
-        0.95, 0.95, 0.78, 0.88];
+    colWidths = [1.35, 0.45, 1.05, 1.35, 0.78, 0.88, ...
+        1.05, 1.35, 0.78, 0.88];
     xEdges = [0, cumsum(colWidths)];
     tableWidth = xEdges(end);
     nRows = height(summaryTable);
 
     fig = figure('Color', 'w', ...
         'Name', 'Parameter by-power-cluster summary');
-    set(fig, 'Position', [100, 100, 980, 340]);
+    set(fig, 'Position', [100, 100, 1080, 340]);
     ax = axes('Parent', fig, 'Position', [0.04, 0.08, 0.92, 0.76]);
     hold(ax, 'on');
     axis(ax, 'off');
@@ -1120,26 +1274,27 @@ function fig = plotParameterClusterSummaryFigure(relevanceStruct)
         xCenter = mean(xEdges(colIdx:(colIdx + 1)));
         text(ax, xCenter, 0.50, headers{colIdx}, ...
             'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
-            'FontName', 'Arial', 'FontSize', 9, 'FontWeight', 'bold', ...
-            'Interpreter', 'tex');
+            'FontName', 'Arial', 'FontSize', 8.5, ...
+            'FontWeight', 'bold', 'Interpreter', 'tex');
     end
 
     for rowIdx = 1:nRows
         yCenter = rowIdx + 0.50;
         rowColor = [0 0 0];
         rowLabel = summaryTable.RowLabel{rowIdx};
-        if strcmp(summaryTable.RowStatus{rowIdx}, 'underpowered')
+        if ~strcmp(summaryTable.RowStatus{rowIdx}, 'ok')
             rowColor = 0.50 .* [1 1 1];
-            rowLabel = sprintf('%s\nunderpowered', rowLabel);
+            rowLabel = sprintf('%s\n%s', rowLabel, ...
+                summaryTable.RowStatus{rowIdx});
         end
 
         rowValues = {rowLabel, formatIntegerCell(summaryTable.N(rowIdx)), ...
             formatR2Cell(summaryTable.BiasInSampleR2(rowIdx)), ...
-            formatR2Cell(summaryTable.BiasPredictiveR2(rowIdx)), ...
+            formatR2Cell(summaryTable.BiasOptimismCorrectedR2(rowIdx)), ...
             summaryTable.BiasTopParameter{rowIdx}, ...
             formatPercentCell(summaryTable.BiasTopParameterPercent(rowIdx)), ...
             formatR2Cell(summaryTable.MaskInSampleR2(rowIdx)), ...
-            formatR2Cell(summaryTable.MaskPredictiveR2(rowIdx)), ...
+            formatR2Cell(summaryTable.MaskOptimismCorrectedR2(rowIdx)), ...
             summaryTable.MaskTopParameter{rowIdx}, ...
             formatPercentCell(summaryTable.MaskTopParameterPercent(rowIdx))};
 
@@ -1153,7 +1308,7 @@ function fig = plotParameterClusterSummaryFigure(relevanceStruct)
             text(ax, xCenter, yCenter, rowValues{colIdx}, ...
                 'HorizontalAlignment', horizontalAlignment, ...
                 'VerticalAlignment', 'middle', 'FontName', 'Arial', ...
-                'FontSize', 9, 'Color', rowColor, 'Interpreter', 'tex');
+                'FontSize', 8.5, 'Color', rowColor, 'Interpreter', 'tex');
         end
     end
 
@@ -1191,6 +1346,78 @@ function textValue = formatPercentCell(value)
     end
 end
 
+function fig = plotParameterByClusterShapleyFigure( ...
+    relevanceStruct, opts, outcomeField)
+    [values, totalR2, predictiveR2, rowLabels] = ...
+        parameterByClusterHeatmapValues(relevanceStruct.parameter, ...
+        outcomeField);
+    outcomeText = outcomeField;
+    if strcmp(outcomeField, 'bias')
+        outcomeText = 'biasing';
+    elseif strcmp(outcomeField, 'mask')
+        outcomeText = 'masking';
+    end
+
+    fig = figure('Color', 'w', ...
+        'Name', ['Parameter ' outcomeText ' by-cluster Shapley']);
+    set(fig, 'Position', [100, 100, 560, 440]);
+    ax = axes('Parent', fig, 'Position', [0.20, 0.22, 0.58, 0.62]);
+    imagesc(ax, values);
+    axis(ax, 'image');
+    caxis(ax, [0, 100]);
+    colormap(parula);
+    cb = colorbar(ax);
+    ylabel(cb, '% of model R^2', 'FontName', 'Arial', 'FontSize', 11);
+    xticks(ax, 1:numel(relevanceStruct.parameter.predictorNames));
+    xticklabels(ax, {'A', 'B', '\alpha', '\beta'});
+    yticks(ax, 1:numel(rowLabels));
+    yticklabels(ax, rowLabels);
+    set(ax, 'FontName', 'Arial', 'FontSize', 11, 'LineWidth', 1.0);
+    title(ax, sprintf('%s %s parameter %s Shapley by cluster', ...
+        opts.monkeyName, opts.chamberWanted, outcomeText), ...
+        'FontName', 'Arial', 'FontSize', 12, 'FontWeight', 'bold');
+    addHeatmapText(values, totalR2, predictiveR2, true);
+    annotation(fig, 'textbox', [0.06, 0.02, 0.88, 0.10], ...
+        'String', ['Cluster-specific models are descriptive because n is ' ...
+        'small relative to the number of predictors. Negative ' ...
+        'optimism-corrected R^2 indicates likely overfitting.'], ...
+        'EdgeColor', 'none', 'HorizontalAlignment', 'center', ...
+        'VerticalAlignment', 'bottom', 'FontName', 'Arial', ...
+        'FontSize', 10);
+end
+
+function [values, totalR2, predictiveR2, rowLabels] = ...
+    parameterByClusterHeatmapValues(parameter, outcomeField)
+    p = numel(parameter.predictorNames);
+    rowLabels = {'All pooled'; 'Power cluster 1'; 'Power cluster 2'; ...
+        'Power cluster 3'};
+    clusterIDs = [NaN; 1; 2; 3];
+    nRows = numel(rowLabels);
+    values = nan(nRows, p);
+    totalR2 = nan(nRows, 1);
+    predictiveR2 = nan(nRows, 1);
+    clusterIDValues = [];
+    if ~isempty(parameter.byCluster)
+        clusterIDValues = [parameter.byCluster.clusterID];
+    end
+
+    for rowIdx = 1:nRows
+        if rowIdx == 1
+            stats = parameter.allBlocks.(outcomeField);
+        else
+            matchIdx = find(clusterIDValues == clusterIDs(rowIdx), 1);
+            if isempty(matchIdx)
+                stats = missingParameterOutcomeStats(p);
+            else
+                stats = parameter.byCluster(matchIdx).(outcomeField);
+            end
+        end
+        values(rowIdx, :) = stats.percentOfModelR2;
+        totalR2(rowIdx) = stats.OLS.R2;
+        predictiveR2(rowIdx) = stats.optimismCorrectedR2;
+    end
+end
+
 function fig = plotStimulationGroupedShapleyFigure(relevanceStruct, opts)
     familyNames = relevanceStruct.stimulation.allBlocks.bias.familyNames;
     values = [
@@ -1198,6 +1425,9 @@ function fig = plotStimulationGroupedShapleyFigure(relevanceStruct, opts)
         relevanceStruct.stimulation.allBlocks.mask.groupedPercentOfModelR2];
     totalR2 = [relevanceStruct.stimulation.allBlocks.bias.OLS.R2; ...
         relevanceStruct.stimulation.allBlocks.mask.OLS.R2];
+    predictiveR2 = [ ...
+        relevanceStruct.stimulation.allBlocks.bias.optimismCorrectedR2; ...
+        relevanceStruct.stimulation.allBlocks.mask.optimismCorrectedR2];
     unavailable = isempty(familyNames) || all(~isfinite(values(:))) || ...
         any(~isfinite(totalR2));
 
@@ -1230,7 +1460,10 @@ function fig = plotStimulationGroupedShapleyFigure(relevanceStruct, opts)
         relevanceStruct.stimulation.allBlocks.bias.n, totalR2(1), ...
         totalR2(2)), 'FontName', 'Arial', 'FontSize', 13, ...
         'FontWeight', 'bold');
-    addHeatmapText(values, totalR2, totalR2, false);
+    xlabel(ax, sprintf(['optimism-corrected R^2: bias=%.2f, ' ...
+        'mask=%.2f'], predictiveR2(1), predictiveR2(2)), ...
+        'FontName', 'Arial', 'FontSize', 10);
+    addHeatmapText(values, totalR2, predictiveR2, true);
     addStimulationPredictorFooter(fig, relevanceStruct);
 end
 
@@ -1315,6 +1548,16 @@ function [includedLine, excludedLine] = stimulationPredictorFooterText( ...
     end
 end
 
+function color = spearmanAnnotationColor(pValue)
+    if isfinite(pValue) && pValue < 0.05
+        color = [0 0 0];
+    elseif isfinite(pValue) && pValue < 0.10
+        color = 0.50 .* [1 1 1];
+    else
+        color = 0.65 .* [1 1 1];
+    end
+end
+
 function outputPaths = saveRelevanceOutputs(relevanceStruct, opts)
     outputDir = fullfile(opts.mainPath, opts.monkeyName, 'Meta', ...
         'psychometrics', 'psycluster-relevance');
@@ -1334,7 +1577,9 @@ function outputPaths = saveRelevanceOutputs(relevanceStruct, opts)
     save(outputPaths.mat, 'relevanceStruct');
 
     figureNames = {'parameterShapley', 'parameterClusterSummary', ...
-        'stimulationGroupedShapley', 'parameterBiasingScatterDiagnostic', ...
+        'parameterBiasByClusterShapley', ...
+        'parameterMaskByClusterShapley', 'stimulationGroupedShapley', ...
+        'parameterBiasingScatterDiagnostic', ...
         'parameterMaskingScatterDiagnostic'};
     outputPaths.figures = struct([]);
     for figIdx = 1:numel(figureHandles)
@@ -1358,6 +1603,6 @@ function addVisualOLSLine(ax, x, y, xLimits)
     coefficients = polyfit(x(validRows), y(validRows), 1);
     xFit = linspace(xLimits(1), xLimits(2), 100);
     yFit = polyval(coefficients, xFit);
-    plot(ax, xFit, yFit, '-', 'Color', 0.15 .* [1 1 1], ...
+    plot(ax, xFit, yFit, '--', 'Color', 0.15 .* [1 1 1], ...
         'LineWidth', 1.5, 'HandleVisibility', 'off');
 end
