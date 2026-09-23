@@ -1,47 +1,69 @@
 function reportState = stageReportPDFPage(reportState, figHandle)
-% Export one live figure to an ordered temporary PDF page.
-
-    if isempty(figHandle) || ~isgraphics(figHandle)
-        error(['Plot producer did not return a live graphics handle. ' ...
-            'class=%s, size=%s'], class(figHandle), mat2str(size(figHandle)));
-    end
-    if ~isfield(reportState, 'tempDir') || ...
-            exist(reportState.tempDir, 'dir') ~= 7
-        error('Report temporary directory is missing.');
-    end
+% Append one live figure to the single local report PDF.
 
     pageIndex = reportState.pageIdx + 1;
-    appendPage = pageIndex > 1;
-    if isfield(reportState, 'outputFilename')
-        fprintf('PDF save setup | saveFlag=%d | page=%d | append=%d\n', ...
-            1, pageIndex, appendPage);
-        fprintf('PDF target: %s\n', reportState.outputFilename);
+    if ~isscalar(figHandle) || ~isgraphics(figHandle, 'figure')
+        error('stageReportPDFPage:InvalidFigure', ...
+            'PDF page %d requires one live figure handle.', pageIndex);
+    end
+    if exist(reportState.tempDir, 'dir') ~= 7
+        error('stageReportPDFPage:MissingDirectory', ...
+            'Report temporary directory is missing: %s', reportState.tempDir);
+    end
+    if ~isempty(reportState.expectedPages) && pageIndex > reportState.expectedPages
+        error('stageReportPDFPage:TooManyPages', 'More figures than requested.');
+    end
+    beforeBytes = 0;
+    if reportState.pageIdx > 0
+        info = dir(reportState.localPdf);
+        if isempty(info) || info.bytes ~= reportState.pageBytes(end, 2)
+            error('stageReportPDFPage:StaleState', ...
+                'Local PDF changed or disappeared: %s', reportState.localPdf);
+        end
+        beforeBytes = info.bytes;
+    elseif exist(reportState.localPdf, 'file') == 2
+        error('stageReportPDFPage:StaleState', ...
+            'Untracked PDF already exists: %s', reportState.localPdf);
     end
 
+    % An interrupted export invalidates the assembly, even if the file survived.
+    pendingFile = fullfile(reportState.tempDir, 'export_pending');
+    if exist(pendingFile, 'file') == 2
+        error('stageReportPDFPage:InterruptedExport', ...
+            'An earlier export did not complete: %s', reportState.tempDir);
+    end
+    fid = fopen(pendingFile, 'w');
+    if fid < 0
+        error('stageReportPDFPage:PendingMarker', ...
+            'Cannot write export marker: %s', pendingFile);
+    end
+    fclose(fid);
+    try
+        drawnow;
+        if ~isgraphics(figHandle, 'figure')
+            error('stageReportPDFPage:ClosedFigure', 'Figure closed during drawnow.');
+        end
+        exportgraphics(figHandle, reportState.localPdf, ...
+            'ContentType', 'image', 'Resolution', reportState.resolution, ...
+            'BackgroundColor', 'white', 'Append', pageIndex > 1);
+        info = dir(reportState.localPdf);
+        if isempty(info) || info.bytes <= beforeBytes
+            error('stageReportPDFPage:NoGrowth', ...
+                'PDF missing, empty, or did not grow after page %d.', pageIndex);
+        end
+    catch exportError
+        error('stageReportPDFPage:ExportFailed', ...
+            'PDF page %d failed. Local files preserved in %s. Cause: %s', ...
+            pageIndex, reportState.tempDir, exportError.message);
+    end
+    delete(pendingFile);
     reportState.pageIdx = pageIndex;
-    pageFilename = fullfile(reportState.tempDir, ...
-        sprintf('page_%04d.pdf', reportState.pageIdx));
-    [~, ~, pageExt] = fileparts(pageFilename);
-    assert(strcmpi(pageExt, '.pdf'), ...
-        'Temporary page filename must end in .pdf: %s', pageFilename);
-
-    drawnow;
-    exportgraphics(figHandle, pageFilename, ...
-        'ContentType', 'image', ...
-        'Resolution', reportState.resolution, ...
-        'BackgroundColor', 'white');
-    assertPdfExists(pageFilename, 'temporary page');
-
-    reportState.pageFiles{reportState.pageIdx} = pageFilename;
-end
-
-function assertPdfExists(pdfFile, description)
-    if exist(pdfFile, 'file') ~= 2
-        error('Expected %s PDF does not exist: %s', description, pdfFile);
+    reportState.pageBytes(pageIndex, :) = [beforeBytes info.bytes];
+    if isempty(reportState.expectedPages)
+        totalText = '?';
+    else
+        totalText = num2str(reportState.expectedPages);
     end
-
-    fileInfo = dir(pdfFile);
-    if isempty(fileInfo) || fileInfo.bytes <= 0
-        error('Expected %s PDF is empty: %s', description, pdfFile);
-    end
+    fprintf('PDF page %d/%s saved | bytes %d -> %d\n', ...
+        pageIndex, totalText, beforeBytes, info.bytes);
 end

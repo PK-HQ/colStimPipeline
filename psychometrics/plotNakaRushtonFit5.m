@@ -49,6 +49,11 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
     tickCfg.mergedSkip = tickCfg.mergedMajor;
     meanBar.rightEdgeRange = [95 100];
 
+    ownsReport = saveFlag && isempty(reportState);
+    if ownsReport
+        reportState = initializeReportPDFAssembly(savefilename, monkeyName, ...
+            struct('expectedPages', nBlocks));
+    end
     for block = 1:nBlocks
         blockInfo = getPlotBlockInfo(datastruct, analysisBlockID, clusterBlocks, block, plotAverageFlag);
         pageClusterLabel = getClusterLabelForRenderBlock(clusterLabel, block);
@@ -860,11 +865,7 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
                 'Units', oldFigUnits);
 
             % Existing report/PDF output: one page per rendered block.
-            if isempty(reportState)
-                saveCompressedPDFPage(savefilename, monkeyName, fig, appendPage);
-            else
-                reportState = stageReportPDFPage(reportState, fig);
-            end
+            reportState = stageReportPDFPage(reportState, fig);
         end
 
         % Do not close merely because the figure was saved.  This preserves
@@ -873,6 +874,10 @@ function [mdl, reportState]=plotNakaRushtonFit5(behavioralData, bitmapData, data
         if ~saveFlag && plotOpts.closeAfterRender && isgraphics(fig)
             close(fig);
         end
+    end
+    if ownsReport
+        finalizeReportPDFAssembly(reportState);
+        reportState = [];
     end
 end
 

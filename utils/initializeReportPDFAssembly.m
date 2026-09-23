@@ -8,13 +8,25 @@ function reportState = initializeReportPDFAssembly(filename, monkeyName, opts)
         opts.resolution = 150;
     end
 
+    validateattributes(opts.resolution, {'numeric'}, ...
+        {'scalar', 'real', 'finite', 'positive'});
+    if nargin < 2
+        monkeyName = '';
+    end
     reportState = struct();
     reportState.outputFilename = resolveReportFilename(filename, monkeyName);
     reportState.tempDir = fullfile(tempdir, ...
         ['colStimReport_' char(java.util.UUID.randomUUID)]);
     mkdir(reportState.tempDir);
-    reportState.pageFiles = {};
+    reportState.localPdf = fullfile(reportState.tempDir, 'complete_report.pdf');
+    reportState.pageBytes = zeros(0, 2);
     reportState.pageIdx = 0;
+    reportState.expectedPages = [];
+    if isfield(opts, 'expectedPages')
+        validateattributes(opts.expectedPages, {'numeric'}, ...
+            {'scalar', 'integer', 'positive', 'finite'});
+        reportState.expectedPages = opts.expectedPages;
+    end
     reportState.resolution = opts.resolution;
 end
 
